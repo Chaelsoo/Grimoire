@@ -151,8 +151,8 @@
     "eyebrows": "breadcrumbs",
     "codeblocks": {
       "theme": {
-        "light": "tokyo-night",
-        "dark": "tokyo-night"
+        "light": "night-owl",
+        "dark": "night-owl"
       }
     }
   },
