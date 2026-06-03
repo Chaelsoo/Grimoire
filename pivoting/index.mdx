@@ -1,0 +1,28 @@
+# Pivoting & Tunneling
+
+Pivoting lets you reach network segments that are not directly accessible from your attacker machine by routing traffic through a compromised host. Choose the tool based on what you can run on the pivot and what the target network allows.
+
+## Pages
+
+| Page | What it covers |
+|------|---------------|
+| [Ligolo-ng](./ligolo) | Reverse TUN-based tunnel: full IP routing through a compromised host, transparent to tools |
+| [Chisel](./chisel) | HTTP-tunnelled SOCKS5 and port forwarding; works through restrictive firewalls |
+| [Proxychains](./proxychains) | Route arbitrary tool traffic through a SOCKS proxy; pairs with Ligolo and Chisel |
+
+## Choosing a Tool
+
+| Scenario | Use |
+|----------|-----|
+| Full subnet access needed, can drop a binary | Ligolo-ng |
+| Only HTTP/HTTPS egress from the pivot | Chisel |
+| Need to run a specific tool through an existing SOCKS proxy | Proxychains |
+| SSH available on the pivot host | SSH local/remote/dynamic port forwarding |
+
+## Quick Mental Model
+
+```
+Attacker  ←—tunnel—→  Pivot host  ←—LAN—→  Internal targets
+```
+
+The pivot host has two network interfaces: one reachable from you, one reachable to the internal segment. The tunnel makes your attacker machine act as if it is on that internal segment.

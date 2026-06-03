@@ -1,0 +1,29 @@
+# Proxychains
+
+Routes tool traffic through a SOCKS proxy: pair with Chisel or SSH dynamic forwarding to reach internal networks.
+
+## Config (/etc/proxychains.conf)
+
+Point proxychains at whichever SOCKS proxy is active: change the port to match your tunnel setup.
+
+```
+socks5 127.0.0.1 1080
+```
+
+## Usage
+
+Prepend `proxychains` to any command to route it through the tunnel: note that nmap requires `-sT -Pn` since SYN scans don't work over SOCKS.
+
+```bash
+proxychains nmap -sT -Pn <IP>
+proxychains nxc smb <IP> -u user -p pass
+proxychains evil-winrm -i <IP> -u user -p pass
+```
+
+## SSH Dynamic Forwarding
+
+Opens a SOCKS5 proxy on localhost without needing chisel: ideal when you already have SSH access to the pivot.
+
+```bash
+ssh -D 1080 user@<IP>
+```

@@ -1,0 +1,250 @@
+# Hashcat
+
+GPU-accelerated password cracker. Commands below are ready to copy: swap in your hash file and wordlist path, then run.
+
+## Quick Mode Reference
+
+| Mode | Hash Type | Where You Get It |
+|------|-----------|-----------------|
+| `0` | MD5 | Web apps, databases |
+| `100` | SHA1 | Web apps, Git |
+| `1400` | SHA256 | Web apps |
+| `1700` | SHA512 | Web apps |
+| `1800` | sha512crypt `$6$` | Linux `/etc/shadow` |
+| `500` | md5crypt `$1$` | Linux `/etc/shadow` (old) |
+| `7400` | sha256crypt `$5$` | Linux `/etc/shadow` |
+| `3200` | bcrypt `$2*$` | Web apps, Linux |
+| `1000` | NTLM | SAM, NTDS.dit, secretsdump output |
+| `5500` | NetNTLMv1 | Responder |
+| `5600` | NetNTLMv2 | Responder, Inveigh |
+| `2100` | DCC2 / mscash2 | Cached domain creds (secretsdump) |
+| `13100` | Kerberoast RC4 (`$krb5tgs$23$`) | GetUserSPNs, Rubeus, nxc |
+| `19600` | Kerberoast AES128 (`$krb5tgs$17$`) | GetUserSPNs, Rubeus |
+| `19700` | Kerberoast AES256 (`$krb5tgs$18$`) | GetUserSPNs, Rubeus |
+| `18200` | AS-REP (`$krb5asrep$23$`) | GetNPUsers, Rubeus, nxc |
+| `19000` | Kerberos TGT AES128 | Rubeus |
+| `19100` | Kerberos TGT AES256 | Rubeus |
+| `7300` | IPMI2 RAKP | Responder IPMI |
+| `22000` | WPA2 PMKID/handshake | hcxdumptool |
+| `16500` | JWT | Web tokens |
+| `11600` | 7-Zip | Encrypted archives |
+| `13600` | WinZip | Encrypted archives |
+| `5200` | Password Safe v3 `.psafe3` | Password manager databases |
+| `300` | MySQL4+ | MySQL `PASSWORD()` |
+| `1731` | MSSQL 2012/2014 | SQL Server sys.sql_logins |
+| `12` | PostgreSQL | PostgreSQL MD5 |
+
+## Windows / Active Directory
+
+These are the most commonly encountered hashes in AD engagements.
+
+### NTLM
+
+Extracted from SAM hives, NTDS.dit, or secretsdump output. Format: `username:RID:LMhash:NThash:::`: crack only the NT hash (right side of the last colon).
+
+```bash
+# Wordlist
+hashcat -m 1000 ntlm.txt ~/tools/wordlists/rockyou
+
+# Wordlist + rules (covers most real-world AD passwords)
+hashcat -m 1000 ntlm.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# Company name + year pattern brute force
+hashcat -m 1000 ntlm.txt -a 3 Company?d?d?d?d!
+hashcat -m 1000 ntlm.txt -a 3 Company?u?l?l?l?d?d?d?d?s
+
+# Incremental mask (Season+Year pattern common in AD)
+hashcat -m 1000 ntlm.txt -a 3 ?u?l?l?l?l?d?d?d?d
+```
+
+### NetNTLMv2
+
+Captured via Responder or Inveigh. Cannot be passed directly (must crack to plaintext).
+
+```bash
+# Wordlist
+hashcat -m 5600 netntlmv2.txt ~/tools/wordlists/rockyou
+
+# Wordlist + rules
+hashcat -m 5600 netntlmv2.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+hashcat -m 5600 netntlmv2.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/OneRuleToRuleThemAll.rule
+```
+
+### NetNTLMv1
+
+Older protocol, weaker than v2. If you capture one, also try ntlmv1-multi to pre-compute via crack.sh.
+
+```bash
+hashcat -m 5500 netntlmv1.txt ~/tools/wordlists/rockyou
+hashcat -m 5500 netntlmv1.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+```
+
+### Kerberoast
+
+RC4 (mode 13100) is always worth trying first: weaker encryption and fastest to crack. If the account only issues AES tickets, use 19700.
+
+```bash
+# RC4 TGS (most common)
+hashcat -m 13100 kerberoast.txt ~/tools/wordlists/rockyou
+hashcat -m 13100 kerberoast.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# AES128 TGS
+hashcat -m 19600 kerberoast.txt ~/tools/wordlists/rockyou
+hashcat -m 19600 kerberoast.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# AES256 TGS
+hashcat -m 19700 kerberoast.txt ~/tools/wordlists/rockyou
+hashcat -m 19700 kerberoast.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+```
+
+### AS-REP Roast
+
+Hashes from accounts with pre-authentication disabled. Same cracking approach as Kerberoast but mode 18200.
+
+```bash
+hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou
+hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/OneRuleToRuleThemAll.rule
+```
+
+### DCC2 / mscash2
+
+Cached domain credentials stored locally when a DC is unreachable. Very slow to crack: use a targeted wordlist.
+
+```bash
+# Slow: use focused wordlist, not full rockyou unless you have a GPU farm
+hashcat -m 2100 dcc2.txt ~/tools/wordlists/rockyou
+hashcat -m 2100 dcc2.txt company_words.txt -r /usr/share/hashcat/rules/best64.rule
+```
+
+## Linux
+
+Linux shadow hashes from `/etc/shadow`. Match the `$id$` prefix to pick the right mode.
+
+```bash
+# sha512crypt $6$ (most modern systems)
+hashcat -m 1800 shadow.txt ~/tools/wordlists/rockyou
+hashcat -m 1800 shadow.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# sha256crypt $5$
+hashcat -m 7400 shadow.txt ~/tools/wordlists/rockyou
+
+# md5crypt $1$ (older systems)
+hashcat -m 500 shadow.txt ~/tools/wordlists/rockyou
+
+# bcrypt $2b$ / $2y$ (slow; use short targeted list)
+hashcat -m 3200 shadow.txt ~/tools/wordlists/rockyou
+```
+
+## Web Application Hashes
+
+Common hashes from database dumps. MD5 and SHA1 crack fast; bcrypt requires targeted wordlists.
+
+```bash
+# MD5
+hashcat -m 0 hashes.txt ~/tools/wordlists/rockyou
+hashcat -m 0 hashes.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# SHA1
+hashcat -m 100 hashes.txt ~/tools/wordlists/rockyou
+
+# SHA256
+hashcat -m 1400 hashes.txt ~/tools/wordlists/rockyou
+
+# SHA512
+hashcat -m 1700 hashes.txt ~/tools/wordlists/rockyou
+
+# bcrypt (slow: targeted list only)
+hashcat -m 3200 hashes.txt ~/tools/wordlists/rockyou
+```
+
+### Database Hashes
+
+```bash
+# MySQL 4+
+hashcat -m 300 mysql.txt ~/tools/wordlists/rockyou
+
+# MSSQL 2012 / 2014
+hashcat -m 1731 mssql.txt ~/tools/wordlists/rockyou
+
+# PostgreSQL MD5
+hashcat -m 12 pg.txt ~/tools/wordlists/rockyou
+```
+
+## Other
+
+```bash
+# JWT (crack the signature secret)
+hashcat -m 16500 jwt.txt ~/tools/wordlists/rockyou
+
+# WPA2 handshake (convert cap to hccapx with hcxtools first)
+hashcat -m 22000 handshake.hc22000 ~/tools/wordlists/rockyou
+
+# 7-Zip archive
+hashcat -m 11600 archive.txt ~/tools/wordlists/rockyou
+
+# WinZip archive
+hashcat -m 13600 archive.txt ~/tools/wordlists/rockyou
+
+# Password Safe v3 (.psafe3) — potfile disabled for this mode, use -o to save results
+hashcat -m 5200 db.psafe3 ~/tools/wordlists/rockyou -o cracked.txt
+hashcat -m 5200 db.psafe3 ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule -o cracked.txt
+```
+
+## Attack Modes
+
+Beyond wordlists, use rules for mangled passwords and masks when you know the pattern.
+
+```bash
+# -a 0: wordlist (default)
+hashcat -m 1000 hash.txt ~/tools/wordlists/rockyou
+
+# -a 0 with rules: covers capitalization, l33t, appended digits
+hashcat -m 1000 hash.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+hashcat -m 1000 hash.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/OneRuleToRuleThemAll.rule
+
+# -a 3: mask brute force
+hashcat -m 1000 hash.txt -a 3 ?u?l?l?l?l?d?d?d?d   # Typical AD pattern
+hashcat -m 1000 hash.txt -a 3 Company?d?d?d?d!       # Company name + year + special
+hashcat -m 1000 hash.txt -a 3 ?u?l?l?l?l?l?l?d?d    # 8-char with trailing digits
+
+# -a 6: wordlist + mask (append mask to each word)
+hashcat -m 1000 hash.txt -a 6 ~/tools/wordlists/rockyou ?d?d?d?d   # word + 4 digits
+
+# -a 7: mask + wordlist (prepend mask)
+hashcat -m 1000 hash.txt -a 7 ?d?d?d?d ~/tools/wordlists/rockyou
+```
+
+## Mask Charset Reference
+
+```
+?l  lowercase a-z
+?u  uppercase A-Z
+?d  digit 0-9
+?s  special !"#$%&'()*+,-./:;<=>?@[\]^_{|}~
+?a  all printable (?l?u?d?s)
+?h  hex lowercase 0-9a-f
+?H  hex uppercase 0-9A-F
+```
+
+## Useful Flags
+
+```bash
+--show              # Print already-cracked hashes from potfile
+--username          # Strip username from hash:user format (secretsdump output)
+-O                  # Optimized kernels (faster, slight rule coverage tradeoff)
+-w 3                # Workload profile: 1=low, 2=default, 3=high, 4=nightmare
+--status            # Print status every N seconds
+--status-timer 10   # Set status interval to 10s
+-o cracked.txt      # Write cracked plaintexts to file
+--potfile-path pot  # Use a custom potfile instead of default hashcat.potfile
+```
+
+## Identify a Hash
+
+When you are unsure of the type, use `hashid` or `name-that-hash` before picking a mode.
+
+```bash
+hashid '$6$rounds=5000$salt$hash'   # identifies sha512crypt
+name-that-hash -t '$krb5tgs$23$*'  # identifies Kerberoast RC4
+```

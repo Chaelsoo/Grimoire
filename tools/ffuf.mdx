@@ -1,0 +1,33 @@
+# ffuf
+
+Fast web fuzzer: use `-fs` or `-fw` to filter noise, `-mc` to whitelist status codes. Run with `-t 50` threads by default; back off if the target rate-limits.
+
+```bash
+# Directory
+ffuf -u http://$IP/FUZZ -w ~/tools/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt
+
+# Files with extensions
+ffuf -u http://$IP/FUZZ -w wordlist.txt -e .php,.txt,.html,.bak
+
+# vHost
+ffuf -u http://$IP/ -H "Host: FUZZ.$DOMAIN" -w subs.txt -mc 200 -fs <size>
+
+# POST
+ffuf -u http://$IP/login -X POST -d "user=FUZZ&pass=test" -w users.txt -mc 200
+
+# Params
+ffuf -u http://$IP/page?FUZZ=test -w params.txt -mc 200 -fs <size>
+```
+
+## Key Flags
+
+```
+-mc 200,301,302   match codes
+-fc 404           filter code
+-fs <size>        filter size
+-fw <words>       filter words
+-t 50             threads
+-rate 100         rate limit
+-o out.json       output
+-c                colorize
+```

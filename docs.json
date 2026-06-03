@@ -1,179 +1,122 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "sequoia",
-  "name": "Knowledge base",
-  "description": "Onboarding, employee handbook, HR guides, IT help, company policies, and department runbooks.",
+  "theme": "aspen",
+  "name": "Grimoire",
   "colors": {
-    "primary": "#166E3F",
-    "light": "#26BD6C",
-    "dark": "#166E3F"
-  },
-  "favicon": "/favicon.ico",
-  "icons": {
-    "library": "lucide"
-  },
-  "metadata": {
-    "timestamp": true
-  },
-  "contextual": {
-    "options": ["copy", "view", "assistant", "mcp", "add-mcp"]
+    "primary": "#000000",
+    "light": "#0075de",
+    "dark": "#0075de"
   },
   "navigation": {
     "tabs": [
       {
-        "tab": "Onboarding",
+        "tab": "Active Directory",
         "groups": [
           {
-            "group": "Welcome",
-            "pages": ["index"]
+            "group": "Overview",
+            "pages": ["active-directory/index"]
           },
           {
-            "group": "Your first days",
-            "pages": [
-              "onboarding/first-day",
-              "onboarding/first-week",
-              "onboarding/meet-the-team"
-            ]
+            "group": "Enumeration",
+            "pages": ["active-directory/enumeration", "active-directory/powerview", "active-directory/groups"]
           },
           {
-            "group": "Tools & access",
-            "pages": [
-              "onboarding/tools/laptop-setup",
-              "onboarding/tools/account-access",
-              "onboarding/tools/vpn-setup"
-            ]
+            "group": "Attacks",
+            "pages": ["active-directory/kerberoasting", "active-directory/asrep-roasting", "active-directory/pass-attacks", "active-directory/acl-abuse", "active-directory/delegation", "active-directory/trusts", "active-directory/credential-dumping"]
+          },
+          {
+            "group": "ADCS",
+            "pages": ["active-directory/adcs"]
           }
         ]
       },
       {
-        "tab": "HR & People",
+        "tab": "Web",
         "groups": [
           {
             "group": "Overview",
-            "pages": ["hr-people/index"]
+            "pages": ["web/index"]
           },
           {
-            "group": "Benefits & time off",
-            "pages": [
-              "hr-people/benefits",
-              "hr-people/time-off"
-            ]
-          },
-          {
-            "group": "Growth & pay",
-            "pages": [
-              "hr-people/performance-reviews",
-              "hr-people/compensation/index",
-              "hr-people/compensation/salary-bands",
-              "hr-people/compensation/equity-overview"
-            ]
+            "group": "Vulnerabilities",
+            "pages": ["web/sqli", "web/xss", "web/ssrf", "web/lfi-rfi", "web/cmdi", "web/file-upload", "web/auth-bypass"]
           }
         ]
       },
       {
-        "tab": "IT & Security",
+        "tab": "Infrastructure",
         "groups": [
           {
-            "group": "Overview",
-            "pages": ["it-security/index"]
+            "group": "Linux",
+            "pages": ["linux/index", "linux/privesc", "linux/postex"]
           },
           {
-            "group": "Access & devices",
-            "pages": [
-              "it-security/access-requests",
-              "it-security/device-policy"
-            ]
+            "group": "Windows",
+            "pages": ["windows/index", "windows/privesc/privesc", "windows/postex/postex"]
           },
           {
-            "group": "Security training",
-            "pages": [
-              "it-security/security-training/index",
-              "it-security/security-training/phishing",
-              "it-security/security-training/data-handling"
-            ]
+            "group": "Pivoting",
+            "pages": ["pivoting/index", "pivoting/ligolo", "pivoting/chisel", "pivoting/proxychains"]
+          },
+          {
+            "group": "File Transfers",
+            "pages": ["file-transfers"]
           }
         ]
       },
       {
-        "tab": "Policies",
+        "tab": "Recon",
         "groups": [
           {
             "group": "Overview",
-            "pages": ["policies/index"]
+            "pages": ["recon/index"]
           },
           {
-            "group": "Conduct & spend",
-            "pages": [
-              "policies/code-of-conduct",
-              "policies/expense-reimbursement",
-              "policies/travel-policy"
-            ]
-          },
-          {
-            "group": "Remote work",
-            "pages": [
-              "policies/remote-work/index",
-              "policies/remote-work/home-office-setup",
-              "policies/remote-work/time-zones"
-            ]
+            "group": "Techniques",
+            "pages": ["recon/port-scanning", "recon/subdomain-dns", "recon/web-enum", "recon/osint"]
           }
         ]
       },
       {
-        "tab": "Engineering",
+        "tab": "Tools",
         "groups": [
           {
             "group": "Overview",
-            "pages": ["engineering/index"]
+            "pages": ["tools/index"]
           },
           {
-            "group": "Setup & deployment",
-            "pages": [
-              "engineering/dev-setup",
-              "engineering/deployment"
-            ]
+            "group": "C2 & Frameworks",
+            "pages": ["tools/sliver", "tools/impacket", "tools/nxc"]
           },
           {
-            "group": "Incident response",
-            "pages": [
-              "engineering/incident-response/index",
-              "engineering/incident-response/on-call",
-              "engineering/incident-response/postmortem"
-            ]
+            "group": "Enumeration",
+            "pages": ["tools/nmap", "tools/ffuf", "tools/bloodhound", "tools/bloodyad"]
           },
           {
-            "group": "Architecture",
-            "pages": [
-              "engineering/architecture/index",
-              "engineering/architecture/services-overview",
-              "engineering/architecture/data-models"
-            ]
+            "group": "Cracking",
+            "pages": ["tools/hashcat"]
+          },
+          {
+            "group": "Misc",
+            "pages": ["tools/api-key-validation"]
+          }
+        ]
+      },
+      {
+        "tab": "Methodology",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["methodology/index", "methodology/mindset", "methodology/workflow"]
           }
         ]
       }
     ]
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Submit IT ticket",
-        "href": "/it-security/access-requests"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Employee portal",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
   "footer": {
     "socials": {
-      "x": "https://x.com/yourcompany",
-      "linkedin": "https://linkedin.com/company/yourcompany"
+      "github": "https://github.com/chaelsoo",
+      "x": "https://x.com/chaelsoo"
     }
   }
 }

@@ -1,0 +1,22 @@
+# nmap
+
+Two-pass approach: fast `-p-` scan to find open ports, then `-sV -sC` on just those ports to avoid scanning 65535 ports with slow scripts.
+
+```bash
+# Fast full TCP
+nmap -p- --min-rate 5000 -T4 $IP
+
+# Service + scripts
+nmap -sV -sC -p <ports> $IP
+
+# UDP top 100
+nmap -sU --top-ports 100 $IP
+
+# All formats output
+nmap -sV -sC -p <ports> $IP -oA scan
+
+# NSE scripts
+nmap --script smb-vuln* $IP
+nmap --script http-enum $IP
+nmap --script ftp-anon $IP
+```

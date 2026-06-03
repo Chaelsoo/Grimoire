@@ -1,0 +1,47 @@
+# Web Enumeration
+
+## Tech Stack Fingerprinting
+
+Identify the backend tech before wordlist fuzzing: knowing it's PHP vs. ASP.NET changes which extensions and paths you prioritize.
+
+```bash
+whatweb <URL>
+curl -I <URL>
+```
+
+## ffuf
+
+Flexible and fast: use it for directories, files, vhosts, and parameter fuzzing. Always set `-fs` or `-fw` to filter out the noise.
+
+```bash
+# Directory fuzzing
+ffuf -u http://<IP>/FUZZ -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,301,302,403 -t 50
+
+# File fuzzing
+ffuf -u http://<IP>/FUZZ -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-files.txt -e .php,.txt,.html,.bak
+
+# vHost fuzzing
+ffuf -u http://<IP>/ -H "Host: FUZZ.<domain>" -w subs.txt -mc 200 -fs <size>
+
+# POST body fuzzing
+ffuf -u http://<IP>/login -X POST -d "username=FUZZ&password=test" -w users.txt -mc 200
+
+# Parameter fuzzing
+ffuf -u http://<IP>/page?FUZZ=test -w /usr/share/wordlists/seclists/Discovery/Web-Content/burp-parameter-names.txt -mc 200 -fs <size>
+```
+
+## gobuster
+
+Good alternative to ffuf for directory and DNS enumeration: simpler syntax when you don't need response filtering.
+
+```bash
+gobuster dir -u http://<IP> -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,html,txt -t 50
+```
+
+## feroxbuster
+
+Recursively busts directories automatically: useful when you expect deep nested paths and don't want to re-run manually.
+
+```bash
+feroxbuster -u http://<IP> -w /usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,html -t 50 --depth 3
+```

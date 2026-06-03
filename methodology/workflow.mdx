@@ -1,0 +1,35 @@
+# Box Solving Workflow
+
+## Phase 1: Recon
+
+Full TCP scan first to avoid missing unusual ports, then a targeted service scan on what's open: don't run slow scripts against all 65535 ports.
+
+```bash
+# Fast full TCP
+nmap -p- --min-rate 5000 -T4 <IP> -oN nmap/full.txt
+
+# Service + script scan on open ports
+nmap -sV -sC -p <ports> <IP> -oN nmap/targeted.txt
+```
+
+## Phase 2: Enumeration
+- Check every service found
+- Web → directory bust, vhost, tech stack
+- SMB → null session, shares, users
+- LDAP → anonymous bind
+- RPC → null auth
+
+## Phase 3: Foothold
+- Find the vulnerability
+- Exploit → get shell
+- Stabilize shell immediately
+
+## Phase 4: Post Exploitation
+- `whoami`, `id`, `hostname`, `ip a`
+- Check sudo, SUID, crons, writable paths
+- Look for credentials in configs, history, env
+
+## Phase 5: Privesc
+- Run linpeas/winpeas
+- Check findings manually
+- Escalate

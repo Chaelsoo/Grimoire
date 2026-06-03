@@ -1,0 +1,33 @@
+# Windows
+
+Windows post-exploitation centres on understanding where you sit in the local and domain privilege hierarchy, then escalating through misconfigs, token abuse, or credential access. These pages cover the core paths.
+
+## Pages
+
+| Page | What it covers |
+|------|---------------|
+| [Privesc](./privesc/privesc) | Service misconfigs, unquoted paths, AlwaysInstallElevated, token impersonation, SeImpersonatePrivilege, and WinPEAS |
+| [Post Exploitation](./postex/postex) | Credential dumping, persistence, AV evasion basics, and lateral movement prep from a Windows foothold |
+
+## First Things After Shell
+
+Run these immediately on landing to understand your position before escalating:
+
+```cmd
+whoami /all                          :: current user, groups, and privileges
+hostname                             :: machine name
+systeminfo                           :: OS version, patch level, architecture
+net user                             :: local accounts
+net localgroup administrators        :: who is local admin
+ipconfig /all                        :: interfaces and DNS (tells you if domain-joined)
+netstat -ano                         :: active connections and listening ports
+tasklist /svc                        :: running processes with service names
+```
+
+```powershell
+# Check if domain-joined
+(Get-WmiObject Win32_ComputerSystem).PartOfDomain
+
+# List all local users and their enabled status
+Get-LocalUser | Select-Object Name, Enabled, LastLogon
+```

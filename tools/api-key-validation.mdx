@@ -1,0 +1,507 @@
+# API Key Validation
+
+When you find an API key during recon or in leaked source, validate it quickly to understand its scope before it gets rotated. Each section below gives the key pattern to recognise, the fastest validation command, and what a successful response looks like.
+
+## GitHub
+
+Tokens appear as `ghp_` (fine-grained PAT), `github_pat_` (newer fine-grained), or a classic 40-character lowercase hex string. Fine-grained tokens have narrower scope; classic tokens may have broad repo and org access.
+
+```bash
+# Validate token and get authenticated user info
+curl -s -H "Authorization: token TOKEN" https://api.github.com/user
+
+# Check which OAuth scopes the token carries (repo, admin:org, gist, etc.)
+curl -sI -H "Authorization: token TOKEN" https://api.github.com/rate_limit \
+  | grep -i "x-oauth-scopes"
+
+# List organisations the token can access
+curl -s -H "Authorization: token TOKEN" https://api.github.com/user/orgs
+
+# List private repositories accessible to the token
+curl -s -H "Authorization: token TOKEN" \
+  "https://api.github.com/user/repos?type=private&per_page=100"
+
+# Clone a private repo directly using the token as credentials
+git clone https://TOKEN@github.com/org/repo.git
+```
+
+Valid response: JSON object with `login`, `email`, `name`, `public_repos` fields. Invalid token returns `{"message":"Bad credentials"}`.
+
+## GitLab
+
+Personal access tokens follow the pattern `glpat-xxxxxxxxxxxxxxxxxxxx`. Project access tokens and group tokens share the same prefix but have narrower scope.
+
+```bash
+# Validate token and get authenticated user info
+curl -s -H "PRIVATE-TOKEN: TOKEN" https://gitlab.com/api/v4/user
+
+# List projects the token is a member of
+curl -s -H "PRIVATE-TOKEN: TOKEN" \
+  "https://gitlab.com/api/v4/projects?membership=true&per_page=100"
+
+# Clone a private repo using the token
+git clone https://oauth2:TOKEN@gitlab.com/org/repo.git
+```
+
+Valid response: JSON with `id`, `username`, `email`, `name` fields.
+
+## AWS
+
+Access keys follow the pattern `AKIA[0-9A-Z]{16}` paired with a 40-character base64 secret key. `AKIA` prefix indicates a long-term IAM key; `ASIA` indicates a temporary STS key that also requires a session token.
+
+```bash
+# Get caller identity: account ID, user ARN, and assumed role (works on any valid key)
+AWS_ACCESS_KEY_ID=AKIA... \
+AWS_SECRET_ACCESS_KEY=xxx \
+  aws sts get-caller-identity
+
+# List S3 buckets accessible to this key
+AWS_ACCESS_KEY_ID=AKIA... \
+AWS_SECRET_ACCESS_KEY=xxx \
+  aws s3 ls
+
+# Enumerate all IAM permissions attached to the key (install enumerate-iam first)
+git clone https://github.com/andresriancho/enumerate-iam
+cd enumerate-iam
+python3 enumerate-iam.py --access-key AKIA... --secret-key xxx
+
+# Temporary STS key (ASIA prefix) requires session token as well
+AWS_ACCESS_KEY_ID=ASIA... \
+AWS_SECRET_ACCESS_KEY=xxx \
+AWS_SESSION_TOKEN=yyy \
+  aws sts get-caller-identity
+```
+
+Valid response from `get-caller-identity`: JSON with `UserId`, `Account`, `Arn`. An `InvalidClientTokenId` error means the key is invalid; `AccessDenied` means the key is valid but lacks permissions for that call.
+
+## Anthropic
+
+API keys follow the pattern `sk-ant-api03-xxxx`. Validation requires making a real (minimal cost) API call since there is no free introspection endpoint.
+
+```bash
+# Send a minimal request to validate the key (uses claude-haiku, lowest cost)
+curl -s https://api.anthropic.com/v1/messages \
+  -H "x-api-key: TOKEN" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"claude-haiku-20240307","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}'
+```
+
+Valid response: JSON with `id`, `type: "message"`, `content` fields. Invalid key returns `{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`.
+
+## OpenAI
+
+Keys use the pattern `sk-[a-zA-Z0-9]{48}` (classic) or `sk-proj-xxxx` (project-scoped). Project keys are narrower in scope than organisation keys.
+
+```bash
+# List available models (fastest, free endpoint for validation)
+curl -s https://api.openai.com/v1/models \
+  -H "Authorization: Bearer TOKEN"
+
+# Check remaining credit balance
+curl -s "https://api.openai.com/dashboard/billing/credit_grants" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Valid response from `/v1/models`: JSON with `data` array of model objects. Invalid key returns `{"error":{"type":"invalid_request_error","code":"invalid_api_key"}}`.
+
+## Google Cloud / GCP
+
+Browser API keys match `AIza[0-9A-Za-z-_]{35}`. Service accounts come as a JSON file containing `client_email`, `private_key`, and `project_id`.
+
+```bash
+# API key: test against the geocoding endpoint (low cost, broad key coverage)
+curl -s "https://maps.googleapis.com/maps/api/geocode/json?latlng=40,30&key=KEY"
+
+# API key: check which Google APIs it can reach by trying different endpoints
+curl -s "https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=KEY"
+
+# Service account JSON: activate and print the resulting OAuth access token
+gcloud auth activate-service-account --key-file=service_account.json
+gcloud auth print-access-token
+
+# List GCS buckets accessible to the service account
+gsutil ls
+
+# List GCP projects accessible to the service account
+gcloud projects list
+```
+
+Note: API keys are often restricted to specific Google services. If one endpoint returns `REQUEST_DENIED`, try others (Maps, YouTube, Drive, Translate) before concluding the key is useless.
+
+## Stripe
+
+Live keys match `sk_live_[a-zA-Z0-9]{24}`. Test keys match `sk_test_xxxx` and access only sandbox data (low value). The colon suffix on `-u TOKEN:` prevents curl from prompting for a password.
+
+```bash
+# Get account info
+curl -s https://api.stripe.com/v1/account \
+  -u TOKEN:
+
+# List recent charges
+curl -s "https://api.stripe.com/v1/charges?limit=5" \
+  -u TOKEN:
+
+# List customers
+curl -s "https://api.stripe.com/v1/customers?limit=5" \
+  -u TOKEN:
+
+# List payment methods on file
+curl -s "https://api.stripe.com/v1/payment_methods?type=card" \
+  -u TOKEN:
+```
+
+`sk_test_` keys are low value. Only `sk_live_` keys access real payment and customer data.
+
+## Airtable
+
+Personal access tokens (post-Feb 2024) match `pat[a-zA-Z0-9]{14}.[a-zA-Z0-9]{64}`. Legacy API keys match `key[a-zA-Z0-9]{14}` and are deprecated but may still be valid.
+
+```bash
+# List all bases (databases) the token can access
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.airtable.com/v0/meta/bases"
+
+# List all tables in a specific base (substitute BASE_ID from the response above)
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.airtable.com/v0/meta/bases/BASE_ID/tables"
+
+# Read records from a table
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.airtable.com/v0/BASE_ID/TABLE_NAME?maxRecords=10"
+```
+
+Valid response from `/v0/meta/bases`: JSON with a `bases` array containing base IDs and names.
+
+## Slack
+
+Token prefixes indicate type: `xoxb-` is a bot token, `xoxp-` is a user token, `xoxa-` is an app-level token, `xoxs-` is an internal workspace token. User tokens (`xoxp-`) generally have the broadest permissions.
+
+```bash
+# Test token validity and get basic workspace info
+curl -s -X POST "https://slack.com/api/auth.test" \
+  -H "Authorization: Bearer TOKEN"
+
+# List channels the token can see
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://slack.com/api/conversations.list?limit=20"
+
+# List users in the workspace
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://slack.com/api/users.list"
+
+# Read recent messages from a channel (get channel ID from conversations.list)
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://slack.com/api/conversations.history?channel=CHANNEL_ID&limit=10"
+```
+
+```bash
+# Webhook URL validation: a valid webhook returns an error about missing content, not 404
+curl -s -X POST -H "Content-type: application/json" \
+  -d '{"text":""}' \
+  "https://hooks.slack.com/services/WEBHOOK_URL"
+# Valid webhook returns: "missing_text_or_fallback_or_attachments"
+# Invalid webhook returns: "no_service" or 404
+```
+
+Valid response from `auth.test`: JSON with `ok: true`, `team`, `user`, `user_id` fields.
+
+## Telegram Bot Token
+
+Bot tokens follow the pattern `[0-9]{8,10}:[a-zA-Z0-9_-]{35}`. They are obtained through BotFather and grant control over the bot account.
+
+```bash
+# Get bot info and confirm the token is valid
+curl -s "https://api.telegram.org/botTOKEN/getMe"
+
+# Get recent messages and updates sent to the bot
+curl -s "https://api.telegram.org/botTOKEN/getUpdates"
+
+# Get the list of updates with an offset to avoid re-reading old messages
+curl -s "https://api.telegram.org/botTOKEN/getUpdates?offset=-5"
+```
+
+Valid response from `getMe`: JSON with `ok: true` and a `result` object containing the bot username and ID.
+
+## Twilio
+
+Account SIDs match `AC[a-z0-9]{32}` and are paired with a 32-character auth token. Both are required to authenticate.
+
+```bash
+# List all subaccounts and confirm credentials are valid
+curl -s -X GET "https://api.twilio.com/2010-04-01/Accounts.json" \
+  -u ACCOUNT_SID:AUTH_TOKEN
+
+# List phone numbers on the account
+curl -s "https://api.twilio.com/2010-04-01/Accounts/ACCOUNT_SID/IncomingPhoneNumbers.json" \
+  -u ACCOUNT_SID:AUTH_TOKEN
+
+# List sent messages
+curl -s "https://api.twilio.com/2010-04-01/Accounts/ACCOUNT_SID/Messages.json?PageSize=5" \
+  -u ACCOUNT_SID:AUTH_TOKEN
+```
+
+Valid response: JSON with `accounts` array containing account SID, friendly name, and status.
+
+## SendGrid
+
+API keys match `SG.[a-zA-Z0-9_-]{22}.[a-zA-Z0-9_-]{43}`. Scope determines what the key can do: some are scoped only to email send, others have full account access.
+
+```bash
+# List scopes assigned to this key (reveals what it can do)
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.sendgrid.com/v3/scopes"
+
+# Get account profile info
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.sendgrid.com/v3/user/profile"
+
+# List verified sender identities
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.sendgrid.com/v3/verified_senders"
+```
+
+Valid response from `/v3/scopes`: JSON with a `scopes` array listing permission strings. Invalid token returns `{"errors":[{"message":"The provided authorization grant is invalid"}]}`.
+
+## Mailchimp
+
+Keys match `[a-zA-Z0-9]{32}-us[0-9]{1,2}`. The suffix after the hyphen (e.g., `us1`, `us21`) identifies the datacenter and must be used in the API base URL.
+
+```bash
+# Ping endpoint: returns {"health_status":"Everything's Chimpy!"} if valid
+# Replace <dc> with the datacenter from the key (the part after the hyphen)
+curl -s -u "anystring:TOKEN" \
+  "https://<dc>.api.mailchimp.com/3.0/ping"
+
+# Get account info and list details
+curl -s -u "anystring:TOKEN" \
+  "https://<dc>.api.mailchimp.com/3.0/"
+
+# List email lists / audiences
+curl -s -u "anystring:TOKEN" \
+  "https://<dc>.api.mailchimp.com/3.0/lists?count=10"
+```
+
+## HubSpot
+
+Private app tokens match `pat-[a-z]{2}-[a-zA-Z0-9-]{36}`. Legacy hapikey tokens are a plain 36-character string. Legacy keys are being phased out but may still be active.
+
+```bash
+# New private app token: get contacts
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.hubapi.com/crm/v3/objects/contacts?limit=5"
+
+# Legacy hapikey: get contacts (older endpoint)
+curl -s "https://api.hubapi.com/contacts/v1/lists/all/contacts/all?hapikey=TOKEN&count=5"
+
+# List deals
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.hubapi.com/crm/v3/objects/deals?limit=5"
+```
+
+## Cloudflare
+
+API tokens are 40-character strings and can be scoped to specific zones or account resources. Global API Keys are paired with an email address and have full account access.
+
+```bash
+# Verify the token and list its permissions (scoped token)
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.cloudflare.com/client/v4/user/tokens/verify"
+
+# List all zones (domains) accessible to the token
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://api.cloudflare.com/client/v4/zones"
+
+# Global API Key: requires X-Auth-Email + X-Auth-Key headers instead of Bearer
+curl -s -H "X-Auth-Email: user@example.com" \
+     -H "X-Auth-Key: GLOBAL_KEY" \
+  "https://api.cloudflare.com/client/v4/user"
+```
+
+Valid response from `/tokens/verify`: JSON with `success: true` and `result.status: "active"`.
+
+## Shodan
+
+API keys are 32-character alphanumeric strings. Free-tier keys have very limited query credits; paid keys can search and download results at scale.
+
+```bash
+# Get account info and remaining query credits
+curl -s "https://api.shodan.io/api-info?key=TOKEN"
+
+# Look up a single host by IP
+curl -s "https://api.shodan.io/shodan/host/8.8.8.8?key=TOKEN"
+
+# Search for hosts (costs query credits)
+curl -s "https://api.shodan.io/shodan/host/search?key=TOKEN&query=nginx+country:US&page=1"
+```
+
+Valid response from `/api-info`: JSON with `scan_credits`, `query_credits`, `plan`, `https` fields.
+
+## NPM
+
+Access tokens match `npm_[a-zA-Z0-9]{36}`. They may be scoped to specific packages or grant publish access to all packages under an account.
+
+```bash
+# Get the username associated with the token
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://registry.npmjs.org/-/whoami"
+
+# List packages owned by the authenticated user
+curl -s -H "Authorization: Bearer TOKEN" \
+  "https://registry.npmjs.org/-/org/ORG_NAME/package"
+
+# Alternatively, configure npm and use the CLI
+echo "//registry.npmjs.org/:_authToken=TOKEN" > .npmrc
+npm whoami
+npm access list packages    # list all packages the token can publish to
+```
+
+Valid response from `/-/whoami`: JSON `{"username":"..."}`.
+
+## Grafana
+
+Service account tokens are JWTs starting with `eyJ` or match the `glsa_xxx` format. Bearer tokens authenticate against Grafana's HTTP API.
+
+```bash
+# Get info about the authenticated user or service account
+curl -s -H "Authorization: Bearer TOKEN" \
+  "http://grafana-host/api/user"
+
+# Get the current organisation
+curl -s -H "Authorization: Bearer TOKEN" \
+  "http://grafana-host/api/org"
+
+# List all dashboards the token can access
+curl -s -H "Authorization: Bearer TOKEN" \
+  "http://grafana-host/api/search?type=dash-db"
+```
+
+Replace `grafana-host` with the actual hostname or IP of the Grafana instance.
+
+## Firebase / FCM
+
+Firebase Cloud Messaging server keys follow no strict pattern. Validation requires sending a test push notification request; even with an invalid registration ID, a valid key returns a `results` array rather than a 401.
+
+```bash
+# Send a test push to a fake registration ID; valid key returns results array
+curl -s -X POST \
+  -H "Authorization: key=TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://fcm.googleapis.com/fcm/send" \
+  -d '{"registration_ids":["test_invalid_id_for_validation"]}'
+```
+
+Valid response contains `"results":[{"error":"InvalidRegistration"}]`. An invalid key returns HTTP 401 with `{"error":"Unauthorized"}`.
+
+## Datadog
+
+Datadog requires both an API key and an application key for most endpoints. API keys alone can only submit metrics; application keys are needed to query and manage the account.
+
+```bash
+# List dashboards (requires both keys)
+curl -s "https://api.datadoghq.com/api/v1/dashboard" \
+  -H "DD-API-KEY: API_KEY" \
+  -H "DD-APPLICATION-KEY: APP_KEY"
+
+# Validate API key alone
+curl -s "https://api.datadoghq.com/api/v1/validate" \
+  -H "DD-API-KEY: API_KEY"
+
+# List monitors
+curl -s "https://api.datadoghq.com/api/v1/monitor" \
+  -H "DD-API-KEY: API_KEY" \
+  -H "DD-APPLICATION-KEY: APP_KEY"
+```
+
+## Heroku
+
+API keys are 36-character UUIDs (`[a-f0-9-]{36}`). They grant full access to the account including all apps, config vars (environment variables), and dynos.
+
+```bash
+# List all apps on the account
+curl -s -X GET "https://api.heroku.com/apps" \
+  -H "Accept: application/vnd.heroku+json; version=3" \
+  -H "Authorization: Bearer TOKEN"
+
+# Get config vars (environment variables) for an app; often contains secrets
+curl -s "https://api.heroku.com/apps/APP_NAME/config-vars" \
+  -H "Accept: application/vnd.heroku+json; version=3" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+## Dropbox
+
+Access tokens match `sl.[a-zA-Z0-9_-]{135}`. They provide access to the file storage of the linked Dropbox account.
+
+```bash
+# Get current account info
+curl -s -X POST "https://api.dropboxapi.com/2/users/get_current_account" \
+  -H "Authorization: Bearer TOKEN"
+
+# List files and folders in root
+curl -s -X POST "https://api.dropboxapi.com/2/files/list_folder" \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"path":""}'
+```
+
+## PayPal
+
+Client ID and secret are separate strings. Sandbox credentials hit `api.sandbox.paypal.com`; live credentials hit `api.paypal.com`. Start with sandbox to test the pair before trying live.
+
+```bash
+# Get an OAuth access token using client credentials
+curl -s -X POST "https://api.sandbox.paypal.com/v1/oauth2/token" \
+  -H "Accept: application/json" \
+  -u "CLIENT_ID:SECRET" \
+  -d "grant_type=client_credentials"
+
+# Use live endpoint for real credentials
+curl -s -X POST "https://api.paypal.com/v1/oauth2/token" \
+  -H "Accept: application/json" \
+  -u "CLIENT_ID:SECRET" \
+  -d "grant_type=client_credentials"
+```
+
+Valid response: JSON with `access_token`, `token_type: "Bearer"`, `expires_in` fields.
+
+## Shopify Admin API
+
+Access tokens (installed app) match `shpat_[a-f0-9]{32}`. The store name is part of the URL: you need both the token and the `.myshopify.com` subdomain.
+
+```bash
+# Get shop info (confirms token and store name are both correct)
+curl -s -H "X-Shopify-Access-Token: TOKEN" \
+  "https://STORE.myshopify.com/admin/api/2024-01/shop.json"
+
+# List products
+curl -s -H "X-Shopify-Access-Token: TOKEN" \
+  "https://STORE.myshopify.com/admin/api/2024-01/products.json?limit=5"
+
+# List orders (requires read_orders scope)
+curl -s -H "X-Shopify-Access-Token: TOKEN" \
+  "https://STORE.myshopify.com/admin/api/2024-01/orders.json?status=any&limit=5"
+```
+
+## Quick Reference
+
+| Service | Key Pattern | Validation Endpoint | Value |
+|---------|-------------|---------------------|-------|
+| GitHub | `ghp_xxx` / 40-char hex | `api.github.com/user` | High: private repos, org access |
+| GitLab | `glpat-xxx` | `gitlab.com/api/v4/user` | High: private repos, CI/CD |
+| AWS | `AKIA[16chars]` + secret | `sts get-caller-identity` | Critical: cloud infrastructure |
+| Anthropic | `sk-ant-api03-` | `api.anthropic.com/v1/messages` | Medium: API billing costs |
+| OpenAI | `sk-xxx` / `sk-proj-xxx` | `api.openai.com/v1/models` | Medium: API billing costs |
+| Stripe Live | `sk_live_` | `api.stripe.com/v1/account` | Critical: financial data |
+| Stripe Test | `sk_test_` | `api.stripe.com/v1/account` | Low: sandbox only |
+| Slack | `xoxb-` / `xoxp-` | `slack.com/api/auth.test` | High: internal comms |
+| Cloudflare | 40-char string | `api.cloudflare.com/tokens/verify` | High: DNS and infra control |
+| GCP API Key | `AIza[35chars]` | Maps geocode endpoint | Varies: depends on restrictions |
+| Twilio | `AC[32chars]` + auth token | `api.twilio.com/Accounts` | Medium: SMS and calling |
+| SendGrid | `SG.xxx` | `api.sendgrid.com/v3/scopes` | Medium: email sending |
+| Airtable | `pat[14].[64]` | `api.airtable.com/v0/meta/bases` | Medium: data access |
+| Heroku | 36-char UUID | `api.heroku.com/apps` | High: app config vars, secrets |
+| Shopify | `shpat_xxx` | `STORE.myshopify.com/admin/shop.json` | High: orders and customer data |
+| Shodan | 32-char | `api.shodan.io/api-info` | Medium: recon query credits |
+| NPM | `npm_xxx` | `registry.npmjs.org/-/whoami` | High: supply chain if publish access |
+| Dropbox | `sl.xxx` | `api.dropboxapi.com/2/users/get_current_account` | Medium: file storage |

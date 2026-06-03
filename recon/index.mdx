@@ -1,0 +1,26 @@
+# Recon & Enumeration
+
+Recon is the foundation of every engagement. The quality of your enumeration directly determines the quality of your attack surface: missed open ports, forgotten vhosts, and unscanned directories are where flags and footholds hide.
+
+## Pages
+
+| Page | What it covers |
+|------|---------------|
+| [Port Scanning](./port-scanning) | nmap techniques: full TCP, UDP, service detection, NSE scripts, and rate tuning |
+| [Web Enumeration](./web-enum) | Directory and file brute force with ffuf/gobuster, extension sweeps, and API path discovery |
+| [Subdomain & DNS](./subdomain-dns) | Subdomain enumeration, DNS zone transfer, vhost fuzzing, and reverse DNS |
+| [OSINT](./osint) | Passive recon: search engine dorks, certificate transparency, email harvesting, and LinkedIn |
+
+## Order of Operations
+
+Run these phases roughly in sequence, but loop back as you find new hosts or services:
+
+```
+Port scan all TCP (full range)
+  → Service and version detection on open ports
+  → Web enumeration on every HTTP/HTTPS port
+  → Subdomain and vhost discovery for web targets
+  → OSINT for credential leads and exposed infrastructure
+```
+
+Never assume the scope is just one IP. Subdomain and port enumeration regularly surfaces additional attack surface not in the original brief.

