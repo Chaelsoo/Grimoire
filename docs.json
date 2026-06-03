@@ -45,7 +45,12 @@
         "groups": [
           {
             "group": "Overview",
-            "pages": ["methodology/index", "methodology/mindset", "methodology/workflow"]
+            "pages": [
+              "methodology/index",
+              "methodology/mindset",
+              "methodology/workflow"
+            ],
+            "icon": "street-view"
           }
         ]
       },

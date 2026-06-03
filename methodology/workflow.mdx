@@ -1,6 +1,5 @@
 ---
 title: "Box Solving Workflow"
-icon: "stack-overflow"
 ---
 
 <Steps>
@@ -10,7 +9,7 @@ icon: "stack-overflow"
     ```bash wrap
     # Fast full TCP
     nmap -p- --min-rate 5000 -T4 <IP> -oN nmap/full.txt
-
+    
     # Service + script scan on open ports
     nmap -sV -sC -p <ports> <IP> -oN nmap/targeted.txt
     ```
@@ -49,7 +48,7 @@ icon: "stack-overflow"
     ```bash wrap
     # Linux
     ./linpeas.sh | tee /tmp/linpeas.txt
-
+    
     # Windows
     .\winPEAS.exe | Out-File C:\Temp\winpeas.txt
     ```
