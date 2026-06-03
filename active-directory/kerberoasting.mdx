@@ -4,7 +4,7 @@ title: "Kerberoasting"
 
 Any authenticated domain user can request a TGS (service ticket) for any account with a registered SPN. The KDC encrypts part of the TGS with the service account's NTLM hash: take that ticket offline and crack the hash without further interaction with the domain.
 
-<Frame caption="Kerberos authentication flow — the KDC issues service tickets encrypted with the service account's hash">
+<Frame caption="Kerberos authentication flow: the KDC issues service tickets encrypted with the service account's hash">
   <img src="/KDC.png" alt="Kerberos KDC flow diagram" />
 </Frame>
 
@@ -18,7 +18,7 @@ Any authenticated domain user can request a TGS (service ticket) for any account
     The KDC returns a TGS ticket encrypted with the **service account's NTLM hash** (RC4-HMAC or AES256 depending on the account config).
   </Step>
   <Step title="Take the ticket offline and crack it">
-    You now hold a blob encrypted with the service account's password. No further domain interaction needed — crack it offline.
+    You now hold a blob encrypted with the service account's password. No further domain interaction needed, crack it offline.
 
     ``` wrap
     authenticated user → request TGS for SPN → $krb5tgs$ blob → hashcat offline → plaintext password
@@ -78,7 +78,7 @@ Look for user accounts (not computer accounts) with SPNs: service accounts are t
     # Specific account
     Rubeus.exe kerberoast /user:$TARGET /outfile:hashes.txt
 
-    # Force RC4 (faster to crack — downgrade if AES is returned)
+    # Force RC4 (faster to crack, downgrade if AES is returned)
     Rubeus.exe kerberoast /tgtdeleg /rc4opsec /outfile:hashes.txt
     ```
   </Tab>

