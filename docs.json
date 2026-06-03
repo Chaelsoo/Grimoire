@@ -7,10 +7,6 @@
     "light": "#22c55e",
     "dark": "#16a34a"
   },
-  "contextual": {
-  "options": ["copy", "view"],
-  "display": "toc"
-  },
   "navigation": {
     "tabs": [
       {
@@ -32,7 +28,8 @@
             "group": "ADCS",
             "pages": ["active-directory/adcs"]
           }
-        ]
+        ],
+        "icon": "ad"
       },
       {
         "tab": "Web",
@@ -45,28 +42,49 @@
             "group": "Vulnerabilities",
             "pages": ["web/sqli", "web/xss", "web/ssrf", "web/lfi-rfi", "web/cmdi", "web/file-upload", "web/auth-bypass"]
           }
-        ]
+        ],
+        "icon": "webhook"
       },
       {
         "tab": "Infrastructure",
         "groups": [
           {
             "group": "Linux",
-            "pages": ["linux/index", "linux/privesc", "linux/postex"]
+            "pages": [
+              "linux/index",
+              "linux/privesc",
+              "linux/postex"
+            ],
+            "icon": "linux"
           },
           {
             "group": "Windows",
-            "pages": ["windows/index", "windows/privesc/privesc", "windows/postex/postex"]
+            "pages": [
+              "windows/index",
+              "windows/privesc/privesc",
+              "windows/postex/postex"
+            ],
+            "icon": "windows"
           },
           {
             "group": "Pivoting",
-            "pages": ["pivoting/index", "pivoting/ligolo", "pivoting/chisel", "pivoting/proxychains"]
+            "pages": [
+              "pivoting/index",
+              "pivoting/ligolo",
+              "pivoting/chisel",
+              "pivoting/proxychains"
+            ],
+            "icon": "table-pivot"
           },
           {
             "group": "File Transfers",
-            "pages": ["file-transfers"]
+            "pages": [
+              "file-transfers"
+            ],
+            "icon": "money-bill-transfer"
           }
-        ]
+        ],
+        "icon": "redhat"
       },
       {
         "tab": "Recon",
@@ -104,7 +122,8 @@
             "group": "Misc",
             "pages": ["tools/api-key-validation"]
           }
-        ]
+        ],
+        "icon": "tools"
       },
       {
         "tab": "Methodology",
@@ -113,14 +132,45 @@
             "group": "Overview",
             "pages": ["methodology/index", "methodology/mindset", "methodology/workflow"]
           }
-        ]
+        ],
+        "icon": "alien-monster"
       }
     ]
   },
   "footer": {
     "socials": {
       "github": "https://github.com/chaelsoo",
-      "x": "https://x.com/chaelsoo"
+      "x": "https://x.com/kanyo_19",
+      "linkedin": "https://www.linkedin.com/in/abderrahmen-dellaa-a78517249"
     }
+  },
+  "interaction": {
+    "drilldown": true
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs",
+    "codeblocks": {
+      "theme": {
+        "light": "tokyo-night",
+        "dark": "tokyo-night"
+      }
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "href": "https://chaelsoo.me/",
+        "label": "Blogpost"
+      }
+    ]
+  },
+  "thumbnails": {
+    "appearance": "dark"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "background": {
+    "decoration": "gradient"
   }
 }

