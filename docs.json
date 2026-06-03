@@ -55,11 +55,23 @@
         "groups": [
           {
             "group": "Overview",
-            "pages": ["web/index"]
+            "pages": [
+              "web/index"
+            ],
+            "icon": "street-view"
           },
           {
             "group": "Vulnerabilities",
-            "pages": ["web/sqli", "web/xss", "web/ssrf", "web/lfi-rfi", "web/cmdi", "web/file-upload", "web/auth-bypass"]
+            "pages": [
+              "web/sqli",
+              "web/xss",
+              "web/ssrf",
+              "web/lfi-rfi",
+              "web/cmdi",
+              "web/file-upload",
+              "web/auth-bypass"
+            ],
+            "icon": "bugs"
           }
         ]
       },
@@ -91,27 +103,51 @@
       },
       {
         "tab": "Recon & Tools",
-        "icon": "tools",
+        "icon": "stool",
         "groups": [
           {
             "group": "Recon",
-            "pages": ["recon/index", "recon/port-scanning", "recon/subdomain-dns", "recon/web-enum", "recon/osint"]
+            "pages": [
+              "recon/index",
+              "recon/port-scanning",
+              "recon/subdomain-dns",
+              "recon/web-enum",
+              "recon/osint"
+            ],
+            "icon": "camera-cctv"
           },
           {
             "group": "Tools",
-            "pages": ["tools/index"]
+            "pages": [
+              "tools/index"
+            ],
+            "icon": "toolbox"
           },
           {
             "group": "C2 & Frameworks",
-            "pages": ["tools/sliver", "tools/impacket", "tools/nxc"]
+            "pages": [
+              "tools/sliver",
+              "tools/impacket",
+              "tools/nxc"
+            ],
+            "icon": "phoenix-framework"
           },
           {
             "group": "Enumeration",
-            "pages": ["tools/nmap", "tools/ffuf", "tools/bloodhound", "tools/bloodyad"]
+            "pages": [
+              "tools/nmap",
+              "tools/ffuf",
+              "tools/bloodhound",
+              "tools/bloodyad"
+            ],
+            "icon": "user-viewfinder"
           },
           {
             "group": "Cracking",
-            "pages": ["tools/hashcat"]
+            "pages": [
+              "tools/hashcat"
+            ],
+            "icon": "hashtag"
           },
           {
             "group": "Misc",
@@ -125,19 +161,39 @@
         "groups": [
           {
             "group": "Overview",
-            "pages": ["active-directory/index"]
+            "pages": [
+              "active-directory/index"
+            ],
+            "icon": "street-view"
           },
           {
             "group": "Enumeration",
-            "pages": ["active-directory/enumeration", "active-directory/powerview", "active-directory/groups"]
+            "pages": [
+              "active-directory/enumeration",
+              "active-directory/powerview",
+              "active-directory/groups"
+            ],
+            "icon": "user-viewfinder"
           },
           {
             "group": "Attacks",
-            "pages": ["active-directory/kerberoasting", "active-directory/asrep-roasting", "active-directory/pass-attacks", "active-directory/acl-abuse", "active-directory/delegation", "active-directory/trusts", "active-directory/credential-dumping"]
+            "pages": [
+              "active-directory/kerberoasting",
+              "active-directory/asrep-roasting",
+              "active-directory/pass-attacks",
+              "active-directory/acl-abuse",
+              "active-directory/delegation",
+              "active-directory/trusts",
+              "active-directory/credential-dumping"
+            ],
+            "icon": "tachometer-fastest"
           },
           {
             "group": "ADCS",
-            "pages": ["active-directory/adcs"]
+            "pages": [
+              "active-directory/adcs"
+            ],
+            "icon": "envelope-certificate"
           }
         ]
       }
