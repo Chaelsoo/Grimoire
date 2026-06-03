@@ -6,7 +6,7 @@ sidebarTitle: "Overview"
 Active Directory attack chains typically follow: enumerate → credential access → lateral movement → privilege escalation → domain dominance. Each concept below is a node in that chain.
 
 <CardGroup cols={2}>
-  <Card title="Enumeration" icon="search" href="./enumeration">
+  <Card title="Enumeration" icon="magnifying-glass" href="./enumeration">
     Unauthenticated and authenticated AD recon: BloodHound, PowerView, bloodyAD, ACL sweeps
   </Card>
   <Card title="Kerberoasting" icon="key" href="./kerberoasting">
@@ -21,7 +21,7 @@ Active Directory attack chains typically follow: enumerate → credential access
   <Card title="Pass Attacks" icon="repeat" href="./pass-attacks">
     PTH, PTT, Overpass-the-Hash, Pass-the-Certificate: authenticate without cracking
   </Card>
-  <Card title="ACL Abuse" icon="alert-triangle" href="./acl-abuse">
+  <Card title="ACL Abuse" icon="triangle-exclamation" href="./acl-abuse">
     Exploit misconfigured ACEs: GenericAll, WriteDACL, WriteOwner, ForceChangePassword, shadow creds
   </Card>
   <Card title="Delegation" icon="users" href="./delegation">
@@ -30,7 +30,7 @@ Active Directory attack chains typically follow: enumerate → credential access
   <Card title="ADCS" icon="award" href="./adcs">
     Certificate template misconfigs (ESC1–ESC11): forge certs to authenticate as any domain user
   </Card>
-  <Card title="Trusts" icon="git-branch" href="./trusts">
+  <Card title="Trusts" icon="code-branch" href="./trusts">
     Cross-domain and cross-forest trusts: ExtraSids attack to escalate from child to parent domain
   </Card>
 </CardGroup>
