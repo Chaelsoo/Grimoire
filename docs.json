@@ -3,14 +3,14 @@
   "theme": "mint",
   "name": "Grimoire",
   "colors": {
-    "primary": "#000000",
-    "light": "#0075de",
-    "dark": "#0075de"
+    "primary": "#15803d",
+    "light": "#22c55e",
+    "dark": "#16a34a"
   },
   "contextual": {
   "options": ["copy", "view"],
   "display": "toc"
-  }
+  },
   "navigation": {
     "tabs": [
       {
