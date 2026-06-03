@@ -4,4 +4,4 @@ Personal security research notes, cheatsheets, and methodology built for quick c
 
 Covers offensive tooling, exploitation techniques, Active Directory attacks, and pivoting. Also includes CPTS module notes and skill assessment prep.
 
-**https://notes.chaelsoo.me**
+You can check it out here **notes.chaelsoo.me**
