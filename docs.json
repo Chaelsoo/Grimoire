@@ -7,6 +7,10 @@
     "light": "#0075de",
     "dark": "#0075de"
   },
+  "contextual": {
+  "options": ["copy", "view"],
+  "display": "toc"
+  }
   "navigation": {
     "tabs": [
       {
