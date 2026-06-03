@@ -2,20 +2,23 @@
 title: "Linux"
 sidebarTitle: "Overview"
 ---
+
 Once you have a shell on a Linux target, the goal is to understand what you have access to and escalate to root. These pages cover the standard privesc enumeration checklist and common post-exploitation tasks.
 
-## Pages
-
-| Page | What it covers |
-|------|---------------|
-| [Privesc](./privesc) | SUID/SGID binaries, sudo misconfigs, cron jobs, writable paths, capabilities, kernel exploits, and enumeration tools (linpeas, pspy) |
-| [Post Exploitation](./postex) | Credential hunting, lateral movement prep, persistence, and loot collection after root |
+<CardGroup cols={2}>
+  <Card title="Privilege Escalation" icon="arrow-up" href="./privesc">
+    SUID/SGID binaries, sudo misconfigs, cron jobs, writable paths, capabilities, kernel exploits, and enumeration tools (linpeas, pspy)
+  </Card>
+  <Card title="Post Exploitation" icon="terminal" href="./postex">
+    Credential hunting, lateral movement prep, persistence, and loot collection after root
+  </Card>
+</CardGroup>
 
 ## First Things After Shell
 
 Run these immediately on landing to orientate before going deeper:
 
-```bash
+```bash wrap
 id && whoami                  # current user and groups
 hostname && uname -a          # machine name and kernel version
 cat /etc/os-release           # distro and version

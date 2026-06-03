@@ -5,7 +5,7 @@ title: "OSINT"
 
 Collect public-facing data without touching the target: emails, subdomains, exposed services, and leaked credentials all show up here.
 
-```bash
+```bash wrap
 theHarvester -d <domain> -b all
 shodan search hostname:<domain>
 shodan host <IP>
@@ -15,7 +15,7 @@ shodan host <IP>
 
 Narrow search results to find exposed files, admin panels, and credentials indexed by Google: add `before:` date filters to find old cached pages.
 
-```
+``` wrap
 site:<domain> filetype:pdf
 site:<domain> inurl:admin
 site:<domain> "index of"
@@ -27,6 +27,6 @@ site:github.com <company> api_key
 
 CT logs record every issued certificate: a reliable way to find subdomains without touching the target at all.
 
-```bash
+```bash wrap
 curl -s "https://crt.sh/?q=<domain>&output=json" | jq '.[].name_value' | sort -u
 ```

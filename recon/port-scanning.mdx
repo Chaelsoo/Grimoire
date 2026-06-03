@@ -5,7 +5,7 @@ title: "Port Scanning"
 
 Two-phase workflow: fast full TCP scan to find open ports, then a targeted service + script scan on just those ports.
 
-```bash
+```bash wrap
 # Fast full TCP
 nmap -p- --min-rate 5000 -T4 <IP> -oN full.txt
 
@@ -26,6 +26,6 @@ nmap --script vuln -p <ports> <IP>
 
 Faster initial port discovery than nmap: pipe results straight into nmap for service scanning.
 
-```bash
+```bash wrap
 rustscan -a <IP> -- -sV -sC
 ```

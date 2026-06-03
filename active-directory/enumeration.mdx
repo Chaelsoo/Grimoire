@@ -5,7 +5,7 @@ title: "Active Directory Enumeration"
 
 Try null sessions, anonymous LDAP binds, and Kerberos user enumeration before you have any credentials: these often hand you a foothold.
 
-```bash
+```bash wrap
 # Port scan for AD services
 nmap -p 88,135,139,389,445,464,636,3268,3269 $DC_IP
 
@@ -36,7 +36,7 @@ enum4linux-ng -A $IP
 
 Once you have creds, enumerate everything before touching exploits.
 
-```bash
+```bash wrap
 # BloodHound collection (most important)
 bloodhound-python -u $USER -p $PASSWORD -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
 nxc ldap $IP -u $USER -p $PASSWORD --bloodhound -c all
@@ -59,7 +59,7 @@ nxc smb $IP -u $USER -p $PASSWORD -M spider_plus
 
 Use smbclient to interactively browse shares and transfer files. More flexible than nxc for actually reading and downloading content.
 
-```bash
+```bash wrap
 # List shares
 smbclient -L //$IP -U $USER%$PASSWORD
 
@@ -79,7 +79,7 @@ smbclient //$IP/share -U $USER%$PASSWORD -c 'recurse; prompt; mget *'
 
 Inside an smbclient session:
 
-```
+``` wrap
 ls                   # list current directory
 cd path              # change directory
 get file.txt         # download a single file
@@ -103,7 +103,7 @@ mget *               # download everything (run recurse on; prompt off first)
 
 BloodHound won't catch everything: sweep with PowerView and bloodyAD to find writable attributes and dangerous ACEs that the graph misses.
 
-```powershell
+```powershell wrap
 # PowerView: import first
 Import-Module .\PowerView.ps1
 
@@ -126,7 +126,7 @@ Get-ObjectAcl -DistinguishedName "DC=domain,DC=local" -ResolveGUIDs | Where-Obje
 }
 ```
 
-```bash
+```bash wrap
 # bloodyAD from Linux
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype ALL
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER
@@ -136,7 +136,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype U
 
 Check delegation, LAPS, gMSA, and dMSA: these are often overlooked and frequently exploitable.
 
-```powershell
+```powershell wrap
 # Domain info
 Get-Domain
 Get-DomainController
@@ -186,7 +186,7 @@ Get-DomainObject -LDAPFilter "(objectClass=msDS-DelegatedManagedServiceAccount)"
 
 Kerberos requires clock skew within 5 minutes of the DC: sync time before any Kerberos-based attack or you'll get `KRB_AP_ERR_SKEW`.
 
-```bash
+```bash wrap
 sudo timedatectl set-ntp false
 sudo date -s "$(curl -s -I http://$DC_IP | grep -i '^Date:' | cut -d' ' -f2-)"
 ```

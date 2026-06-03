@@ -1,22 +1,19 @@
 ---
-title: "Methodology"
+title: "Methodology & Assessments"
 sidebarTitle: "Overview"
 ---
+
 Pentesting is not a linear checklist. It is a loop of enumeration, hypothesis, and exploitation. The pages here cover the mindset and workflow that structure that loop across different engagement types.
 
-## Pages
+<CardGroup cols={2}>
+  <Card title="Pentest Mindset" icon="lightbulb" href="./mindset">
+    How to think about attack surfaces, prioritize findings, and avoid rabbit holes
+  </Card>
+  <Card title="Box Solving Workflow" icon="list-checks" href="./workflow">
+    Step-by-step approach for working through HackTheBox and CTF machines from initial recon to root
+  </Card>
+</CardGroup>
 
-| Page | What it covers |
-|------|---------------|
-| [Pentest Mindset](./mindset) | How to think about attack surfaces, prioritize findings, and avoid rabbit holes |
-| [Box Solving Workflow](./workflow) | Step-by-step approach for working through HackTheBox and CTF machines from initial recon to root |
-
-## Core Loop
-
-Every engagement follows the same rhythm regardless of the target:
-
-```
-Enumerate  →  Identify attack surface  →  Exploit  →  Post-exploit  →  Repeat
-```
-
+<Tip>
 Resist jumping to exploitation before thorough enumeration. When stuck, the answer is almost always more enumeration, not a different exploit.
+</Tip>

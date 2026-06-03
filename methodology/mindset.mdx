@@ -1,18 +1,34 @@
 ---
 title: "Pentest Mindset"
 ---
+
 ## The 3-Layer Question
-At every foothold, answer these three:
-1. **What am I running on?** (OS, version, role)
-2. **What can I talk to?** (network, services, protocols)
-3. **Who am I?** (user context, privileges, group memberships)
+
+At every foothold, answer these three before doing anything else:
+
+<Steps>
+  <Step title="What am I running on?">
+    OS, version, and role. Determines your escalation path and which tools are available locally.
+  </Step>
+  <Step title="What can I talk to?">
+    Network interfaces, open ports, reachable services, and protocols. Defines your lateral movement surface.
+  </Step>
+  <Step title="Who am I?">
+    User context, privileges, and group memberships. Everything else depends on this answer.
+  </Step>
+</Steps>
 
 ## Triage Speed Rule
-Spend ≤10 min on a rabbit hole before pivoting. If enumeration stalls, switch dimensions.
+
+<Tip>
+Spend ≤10 minutes on a rabbit hole before pivoting. If enumeration stalls, switch dimensions.
+</Tip>
+
 - Stuck on web? Try SMB, RPC, LDAP
 - No creds? Try null sessions, AS-REP roasting, OSINT
 
 ## Mindset
+
 - Enumerate before exploiting: always
 - Take notes as you go, not after
 - If something feels like a rabbit hole, it probably is

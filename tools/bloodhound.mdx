@@ -9,20 +9,20 @@ Graphs AD relationships to find attack paths to Domain Admin: run collection fir
 
 Collect from your attack box using bloodhound-python or nxc: no need to touch the target host.
 
-```bash
+```bash wrap
 bloodhound-python -u $USER -p $PASSWORD -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
 nxc ldap $IP -u $USER -p $PASSWORD --bloodhound -c all
 ```
 
 ### Windows
 
-```powershell
+```powershell wrap
 .\SharpHound.exe -c All
 ```
 
 ## Start BloodHound CE
 
-```bash
+```bash wrap
 cd ~/tools/bloodhound
 docker compose up -d
 # http://localhost:8080

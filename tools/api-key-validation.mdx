@@ -7,7 +7,7 @@ When you find an API key during recon or in leaked source, validate it quickly t
 
 Tokens appear as `ghp_` (fine-grained PAT), `github_pat_` (newer fine-grained), or a classic 40-character lowercase hex string. Fine-grained tokens have narrower scope; classic tokens may have broad repo and org access.
 
-```bash
+```bash wrap
 # Validate token and get authenticated user info
 curl -s -H "Authorization: token TOKEN" https://api.github.com/user
 
@@ -32,7 +32,7 @@ Valid response: JSON object with `login`, `email`, `name`, `public_repos` fields
 
 Personal access tokens follow the pattern `glpat-xxxxxxxxxxxxxxxxxxxx`. Project access tokens and group tokens share the same prefix but have narrower scope.
 
-```bash
+```bash wrap
 # Validate token and get authenticated user info
 curl -s -H "PRIVATE-TOKEN: TOKEN" https://gitlab.com/api/v4/user
 
@@ -50,7 +50,7 @@ Valid response: JSON with `id`, `username`, `email`, `name` fields.
 
 Access keys follow the pattern `AKIA[0-9A-Z]{16}` paired with a 40-character base64 secret key. `AKIA` prefix indicates a long-term IAM key; `ASIA` indicates a temporary STS key that also requires a session token.
 
-```bash
+```bash wrap
 # Get caller identity: account ID, user ARN, and assumed role (works on any valid key)
 AWS_ACCESS_KEY_ID=AKIA... \
 AWS_SECRET_ACCESS_KEY=xxx \
@@ -79,7 +79,7 @@ Valid response from `get-caller-identity`: JSON with `UserId`, `Account`, `Arn`.
 
 API keys follow the pattern `sk-ant-api03-xxxx`. Validation requires making a real (minimal cost) API call since there is no free introspection endpoint.
 
-```bash
+```bash wrap
 # Send a minimal request to validate the key (uses claude-haiku, lowest cost)
 curl -s https://api.anthropic.com/v1/messages \
   -H "x-api-key: TOKEN" \
@@ -94,7 +94,7 @@ Valid response: JSON with `id`, `type: "message"`, `content` fields. Invalid key
 
 Keys use the pattern `sk-[a-zA-Z0-9]{48}` (classic) or `sk-proj-xxxx` (project-scoped). Project keys are narrower in scope than organisation keys.
 
-```bash
+```bash wrap
 # List available models (fastest, free endpoint for validation)
 curl -s https://api.openai.com/v1/models \
   -H "Authorization: Bearer TOKEN"
@@ -110,7 +110,7 @@ Valid response from `/v1/models`: JSON with `data` array of model objects. Inval
 
 Browser API keys match `AIza[0-9A-Za-z-_]{35}`. Service accounts come as a JSON file containing `client_email`, `private_key`, and `project_id`.
 
-```bash
+```bash wrap
 # API key: test against the geocoding endpoint (low cost, broad key coverage)
 curl -s "https://maps.googleapis.com/maps/api/geocode/json?latlng=40,30&key=KEY"
 
@@ -134,7 +134,7 @@ Note: API keys are often restricted to specific Google services. If one endpoint
 
 Live keys match `sk_live_[a-zA-Z0-9]{24}`. Test keys match `sk_test_xxxx` and access only sandbox data (low value). The colon suffix on `-u TOKEN:` prevents curl from prompting for a password.
 
-```bash
+```bash wrap
 # Get account info
 curl -s https://api.stripe.com/v1/account \
   -u TOKEN:
@@ -158,7 +158,7 @@ curl -s "https://api.stripe.com/v1/payment_methods?type=card" \
 
 Personal access tokens (post-Feb 2024) match `pat[a-zA-Z0-9]{14}.[a-zA-Z0-9]{64}`. Legacy API keys match `key[a-zA-Z0-9]{14}` and are deprecated but may still be valid.
 
-```bash
+```bash wrap
 # List all bases (databases) the token can access
 curl -s -H "Authorization: Bearer TOKEN" \
   "https://api.airtable.com/v0/meta/bases"
@@ -178,7 +178,7 @@ Valid response from `/v0/meta/bases`: JSON with a `bases` array containing base 
 
 Token prefixes indicate type: `xoxb-` is a bot token, `xoxp-` is a user token, `xoxa-` is an app-level token, `xoxs-` is an internal workspace token. User tokens (`xoxp-`) generally have the broadest permissions.
 
-```bash
+```bash wrap
 # Test token validity and get basic workspace info
 curl -s -X POST "https://slack.com/api/auth.test" \
   -H "Authorization: Bearer TOKEN"
@@ -196,7 +196,7 @@ curl -s -H "Authorization: Bearer TOKEN" \
   "https://slack.com/api/conversations.history?channel=CHANNEL_ID&limit=10"
 ```
 
-```bash
+```bash wrap
 # Webhook URL validation: a valid webhook returns an error about missing content, not 404
 curl -s -X POST -H "Content-type: application/json" \
   -d '{"text":""}' \
@@ -211,7 +211,7 @@ Valid response from `auth.test`: JSON with `ok: true`, `team`, `user`, `user_id`
 
 Bot tokens follow the pattern `[0-9]{8,10}:[a-zA-Z0-9_-]{35}`. They are obtained through BotFather and grant control over the bot account.
 
-```bash
+```bash wrap
 # Get bot info and confirm the token is valid
 curl -s "https://api.telegram.org/botTOKEN/getMe"
 
@@ -228,7 +228,7 @@ Valid response from `getMe`: JSON with `ok: true` and a `result` object containi
 
 Account SIDs match `AC[a-z0-9]{32}` and are paired with a 32-character auth token. Both are required to authenticate.
 
-```bash
+```bash wrap
 # List all subaccounts and confirm credentials are valid
 curl -s -X GET "https://api.twilio.com/2010-04-01/Accounts.json" \
   -u ACCOUNT_SID:AUTH_TOKEN
@@ -248,7 +248,7 @@ Valid response: JSON with `accounts` array containing account SID, friendly name
 
 API keys match `SG.[a-zA-Z0-9_-]{22}.[a-zA-Z0-9_-]{43}`. Scope determines what the key can do: some are scoped only to email send, others have full account access.
 
-```bash
+```bash wrap
 # List scopes assigned to this key (reveals what it can do)
 curl -s -H "Authorization: Bearer TOKEN" \
   "https://api.sendgrid.com/v3/scopes"
@@ -268,7 +268,7 @@ Valid response from `/v3/scopes`: JSON with a `scopes` array listing permission 
 
 Keys match `[a-zA-Z0-9]{32}-us[0-9]{1,2}`. The suffix after the hyphen (e.g., `us1`, `us21`) identifies the datacenter and must be used in the API base URL.
 
-```bash
+```bash wrap
 # Ping endpoint: returns {"health_status":"Everything's Chimpy!"} if valid
 # Replace <dc> with the datacenter from the key (the part after the hyphen)
 curl -s -u "anystring:TOKEN" \
@@ -287,7 +287,7 @@ curl -s -u "anystring:TOKEN" \
 
 Private app tokens match `pat-[a-z]{2}-[a-zA-Z0-9-]{36}`. Legacy hapikey tokens are a plain 36-character string. Legacy keys are being phased out but may still be active.
 
-```bash
+```bash wrap
 # New private app token: get contacts
 curl -s -H "Authorization: Bearer TOKEN" \
   "https://api.hubapi.com/crm/v3/objects/contacts?limit=5"
@@ -304,7 +304,7 @@ curl -s -H "Authorization: Bearer TOKEN" \
 
 API tokens are 40-character strings and can be scoped to specific zones or account resources. Global API Keys are paired with an email address and have full account access.
 
-```bash
+```bash wrap
 # Verify the token and list its permissions (scoped token)
 curl -s -H "Authorization: Bearer TOKEN" \
   "https://api.cloudflare.com/client/v4/user/tokens/verify"
@@ -325,7 +325,7 @@ Valid response from `/tokens/verify`: JSON with `success: true` and `result.stat
 
 API keys are 32-character alphanumeric strings. Free-tier keys have very limited query credits; paid keys can search and download results at scale.
 
-```bash
+```bash wrap
 # Get account info and remaining query credits
 curl -s "https://api.shodan.io/api-info?key=TOKEN"
 
@@ -342,7 +342,7 @@ Valid response from `/api-info`: JSON with `scan_credits`, `query_credits`, `pla
 
 Access tokens match `npm_[a-zA-Z0-9]{36}`. They may be scoped to specific packages or grant publish access to all packages under an account.
 
-```bash
+```bash wrap
 # Get the username associated with the token
 curl -s -H "Authorization: Bearer TOKEN" \
   "https://registry.npmjs.org/-/whoami"
@@ -363,7 +363,7 @@ Valid response from `/-/whoami`: JSON `{"username":"..."}`.
 
 Service account tokens are JWTs starting with `eyJ` or match the `glsa_xxx` format. Bearer tokens authenticate against Grafana's HTTP API.
 
-```bash
+```bash wrap
 # Get info about the authenticated user or service account
 curl -s -H "Authorization: Bearer TOKEN" \
   "http://grafana-host/api/user"
@@ -383,7 +383,7 @@ Replace `grafana-host` with the actual hostname or IP of the Grafana instance.
 
 Firebase Cloud Messaging server keys follow no strict pattern. Validation requires sending a test push notification request; even with an invalid registration ID, a valid key returns a `results` array rather than a 401.
 
-```bash
+```bash wrap
 # Send a test push to a fake registration ID; valid key returns results array
 curl -s -X POST \
   -H "Authorization: key=TOKEN" \
@@ -398,7 +398,7 @@ Valid response contains `"results":[{"error":"InvalidRegistration"}]`. An invali
 
 Datadog requires both an API key and an application key for most endpoints. API keys alone can only submit metrics; application keys are needed to query and manage the account.
 
-```bash
+```bash wrap
 # List dashboards (requires both keys)
 curl -s "https://api.datadoghq.com/api/v1/dashboard" \
   -H "DD-API-KEY: API_KEY" \
@@ -418,7 +418,7 @@ curl -s "https://api.datadoghq.com/api/v1/monitor" \
 
 API keys are 36-character UUIDs (`[a-f0-9-]{36}`). They grant full access to the account including all apps, config vars (environment variables), and dynos.
 
-```bash
+```bash wrap
 # List all apps on the account
 curl -s -X GET "https://api.heroku.com/apps" \
   -H "Accept: application/vnd.heroku+json; version=3" \
@@ -434,7 +434,7 @@ curl -s "https://api.heroku.com/apps/APP_NAME/config-vars" \
 
 Access tokens match `sl.[a-zA-Z0-9_-]{135}`. They provide access to the file storage of the linked Dropbox account.
 
-```bash
+```bash wrap
 # Get current account info
 curl -s -X POST "https://api.dropboxapi.com/2/users/get_current_account" \
   -H "Authorization: Bearer TOKEN"
@@ -450,7 +450,7 @@ curl -s -X POST "https://api.dropboxapi.com/2/files/list_folder" \
 
 Client ID and secret are separate strings. Sandbox credentials hit `api.sandbox.paypal.com`; live credentials hit `api.paypal.com`. Start with sandbox to test the pair before trying live.
 
-```bash
+```bash wrap
 # Get an OAuth access token using client credentials
 curl -s -X POST "https://api.sandbox.paypal.com/v1/oauth2/token" \
   -H "Accept: application/json" \
@@ -470,7 +470,7 @@ Valid response: JSON with `access_token`, `token_type: "Bearer"`, `expires_in` f
 
 Access tokens (installed app) match `shpat_[a-f0-9]{32}`. The store name is part of the URL: you need both the token and the `.myshopify.com` subdomain.
 
-```bash
+```bash wrap
 # Get shop info (confirms token and store name are both correct)
 curl -s -H "X-Shopify-Access-Token: TOKEN" \
   "https://STORE.myshopify.com/admin/api/2024-01/shop.json"

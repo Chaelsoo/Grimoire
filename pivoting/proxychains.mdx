@@ -7,7 +7,7 @@ Routes tool traffic through a SOCKS proxy: pair with Chisel or SSH dynamic forwa
 
 Point proxychains at whichever SOCKS proxy is active: change the port to match your tunnel setup.
 
-```
+``` wrap
 socks5 127.0.0.1 1080
 ```
 
@@ -15,7 +15,7 @@ socks5 127.0.0.1 1080
 
 Prepend `proxychains` to any command to route it through the tunnel: note that nmap requires `-sT -Pn` since SYN scans don't work over SOCKS.
 
-```bash
+```bash wrap
 proxychains nmap -sT -Pn <IP>
 proxychains nxc smb <IP> -u user -p pass
 proxychains evil-winrm -i <IP> -u user -p pass
@@ -25,6 +25,6 @@ proxychains evil-winrm -i <IP> -u user -p pass
 
 Opens a SOCKS5 proxy on localhost without needing chisel: ideal when you already have SSH access to the pivot.
 
-```bash
+```bash wrap
 ssh -D 1080 user@<IP>
 ```

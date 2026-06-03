@@ -2,24 +2,37 @@
 title: "Web Exploitation"
 sidebarTitle: "Overview"
 ---
+
 Web vulnerabilities remain the most common initial access path in both real engagements and CTFs. Each page here covers one vulnerability class: how it works, how to find it, and how to exploit it.
 
-## Pages
-
-| Page | What it covers |
-|------|---------------|
-| [SQL Injection](./sqli) | Error-based, union-based, blind, and time-based SQLi; sqlmap usage |
-| [XSS](./xss) | Reflected, stored, and DOM-based XSS; cookie theft, keylogging, CSRF chains |
-| [SSRF](./ssrf) | Server-side request forgery; reaching internal services, cloud metadata, and blind SSRF |
-| [File Upload](./file-upload) | Bypassing extension filters and content-type checks to upload web shells |
-| [LFI / RFI](./lfi-rfi) | Local and remote file inclusion; log poisoning, PHP wrappers, RCE paths |
-| [Command Injection](./cmdi) | OS command injection patterns, WAF bypass techniques, blind exfil methods |
-| [Auth Bypass](./auth-bypass) | Broken authentication, JWT attacks, OAuth misconfigs, forced browsing |
+<CardGroup cols={2}>
+  <Card title="SQL Injection" icon="database" href="./sqli">
+    Error-based, union-based, blind, and time-based SQLi; sqlmap usage
+  </Card>
+  <Card title="XSS" icon="code" href="./xss">
+    Reflected, stored, and DOM-based XSS; cookie theft, keylogging, CSRF chains
+  </Card>
+  <Card title="SSRF" icon="server" href="./ssrf">
+    Server-side request forgery; reaching internal services, cloud metadata, and blind SSRF
+  </Card>
+  <Card title="File Upload" icon="upload" href="./file-upload">
+    Bypassing extension filters and content-type checks to upload web shells
+  </Card>
+  <Card title="LFI / RFI" icon="file" href="./lfi-rfi">
+    Local and remote file inclusion; log poisoning, PHP wrappers, RCE paths
+  </Card>
+  <Card title="Command Injection" icon="terminal" href="./cmdi">
+    OS command injection patterns, WAF bypass techniques, blind exfil methods
+  </Card>
+  <Card title="Auth Bypass" icon="key" href="./auth-bypass">
+    Broken authentication, JWT attacks, OAuth misconfigs, forced browsing
+  </Card>
+</CardGroup>
 
 ## Recon Before Exploitation
 
 Before attempting any of the above, spend time on web enumeration. Technology fingerprinting (Wappalyzer, headers, cookies) narrows which vulnerabilities are even plausible. A PHP app with a login form is a different target from a Node.js API behind an nginx proxy.
 
-```
+``` wrap
 Identify tech stack  →  Map endpoints  →  Check each input for the relevant class
 ```

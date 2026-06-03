@@ -43,7 +43,7 @@ These are the most commonly encountered hashes in AD engagements.
 
 Extracted from SAM hives, NTDS.dit, or secretsdump output. Format: `username:RID:LMhash:NThash:::`: crack only the NT hash (right side of the last colon).
 
-```bash
+```bash wrap
 # Wordlist
 hashcat -m 1000 ntlm.txt ~/tools/wordlists/rockyou
 
@@ -62,7 +62,7 @@ hashcat -m 1000 ntlm.txt -a 3 ?u?l?l?l?l?d?d?d?d
 
 Captured via Responder or Inveigh. Cannot be passed directly (must crack to plaintext).
 
-```bash
+```bash wrap
 # Wordlist
 hashcat -m 5600 netntlmv2.txt ~/tools/wordlists/rockyou
 
@@ -75,7 +75,7 @@ hashcat -m 5600 netntlmv2.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/ru
 
 Older protocol, weaker than v2. If you capture one, also try ntlmv1-multi to pre-compute via crack.sh.
 
-```bash
+```bash wrap
 hashcat -m 5500 netntlmv1.txt ~/tools/wordlists/rockyou
 hashcat -m 5500 netntlmv1.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
 ```
@@ -84,7 +84,7 @@ hashcat -m 5500 netntlmv1.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/ru
 
 RC4 (mode 13100) is always worth trying first: weaker encryption and fastest to crack. If the account only issues AES tickets, use 19700.
 
-```bash
+```bash wrap
 # RC4 TGS (most common)
 hashcat -m 13100 kerberoast.txt ~/tools/wordlists/rockyou
 hashcat -m 13100 kerberoast.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
@@ -102,7 +102,7 @@ hashcat -m 19700 kerberoast.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/
 
 Hashes from accounts with pre-authentication disabled. Same cracking approach as Kerberoast but mode 18200.
 
-```bash
+```bash wrap
 hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou
 hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
 hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/OneRuleToRuleThemAll.rule
@@ -112,7 +112,7 @@ hashcat -m 18200 asrep.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules
 
 Cached domain credentials stored locally when a DC is unreachable. Very slow to crack: use a targeted wordlist.
 
-```bash
+```bash wrap
 # Slow: use focused wordlist, not full rockyou unless you have a GPU farm
 hashcat -m 2100 dcc2.txt ~/tools/wordlists/rockyou
 hashcat -m 2100 dcc2.txt company_words.txt -r /usr/share/hashcat/rules/best64.rule
@@ -122,7 +122,7 @@ hashcat -m 2100 dcc2.txt company_words.txt -r /usr/share/hashcat/rules/best64.ru
 
 Linux shadow hashes from `/etc/shadow`. Match the `$id$` prefix to pick the right mode.
 
-```bash
+```bash wrap
 # sha512crypt $6$ (most modern systems)
 hashcat -m 1800 shadow.txt ~/tools/wordlists/rockyou
 hashcat -m 1800 shadow.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
@@ -141,7 +141,7 @@ hashcat -m 3200 shadow.txt ~/tools/wordlists/rockyou
 
 Common hashes from database dumps. MD5 and SHA1 crack fast; bcrypt requires targeted wordlists.
 
-```bash
+```bash wrap
 # MD5
 hashcat -m 0 hashes.txt ~/tools/wordlists/rockyou
 hashcat -m 0 hashes.txt ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/best64.rule
@@ -161,7 +161,7 @@ hashcat -m 3200 hashes.txt ~/tools/wordlists/rockyou
 
 ### Database Hashes
 
-```bash
+```bash wrap
 # MySQL 4+
 hashcat -m 300 mysql.txt ~/tools/wordlists/rockyou
 
@@ -174,7 +174,7 @@ hashcat -m 12 pg.txt ~/tools/wordlists/rockyou
 
 ## Other
 
-```bash
+```bash wrap
 # JWT (crack the signature secret)
 hashcat -m 16500 jwt.txt ~/tools/wordlists/rockyou
 
@@ -196,7 +196,7 @@ hashcat -m 5200 db.psafe3 ~/tools/wordlists/rockyou -r /usr/share/hashcat/rules/
 
 Beyond wordlists, use rules for mangled passwords and masks when you know the pattern.
 
-```bash
+```bash wrap
 # -a 0: wordlist (default)
 hashcat -m 1000 hash.txt ~/tools/wordlists/rockyou
 
@@ -218,7 +218,7 @@ hashcat -m 1000 hash.txt -a 7 ?d?d?d?d ~/tools/wordlists/rockyou
 
 ## Mask Charset Reference
 
-```
+``` wrap
 ?l  lowercase a-z
 ?u  uppercase A-Z
 ?d  digit 0-9
@@ -230,7 +230,7 @@ hashcat -m 1000 hash.txt -a 7 ?d?d?d?d ~/tools/wordlists/rockyou
 
 ## Useful Flags
 
-```bash
+```bash wrap
 --show              # Print already-cracked hashes from potfile
 --username          # Strip username from hash:user format (secretsdump output)
 -O                  # Optimized kernels (faster, slight rule coverage tradeoff)
@@ -245,7 +245,7 @@ hashcat -m 1000 hash.txt -a 7 ?d?d?d?d ~/tools/wordlists/rockyou
 
 When you are unsure of the type, use `hashid` or `name-that-hash` before picking a mode.
 
-```bash
+```bash wrap
 hashid '$6$rounds=5000$salt$hash'   # identifies sha512crypt
 name-that-hash -t '$krb5tgs$23$*'  # identifies Kerberoast RC4
 ```

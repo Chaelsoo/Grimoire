@@ -3,7 +3,7 @@ title: "nmap"
 ---
 Two-pass approach: fast `-p-` scan to find open ports, then `-sV -sC` on just those ports to avoid scanning 65535 ports with slow scripts.
 
-```bash
+```bash wrap
 # Fast full TCP
 nmap -p- --min-rate 5000 -T4 $IP
 
