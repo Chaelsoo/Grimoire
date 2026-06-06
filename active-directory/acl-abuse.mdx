@@ -52,6 +52,10 @@ Get-ObjectAcl -DistinguishedName "DC=domain,DC=local" -ResolveGUIDs | Where-Obje
 | `CreateChild` | OU | BadSuccessor: dMSA escalation (WS2025) |
 | `DS-Replication-Get-Changes[-All]` | Domain | DCSync |
 
+<Frame caption="ACL abuse mindmap">
+  <img src="/images/acl-mindmap.png" alt="ACL abuse mindmap" />
+</Frame>
+
 <Frame caption="DACL abuse attack paths by right and object type">
   <img src="/images/dacl-abuse-mindmap.png" alt="DACL abuse mindmap showing attack paths for GenericAll, GenericWrite, WriteDACL, AllExtendedRights, and WriteOwner across Group, User, Computer, Domain Object, AdminSD Holder, Group Policy, and Security Descriptor" />
 </Frame>
