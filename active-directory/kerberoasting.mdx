@@ -5,7 +5,7 @@ title: "Kerberoasting"
 Any authenticated domain user can request a TGS (service ticket) for any account with a registered SPN. The KDC encrypts part of the TGS with the service account's NTLM hash: take that ticket offline and crack the hash without further interaction with the domain.
 
 <Frame caption="Kerberos authentication flow: the KDC issues service tickets encrypted with the service account's hash">
-  <img src="/KDC.png" alt="Kerberos KDC flow diagram" />
+  <img src="/images/active-directory/kerberoasting/KDC.png" alt="Kerberos KDC flow diagram" />
 </Frame>
 
 ## How It Works
