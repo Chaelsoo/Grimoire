@@ -199,6 +199,13 @@
               "active-directory/adcs"
             ],
             "icon": "envelope-certificate"
+          },
+          {
+            "group": "Hardened Environments",
+            "pages": [
+              "active-directory/ntlm-disabled"
+            ],
+            "icon": "shield-halved"
           }
         ]
       }

