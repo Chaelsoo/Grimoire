@@ -1,0 +1,204 @@
+---
+title: "John the Ripper & File Cracking"
+---
+
+The `*2john` utilities extract crackable hashes from password-protected files. The workflow is always the same: extract the hash, then crack it with `john` or feed it to `hashcat` with the right mode.
+
+```bash wrap
+# General pattern
+<format>2john <file> > hash.txt
+john hash.txt --wordlist=~/tools/wordlists/rockyou.txt
+john hash.txt --show
+```
+
+## Office Documents
+
+Covers `.docx`, `.xlsx`, `.pptx` (Office 2007+) and the legacy `.doc`, `.xls`, `.ppt` (Office 97-2003).
+
+```bash wrap
+office2john document.docx > office.hash
+office2john spreadsheet.xlsx > office.hash
+
+# John
+john office.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat modes by Office version
+hashcat -m 9400 office.hash ~/tools/wordlists/rockyou.txt   # Office 2007
+hashcat -m 9500 office.hash ~/tools/wordlists/rockyou.txt   # Office 2010
+hashcat -m 9600 office.hash ~/tools/wordlists/rockyou.txt   # Office 2013
+hashcat -m 25300 office.hash ~/tools/wordlists/rockyou.txt  # Office 2016/2019/2021
+
+# Add rules for better coverage
+hashcat -m 9600 office.hash ~/tools/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule
+```
+
+## ZIP Archives
+
+Classic PKZIP encryption and WinZip AES are different formats with different modes.
+
+```bash wrap
+zip2john archive.zip > zip.hash
+
+# John
+john zip.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat
+hashcat -m 17200 zip.hash ~/tools/wordlists/rockyou.txt   # PKZIP (classic)
+hashcat -m 13600 zip.hash ~/tools/wordlists/rockyou.txt   # WinZip AES
+hashcat -m 17200 zip.hash ~/tools/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule
+```
+
+## RAR Archives
+
+RAR3 and RAR5 use different algorithms; `rar2john` outputs both formats.
+
+```bash wrap
+rar2john archive.rar > rar.hash
+
+# John
+john rar.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat
+hashcat -m 12500 rar.hash ~/tools/wordlists/rockyou.txt   # RAR3-hp
+hashcat -m 13000 rar.hash ~/tools/wordlists/rockyou.txt   # RAR5
+```
+
+## 7-Zip
+
+```bash wrap
+7z2john archive.7z > 7z.hash
+
+# John
+john 7z.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat
+hashcat -m 11600 7z.hash ~/tools/wordlists/rockyou.txt
+hashcat -m 11600 7z.hash ~/tools/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule
+```
+
+## PDF
+
+PDF encryption level determines the hashcat mode. `pdf2john` handles the extraction.
+
+```bash wrap
+pdf2john document.pdf > pdf.hash
+
+# John
+john pdf.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat
+hashcat -m 10400 pdf.hash ~/tools/wordlists/rockyou.txt   # PDF 1.1-1.3 (RC4 40-bit)
+hashcat -m 10500 pdf.hash ~/tools/wordlists/rockyou.txt   # PDF 1.4-1.6 (RC4/AES 128-bit)
+hashcat -m 10600 pdf.hash ~/tools/wordlists/rockyou.txt   # PDF 1.7 L3 (AES 256-bit)
+hashcat -m 10700 pdf.hash ~/tools/wordlists/rockyou.txt   # PDF 1.7 L4 (AES 256-bit, stronger)
+```
+
+## KeePass
+
+KeePass databases are high-value targets. They are slow to crack: use a targeted wordlist.
+
+```bash wrap
+keepass2john database.kdbx > keepass.hash
+
+# John
+john keepass.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat (mode 13400 covers both KeePass 1.x and 2.x)
+hashcat -m 13400 keepass.hash ~/tools/wordlists/rockyou.txt
+hashcat -m 13400 keepass.hash company_words.txt -r /usr/share/hashcat/rules/best64.rule
+```
+
+## SSH Private Keys
+
+Passphrase-protected private keys (`id_rsa`, `id_ed25519`, etc.).
+
+```bash wrap
+ssh2john id_rsa > ssh.hash
+
+# John (most reliable for SSH key formats)
+john ssh.hash --wordlist=~/tools/wordlists/rockyou.txt
+john ssh.hash --wordlist=~/tools/wordlists/rockyou.txt --rules=best64
+
+# Hashcat (RSA/DSA/EC/OPENSSH)
+hashcat -m 22931 ssh.hash ~/tools/wordlists/rockyou.txt   # RSA/DSA/EC OPENSSH
+hashcat -m 22921 ssh.hash ~/tools/wordlists/rockyou.txt   # RSA PKCS#8
+```
+
+## PFX / PKCS#12 Certificates
+
+Password-protected PFX files found during post-exploitation.
+
+```bash wrap
+pfx2john cert.pfx > pfx.hash
+
+# John
+john pfx.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat
+hashcat -m 22500 pfx.hash ~/tools/wordlists/rockyou.txt   # PKCS#12 SHA1/3DES
+hashcat -m 22600 pfx.hash ~/tools/wordlists/rockyou.txt   # PKCS#12 SHA1/3DES + extra iter
+```
+
+## BitLocker
+
+```bash wrap
+bitlocker2john -i encrypted_drive.img > bitlocker.hash
+
+# John
+john bitlocker.hash --wordlist=~/tools/wordlists/rockyou.txt
+
+# Hashcat
+hashcat -m 22100 bitlocker.hash ~/tools/wordlists/rockyou.txt
+hashcat -m 22100 bitlocker.hash ~/tools/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule
+```
+
+## GPG Keys
+
+```bash wrap
+gpg2john key.gpg > gpg.hash
+
+john gpg.hash --wordlist=~/tools/wordlists/rockyou.txt
+```
+
+## John Flags
+
+```bash wrap
+# Show already-cracked hashes
+john hash.txt --show
+
+# Use a specific format (override auto-detect)
+john hash.txt --format=Office --wordlist=~/tools/wordlists/rockyou.txt
+john hash.txt --format=zip --wordlist=~/tools/wordlists/rockyou.txt
+
+# Rules (mangling: capitalization, l33t, appended digits)
+john hash.txt --wordlist=~/tools/wordlists/rockyou.txt --rules=best64
+john hash.txt --wordlist=~/tools/wordlists/rockyou.txt --rules=jumbo
+
+# Brute force with incremental mode (slow, last resort)
+john hash.txt --incremental
+
+# List all supported formats
+john --list=formats
+```
+
+## Quick Reference Table
+
+| File Type | Extract | John Format | Hashcat Mode |
+|-----------|---------|-------------|--------------|
+| Office 2007 | `office2john` | `Office` | `9400` |
+| Office 2010 | `office2john` | `Office` | `9500` |
+| Office 2013 | `office2john` | `Office` | `9600` |
+| Office 2016+ | `office2john` | `Office` | `25300` |
+| ZIP (classic) | `zip2john` | `zip` | `17200` |
+| ZIP (WinZip AES) | `zip2john` | `ZIP` | `13600` |
+| RAR3 | `rar2john` | `rar` | `12500` |
+| RAR5 | `rar2john` | `rar5` | `13000` |
+| 7-Zip | `7z2john` | `7z` | `11600` |
+| PDF (1.1-1.3) | `pdf2john` | `pdf` | `10400` |
+| PDF (1.4-1.6) | `pdf2john` | `pdf` | `10500` |
+| PDF (1.7+) | `pdf2john` | `pdf` | `10600` |
+| KeePass | `keepass2john` | `keepass` | `13400` |
+| SSH key | `ssh2john` | `SSH` | `22931` |
+| PFX/PKCS#12 | `pfx2john` | `pfx` | `22500` |
+| BitLocker | `bitlocker2john` | `bitlocker` | `22100` |
+| GPG key | `gpg2john` | `gpg` | N/A |

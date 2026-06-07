@@ -150,7 +150,8 @@
           {
             "group": "Cracking",
             "pages": [
-              "tools/hashcat"
+              "tools/hashcat",
+              "tools/john"
             ],
             "icon": "hashtag"
           },

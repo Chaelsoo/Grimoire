@@ -41,21 +41,33 @@ echo "$DC_IP  $DC_HOST $DOMAIN" | sudo tee -a /etc/hosts
 ### Getting a TGT
 
 ```bash wrap
-# With password
+# kinit: native Kerberos, stores ticket in default ccache (/tmp/krb5cc_<uid>)
+# no KRB5CCNAME needed, tools pick it up automatically
+kinit $USER@$DOMAIN
+klist
+
+# kinit with a specific ccache path
+KRB5CCNAME=/tmp/$USER.ccache kinit $USER@$DOMAIN
+
+# getTGT.py: saves to a named file, set KRB5CCNAME after
 getTGT.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
+export KRB5CCNAME=$USER.ccache
 
-# With NT hash (Pass-the-Hash → Pass-the-Key)
+# getTGT.py with NT hash (Pass-the-Key)
 getTGT.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
+export KRB5CCNAME=$USER.ccache
 
-# With AES key
+# getTGT.py with AES key
 getTGT.py $DOMAIN/$USER -aesKey $AES_KEY -dc-ip $DC_IP
+export KRB5CCNAME=$USER.ccache
 
 # With certificate (PKINIT)
 certipy auth -pfx $USER.pfx -dc-ip $DC_IP -no-hash
-
-# Set and verify
 export KRB5CCNAME=$USER.ccache
+
+# Verify and destroy
 klist
+kdestroy
 ```
 
 ## Tool Reference

