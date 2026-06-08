@@ -77,6 +77,14 @@
               "web/auth-bypass"
             ],
             "icon": "bugs"
+          },
+          {
+            "group": "Web Tools",
+            "pages": [
+              "web/ffuf",
+              "web/sqlmap"
+            ],
+            "icon": "screwdriver-wrench"
           }
         ]
       },
@@ -141,7 +149,6 @@
             "group": "Enumeration",
             "pages": [
               "tools/nmap",
-              "tools/ffuf",
               "tools/bloodhound",
               "tools/bloodyad"
             ],

