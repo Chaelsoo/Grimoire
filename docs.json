@@ -95,7 +95,7 @@
           {
             "group": "Linux",
             "icon": "linux",
-            "pages": ["linux/index", "linux/privesc", "linux/postex"]
+            "pages": ["linux/index", "linux/privesc", "linux/postex", "linux/awk"]
           },
           {
             "group": "Windows",

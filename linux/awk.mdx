@@ -1,0 +1,244 @@
+---
+title: "awk"
+---
+
+`awk` processes text line by line, splitting each line into fields. Indispensable for parsing tool output, log files, and structured data without writing a script.
+
+```
+awk 'pattern { action }' file
+awk -F: 'pattern { action }' file      # custom field separator
+command | awk 'pattern { action }'     # from stdin
+```
+
+## Fields and Records
+
+```bash wrap
+# $0 = entire line, $1 $2 ... = fields (whitespace-delimited by default)
+awk '{ print $1 }' file               # first field of every line
+awk '{ print $1, $3 }' file           # first and third field
+awk '{ print $NF }' file              # last field  (NF = number of fields)
+awk '{ print $(NF-1) }' file          # second to last field
+awk '{ print NR, $0 }' file           # prepend line number to each line
+
+# Custom delimiter with -F
+awk -F: '{ print $1 }' /etc/passwd    # colon-separated: print usernames
+awk -F, '{ print $2 }' data.csv       # CSV: print second column
+awk -F'\t' '{ print $3 }' data.tsv    # tab-separated
+
+# Set delimiter inside the script
+awk 'BEGIN { FS=":" } { print $1, $3 }' /etc/passwd
+```
+
+## Built-in Variables
+
+| Variable | Description |
+|----------|-------------|
+| `$0` | Full current line |
+| `$1..$N` | Fields 1 through N |
+| `NR` | Current line number (across all files) |
+| `FNR` | Line number within the current file |
+| `NF` | Number of fields in the current line |
+| `FS` | Input field separator (default: whitespace) |
+| `OFS` | Output field separator (default: space) |
+| `RS` | Input record separator (default: newline) |
+| `ORS` | Output record separator (default: newline) |
+| `FILENAME` | Name of the current input file |
+
+```bash wrap
+# OFS: control how printed fields are separated
+awk 'BEGIN { OFS="," } { print $1,$2,$3 }' file
+
+# RS: treat multi-line blocks as single records
+awk 'BEGIN { RS="" } { print NR, $0 }' file   # blank line = record boundary
+
+# FILENAME: print which file each line came from
+awk '{ print FILENAME, NR, $0 }' *.log
+```
+
+## Pattern Matching
+
+```bash wrap
+# Lines containing a string
+awk '/root/' /etc/passwd
+
+# Lines NOT containing a string
+awk '!/root/' /etc/passwd
+
+# Regex on a specific field
+awk -F: '$7 ~ /bash/' /etc/passwd       # users with bash shell
+awk -F: '$7 !~ /nologin/' /etc/passwd   # users with a real shell
+
+# Field comparison
+awk -F: '$3 >= 1000' /etc/passwd        # UID >= 1000 (non-system users)
+awk -F: '$3 == 0' /etc/passwd           # root (UID 0)
+awk '{ if ($2 > 50) print $0 }' file
+
+# Line ranges: print lines 5 through 10
+awk 'NR==5, NR==10' file
+
+# Print lines between two patterns (inclusive)
+awk '/START/, /END/' file
+```
+
+## BEGIN and END
+
+```bash wrap
+# BEGIN runs once before any input is read
+awk 'BEGIN { print "--- Output ---" } { print $1 }' file
+
+# END runs once after all input is processed
+awk 'END { print "Total lines:", NR }' file
+
+# Count matching lines
+awk '/FAILED/ { count++ } END { print count }' auth.log
+
+# Sum a column
+awk '{ total += $3 } END { print "Total:", total }' file
+```
+
+## Conditionals and Loops
+
+```bash wrap
+# if / else
+awk '{ if ($3 > 100) print $1, "HIGH"; else print $1, "LOW" }' file
+
+# while loop
+awk '{ i=1; while (i <= NF) { print $i; i++ } }' file
+
+# for loop
+awk 'BEGIN { for (i=1; i<=5; i++) print i }'
+
+# for-in over an array
+awk '{ count[$1]++ } END { for (k in count) print k, count[k] }' file
+```
+
+## String Functions
+
+```bash wrap
+# length
+awk '{ print length($0) }' file
+awk 'length($1) > 10' file              # filter lines where field 1 is long
+
+# substr(string, start, length)   [1-indexed]
+awk '{ print substr($1, 1, 4) }' file  # first 4 chars of field 1
+
+# index(string, target)  → position of target, 0 if not found
+awk '{ print index($0, "ERROR") }' file
+
+# split(string, array, delimiter)
+awk '{ n = split($1, a, "."); print a[1] }' file   # first octet of an IP
+
+# sub(regex, replacement, target)  → replace FIRST match
+awk '{ sub(/foo/, "bar"); print }' file
+
+# gsub(regex, replacement, target) → replace ALL matches
+awk '{ gsub(/[0-9]/, "X"); print }' file
+
+# tolower / toupper
+awk '{ print tolower($0) }' file
+awk '{ print toupper($1) }' file
+
+# match(string, regex)  → sets RSTART and RLENGTH
+awk '{ if (match($0, /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)) print substr($0, RSTART, RLENGTH) }' file
+
+# sprintf: format without printing
+awk '{ padded = sprintf("%-20s %s", $1, $2); print padded }' file
+```
+
+## Arrays
+
+```bash wrap
+# Count occurrences of a field value
+awk '{ count[$1]++ } END { for (k in count) print count[k], k }' file | sort -rn
+
+# Store lines by key
+awk -F: '{ users[$1] = $3 } END { for (u in users) print u, users[u] }' /etc/passwd
+
+# Check if a key exists
+awk '{ if ($1 in seen) print "DUPLICATE:", $0; seen[$1]=1 }' file
+
+# Delete from array
+awk '{ a[$1]=$0 } END { delete a["badkey"]; for (k in a) print a[k] }' file
+```
+
+## Practical Security Examples
+
+```bash wrap
+# /etc/passwd: list users with a real shell (non-system accounts)
+awk -F: '$7 ~ /bash|sh|zsh|fish/ { print $1, $3, $6 }' /etc/passwd
+
+# /etc/passwd: find UID 0 accounts (root equivalents)
+awk -F: '$3 == 0 { print $1 }' /etc/passwd
+
+# secretsdump output: extract just NTLM hashes (user:RID:LM:NT)
+awk -F: 'NF==7 { print $1":"$4 }' secretsdump.txt
+# or pull NT hash only
+awk -F: 'NF==7 { print $4 }' secretsdump.txt
+
+# nmap gnmap output: show only open ports per host
+awk '/Host:/ { host=$2 } /open/ { print host, $1 }' scan.gnmap
+
+# nmap: extract IPs with a specific open port (e.g. 445)
+awk '/445\/open/ { print $2 }' scan.gnmap
+
+# auth.log: count failed SSH login attempts per IP
+awk '/Failed password/ { print $(NF-3) }' /var/log/auth.log | sort | uniq -c | sort -rn
+
+# auth.log: list successful logins
+awk '/Accepted password|Accepted publickey/ { print $1,$2,$3,$9,$11 }' /var/log/auth.log
+
+# Apache access.log: top 10 requesting IPs
+awk '{ print $1 }' /var/log/apache2/access.log | sort | uniq -c | sort -rn | head -10
+
+# Apache access.log: show only 500 errors
+awk '$9 == 500' /var/log/apache2/access.log
+
+# Extract unique subdomains from a list of URLs
+awk -F/ '{ print $3 }' urls.txt | sort -u
+
+# Nessus / OpenVAS CSV: show critical findings only
+awk -F, '$7 == "Critical" { print $5, $6 }' findings.csv
+
+# Combine cut-like extraction with filtering
+awk 'NR > 1 { print $2 }' output.txt      # skip header line, print col 2
+
+# Remove duplicate lines while preserving order
+awk '!seen[$0]++' file
+
+# Print every other line
+awk 'NR % 2 == 0' file
+
+# Print lines between two line numbers from a variable
+awk -v start=10 -v end=20 'NR>=start && NR<=end' file
+
+# Add line numbers to output (useful for large tool outputs)
+awk '{ printf "%4d  %s\n", NR, $0 }' file
+```
+
+## One-Liner Reference
+
+```bash wrap
+# Word count per line
+awk '{ print NF }' file
+
+# Print lines longer than 80 chars
+awk 'length > 80' file
+
+# Reverse field order
+awk '{ for(i=NF;i>=1;i--) printf "%s%s",$i,(i>1?OFS:ORS) }' file
+
+# Sum column 2
+awk '{ s+=$2 } END { print s }' file
+
+# Average of column 3
+awk '{ s+=$3; n++ } END { print s/n }' file
+
+# Print unique values of field 1 (preserving order)
+awk '!seen[$1]++{ print $1 }' file
+
+# Simulate grep -v for a field
+awk '$1 != "exclude_value"' file
+
+# Merge two files on a common key (like join)
+awk 'FNR==NR { a[$1]=$2; next } $1 in a { print $0, a[$1] }' file1 file2
+```
