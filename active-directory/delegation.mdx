@@ -8,6 +8,10 @@ Delegation solves the **double-hop problem**: when a user authenticates to Servi
 
 Two Kerberos extensions underpin all constrained delegation abuse:
 
+<Frame caption="S4U2Self and S4U2Proxy flow: how a service obtains a forwardable ticket on behalf of a user and uses it to access a third service">
+  <img src="/images/active-directory/delegation/s4u-flow.png" alt="S4U2Self and S4U2Proxy authentication flow diagram" />
+</Frame>
+
 **S4U2Self (Service-for-User-to-Self):** Allows a service to request a forwardable service ticket to itself on behalf of any user, without that user's password or prior authentication. Requires the account to have an SPN.
 
 **S4U2Proxy (Service-for-User-to-Proxy):** Allows a service to use a forwardable TGS (obtained from S4U2Self or a real user auth) to request a ticket to a third service. On classic constrained delegation, the KDC validates the target SPN against `msDS-AllowedToDelegateTo`. On RBCD, the KDC validates the source against `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target.
@@ -309,3 +313,14 @@ ntlmrelayx.py -t ldap://$DC_HOST --delegate-access --escalate-user '$COMP_NAME$'
 | `Account is sensitive and cannot be delegated` | Cannot be impersonated via any delegation type |
 | `SeEnableDelegationPrivilege` absent | Low-priv users cannot set delegation flags even on accounts they create |
 | KB4577252 / CVE-2020-16996 | Patches S4U2Proxy validation bypass |
+
+## References
+
+<CardGroup cols={2}>
+  <Card title="S4U2Pwnage" icon="link" href="https://blog.harmj0y.net/activedirectory/s4u2pwnage/">
+    harmj0y's deep-dive into S4U2Self and S4U2Proxy abuse, the original research behind most constrained delegation and RBCD attack chains
+  </Card>
+  <Card title="The Most Dangerous User Right You've Never Heard Of" icon="link" href="https://blog.harmj0y.net/activedirectory/the-most-dangerous-user-right-you-probably-have-never-heard-of/">
+    harmj0y on SeEnableDelegationPrivilege: why it matters, how to find it, and what an attacker can do with it
+  </Card>
+</CardGroup>
