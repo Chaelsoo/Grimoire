@@ -186,9 +186,10 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 The account has `msDS-AllowedToDelegateTo` set to a specific list of SPNs it can delegate to. There are two sub-variants depending on whether **protocol transition** is enabled.
 
 **Requirements:**
-- Compromised account with `msDS-AllowedToDelegateTo` populated
-- With protocol transition (`TRUSTED_TO_AUTH_FOR_DELEGATION`): no prior user auth needed, impersonate anyone directly
-- Without protocol transition: need a controlled SPN account to generate a forwardable ticket via RBCD first
+- Controlled account with `TRUSTED_TO_AUTH_FOR_DELEGATION` set — enables S4U2Self, without it the impersonation ticket cannot be generated
+- `msDS-AllowedToDelegateTo` populated with a valid SPN — the SPN must be registered in AD, the KDC rejects S4U2Proxy if it can't find the target account
+- Valid credentials for the delegating account (password, hash, or TGT) — needed to request the initial TGT to kick off the chain
+- Without protocol transition: need a controlled SPN account to generate a forwardable ticket via RBCD first, then feed it into S4U2Proxy
 
 ### Enumeration
 
