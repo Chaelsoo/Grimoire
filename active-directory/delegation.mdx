@@ -96,6 +96,12 @@ The service can impersonate the user against **any** service in the domain. Set 
 
 **Attack goal:** coerce a privileged account (usually the DC machine account) into authenticating to the compromised host, extract its TGT, then DCSync.
 
+**Requirements:**
+- Compromised account with `TRUSTED_FOR_DELEGATION` set (a computer or service account)
+- Account has an SPN (machine accounts always do)
+- DNS write access to register an A record for your attacker listener
+- Ability to coerce outbound auth from a privileged account (PetitPotam, printerbug, etc.)
+
 Accounts in the **Protected Users** group and accounts flagged **sensitive and cannot be delegated** have their TGTs excluded. Exception: the native Administrator (RID 500) bypasses this even if added to Protected Users.
 
 ### Enumeration
@@ -179,6 +185,11 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 The account has `msDS-AllowedToDelegateTo` set to a specific list of SPNs it can delegate to. There are two sub-variants depending on whether **protocol transition** is enabled.
 
+**Requirements:**
+- Compromised account with `msDS-AllowedToDelegateTo` populated
+- With protocol transition (`TRUSTED_TO_AUTH_FOR_DELEGATION`): no prior user auth needed, impersonate anyone directly
+- Without protocol transition: need a controlled SPN account to generate a forwardable ticket via RBCD first
+
 ### Enumeration
 
 ```bash wrap
@@ -259,9 +270,10 @@ smbexec.py -k -no-pass Administrator@$TARGET.$DOMAIN
 
 Instead of the source account controlling where it can delegate, the **target** resource defines which accounts it trusts to impersonate users to it. Set via `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target. Requires only write access to that attribute — no Domain Admin.
 
-**Conditions:**
-- Write access on the target's `msDS-AllowedToActOnBehalfOfOtherIdentity` (GenericAll, GenericWrite, WriteProperty)
-- A controlled account with an SPN — a machine account (sAMAccountName ending in `$`) or a user with an SPN set
+**Requirements:**
+- Write access on the target object's `msDS-AllowedToActOnBehalfOfOtherIdentity` (GenericAll, GenericWrite, WriteProperty, or WriteDACL)
+- A controlled account with an SPN: machine account (`MachineAccountQuota > 0`) or existing user/computer with an SPN
+- If `MachineAccountQuota = 0`: use an existing SPN account or the SPN-less U2U path below
 - DC functional level: Windows Server 2012+
 
 ### Enumeration
