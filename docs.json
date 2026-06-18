@@ -196,6 +196,7 @@
               "active-directory/pass-attacks",
               "active-directory/acl-abuse",
               "active-directory/delegation",
+              "active-directory/service-accounts",
               "active-directory/trusts",
               "active-directory/credential-dumping"
             ],
