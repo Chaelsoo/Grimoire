@@ -1,6 +1,50 @@
 ---
 title: "Port Scanning"
 ---
+
+## Ping Sweep
+
+Quick host discovery before port scanning. Replace `$SUBNET` with the first three octets (e.g. `10.10.110`).
+
+### Linux
+
+```bash wrap
+# Background pings, print only live hosts
+for i in $(seq 1 254); do ping -c1 -W1 $SUBNET.$i & done | grep "64 bytes"
+
+# fping: cleaner, built for sweeps
+fping -a -g $SUBNET.0/24 2>/dev/null
+
+# nmap host discovery only (no port scan)
+nmap -sn $SUBNET.0/24
+
+# nmap host discovery, no DNS resolution (faster on large ranges)
+nmap -sn -n $SUBNET.0/24 --min-rate 2000
+```
+
+### Windows
+
+```cmd
+:: CMD: sweep and print lines with TTL (live hosts)
+for /L %i in (1,1,254) do @ping -n 1 -w 200 $SUBNET.%i | findstr "TTL"
+```
+
+```powershell wrap
+# PowerShell: sequential
+1..254 | ForEach-Object {
+    $ip = "$SUBNET.$_"
+    if (Test-Connection -Count 1 -Quiet -ComputerName $ip) { Write-Output $ip }
+}
+
+# PowerShell 7: parallel (much faster)
+1..254 | ForEach-Object -Parallel {
+    $ip = "$using:SUBNET.$_"
+    if (Test-Connection -Count 1 -Quiet -ComputerName $ip) { Write-Output $ip }
+} -ThrottleLimit 50
+```
+
+---
+
 ## nmap
 
 Two-phase workflow: fast full TCP scan to find open ports, then a targeted service + script scan on just those ports.

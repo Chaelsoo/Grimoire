@@ -31,6 +31,40 @@ ffuf -u http://<IP>/login -X POST -d "username=FUZZ&password=test" -w users.txt 
 ffuf -u http://<IP>/page?FUZZ=test -w /usr/share/wordlists/seclists/Discovery/Web-Content/burp-parameter-names.txt -mc 200 -fs <size>
 ```
 
+## CeWL
+
+Crawls a target site and generates a wordlist from the words it finds. More effective than generic wordlists for password spraying and cracking on targets with unique terminology (product names, internal jargon, project names).
+
+```bash wrap
+# Basic: depth 2, min word length 5, save to file
+cewl http://$TARGET:$PORT/ -d 2 -m 5 -w cewl_out.txt
+
+# Include numbers in the wordlist
+cewl http://$TARGET/ -d 2 -m 5 --with-numbers -w cewl_out.txt
+
+# Extract emails too
+cewl http://$TARGET/ -d 2 -m 5 -e -w cewl_out.txt
+
+# With HTTP basic auth
+cewl http://$TARGET/ -d 2 -m 5 \
+  --auth-type basic --auth-user $USER --auth-pass $PASSWORD \
+  -w cewl_out.txt
+
+# With a session cookie (post-login pages)
+cewl http://$TARGET/ -d 3 -m 4 \
+  -H "Cookie: PHPSESSID=$SESSION_ID" \
+  -w cewl_out.txt
+
+# Include words from meta tags (-a) and verbose count
+cewl http://$TARGET/ -d 2 -m 5 -a -v -w cewl_out.txt
+```
+
+Combine with a base wordlist before cracking or spraying:
+
+```bash wrap
+cat /usr/share/wordlists/rockyou.txt cewl_out.txt | sort -u > combined.txt
+```
+
 ## gobuster
 
 Good alternative to ffuf for directory and DNS enumeration: simpler syntax when you don't need response filtering.
