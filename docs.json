@@ -210,6 +210,13 @@
             "icon": "envelope-certificate"
           },
           {
+            "group": "ADFS",
+            "pages": [
+              "active-directory/adfs"
+            ],
+            "icon": "id-card"
+          },
+          {
             "group": "Hardened Environments",
             "pages": [
               "active-directory/ntlm-disabled"
