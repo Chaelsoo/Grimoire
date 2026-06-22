@@ -169,6 +169,59 @@
         ]
       },
       {
+        "tab": "CPTS",
+        "icon": "graduation-cap",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["cpts/index"],
+            "icon": "street-view"
+          },
+          {
+            "group": "Recon & Enumeration",
+            "icon": "camera-cctv",
+            "pages": [
+              "cpts/footprinting",
+              "cpts/network-services",
+              "cpts/remote-management",
+              "cpts/web-enumeration",
+              "cpts/vulnerability-assessment",
+              "cpts/firewall-evasion"
+            ]
+          },
+          {
+            "group": "Exploitation",
+            "icon": "tachometer-fastest",
+            "pages": [
+              "cpts/shells-and-payloads",
+              "cpts/file-transfers",
+              "cpts/database-services",
+              "cpts/attacking-common-services",
+              "cpts/web-attacks"
+            ]
+          },
+          {
+            "group": "Post-Exploitation",
+            "icon": "user-secret",
+            "pages": [
+              "cpts/password-attacks",
+              "cpts/windows-privesc",
+              "cpts/linux-privesc",
+              "cpts/pivoting",
+              "cpts/active-directory"
+            ]
+          },
+          {
+            "group": "Capstone",
+            "icon": "flag-checkered",
+            "pages": [
+              "cpts/enterprise-networks",
+              "cpts/reporting"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Active Directory",
         "icon": "ad",
         "groups": [

