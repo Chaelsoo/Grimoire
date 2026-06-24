@@ -259,7 +259,7 @@ depth=0 C = US, ST = California, L = Sacramento, O = Inlanefreight,
 
 * **Hostname**: master.inlanefreight.htb
 * **Organization**: Inlanefreight
-* **Email**: <admin@inlanefreight.htb>
+* **Email**: \<admin@inlanefreight.htb>
 * **Location**: Sacramento, California
 
 ### **2. FTP Bounce Attacks**
@@ -446,7 +446,7 @@ ftpmap -s target_ip
 ## **References**
 
 * HTB Academy: Host Based Enumeration - FTP
-* vsftpd Documentation: <https://security.appspot.com/vsftpd.html>
+* vsftpd Documentation: https://security.appspot.com/vsftpd.html
 * RFC 959: File Transfer Protocol (FTP)
 * OWASP Testing Guide: Testing for FTP
 
@@ -671,11 +671,11 @@ rpcclient -U "username" target_ip
 | `enumdomains`             | Enumerate domains      |
 | `querydominfo`            | Domain information     |
 | `netshareenumall`         | List all shares        |
-| `netsharegetinfo <share>` | Share information      |
+| `netsharegetinfo \<share>` | Share information      |
 | `enumdomusers`            | Enumerate domain users |
-| `queryuser <RID>`         | User information       |
+| `queryuser \<RID>`         | User information       |
 | `enumdomgroups`           | Enumerate groups       |
-| `querygroup <RID>`        | Group information      |
+| `querygroup \<RID>`        | Group information      |
 
 **Example RPCclient Session:**
 
@@ -1845,7 +1845,7 @@ IMAP and POP3 are email retrieval protocols that allow clients to access email m
 | `1 LSUB "" *`                   | Returns subset of names from active/subscribed mailboxes |
 | `1 SELECT INBOX`                | Selects a mailbox for message access                     |
 | `1 UNSELECT INBOX`              | Exits the selected mailbox                               |
-| `1 FETCH <ID> all`              | Retrieves data associated with a message                 |
+| `1 FETCH \<ID> all`              | Retrieves data associated with a message                 |
 | `1 CLOSE`                       | Removes all messages with Deleted flag set               |
 | `1 LOGOUT`                      | Closes connection with IMAP server                       |
 
@@ -2435,8 +2435,8 @@ Some dangerous settings that administrators can configure with SNMP:
 | Setting                           | Description                                                   | Risk Level |
 | --------------------------------- | ------------------------------------------------------------- | ---------- |
 | `rwuser noauth`                   | Provides access to full OID tree without authentication       | Critical   |
-| `rwcommunity <community> <IPv4>`  | Provides access to full OID tree regardless of request source | Critical   |
-| `rwcommunity6 <community> <IPv6>` | Same as rwcommunity but for IPv6 addresses                    | Critical   |
+| `rwcommunity \<community> \<IPv4>`  | Provides access to full OID tree regardless of request source | Critical   |
+| `rwcommunity6 \<community> \<IPv6>` | Same as rwcommunity but for IPv6 addresses                    | Critical   |
 
 **High-Risk Configuration Examples:**
 
