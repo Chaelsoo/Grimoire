@@ -2,36 +2,6 @@
 title: "Database Services"
 ---
 
-- [MySQL Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/mysql-enumeration.md)
-- [MSSQL Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/mssql-enumeration.md)
-- [Oracle TNS Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/oracle-enumeration.md)
-- [SQL Basics](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/sql-basics.md)
-- [SQL Injection Cheatsheet](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/sql-injection-cheatsheet.md)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
----
-
-## MySQL Enumeration
-
 ## Overview
 
 MySQL is an open-source SQL relational database management system developed and supported by Oracle. A database is simply a structured collection of data organized for easy use and retrieval. The database system can quickly process large amounts of data with high performance.
@@ -516,26 +486,6 @@ MySQL [customers]> SELECT email FROM myTable WHERE name = "Otto Lang";
 * **HTB Academy**: Practical enumeration techniques
 * **Penetration Testing**: Real-world attack scenarios
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/mysql-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## MSSQL Enumeration
@@ -948,26 +898,6 @@ use auxiliary/scanner/mssql/mssql_login
 4. **Regular updates**: Apply security patches
 5. **Monitor access**: Enable audit logging
 6. **Network security**: Firewall restrictions
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/mssql-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -1542,26 +1472,6 @@ SQL> SELECT * FROM dba_tab_privs;
 5. **Monitor Access**: Enable audit logging
 6. **Least Privilege**: Restrict database user permissions
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/oracle-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## SQL Basics
@@ -2020,26 +1930,6 @@ SELECT department_id FROM departments WHERE department_name = 'Development';
 4. Explore: `SHOW TABLES;`
 5. Query: `SELECT * FROM table_name;`
 6. Target: `SELECT column FROM table WHERE condition;`
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/sql-basics.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -5034,23 +4924,3 @@ sqlmap -u "URL" --os-shell --batch
 4. Analyze results in Burp Scanner
 5. Manual verification with Repeater
 ```
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/database-services/sql-injection-cheatsheet.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

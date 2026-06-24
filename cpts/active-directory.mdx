@@ -2,58 +2,6 @@
 title: "Active Directory Enumeration & Attacks"
 ---
 
-- [Initial Domain Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/initial-enumeration-domain.md)
-- [LLMNR/NBT-NS Poisoning from Linux](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/llmnr-nbt-ns-poisoning-linux.md)
-- [LLMNR/NBT-NS Poisoning from Windows](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/llmnr-nbt-ns-poisoning-windows.md)
-- [Password Policy Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-policy-enumeration.md)
-- [Password Spraying - Target User Lists](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-spraying-user-list.md)
-- [Password Spraying from Linux](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-spraying-linux.md)
-- [Password Spraying from Windows](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-spraying-windows.md)
-- [Security Controls Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/security-controls-enumeration.md)
-- [Credentialed Enumeration from Linux](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/credentialed-enumeration-linux.md)
-- [Credentialed Enumeration from Windows](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/credentialed-enumeration-windows.md)
-- [Living Off the Land](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/living-off-the-land.md)
-- [Kerberoasting from Linux](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/kerberoasting-linux.md)
-- [Kerberoasting from Windows](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/kerberoasting-windows.md)
-- [ACL Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/acl-enumeration.md)
-- [ACL Abuse Tactics](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/acl-abuse-tactics.md)
-- [DCSync Attack](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/dcsync-attack.md)
-- [Privileged Access](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/privileged-access.md)
-- [Kerberos "Double Hop" Problem](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/kerberos-double-hop-problem.md)
-- [Bleeding Edge Vulnerabilities](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/bleeding-edge-vulnerabilities.md)
-- [Miscellaneous Misconfigurations](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/miscellaneous-misconfigurations.md)
-- [Domain Trusts Primer](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/domain-trusts-primer.md)
-- [Child → Parent Trust Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/child-parent-trust-attacks.md)
-- [Child → Parent Trust Attacks - from Linux](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/child-parent-trust-attacks-linux.md)
-- [Cross-Forest Trust Abuse - from Windows](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/cross-forest-trust-abuse-windows.md)
-- [Cross-Forest Trust Abuse - from Linux](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/cross-forest-trust-abuse-linux.md)
-- [Skills Assessment Part I - Complete Walkthrough](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/skills-assessment-part-1.md)
-- [Skills Assessment Part II - Advanced Professional Methodology](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/skills-assessment-part-2.md)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
----
-
-## Initial Domain Enumeration
-
 ## Page 5 - Initial Enumeration of the Domain
 
 ### Overview
@@ -425,26 +373,6 @@ cat valid_users | cut -d@ -f1 > usernames.txt
 ```
 
 This methodology provides a systematic approach to initial AD enumeration, balancing thoroughness with operational security considerations.
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/initial-enumeration-domain.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -898,26 +826,6 @@ cat /usr/share/responder/logs/SMB-NTLMv2-SSP-*.txt
 
 This poisoning technique provides an excellent foothold for domain penetration testing by exploiting fundamental Windows networking protocols.
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/llmnr-nbt-ns-poisoning-linux.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## LLMNR/NBT-NS Poisoning from Windows
@@ -1287,26 +1195,6 @@ hashcat -m 5600 -w 3 -O svc_qualys_hash.txt /usr/share/wordlists/rockyou.txt
 ***
 
 *This attack is effective when LLMNR/NBT-NS protocols are enabled and demonstrates the importance of proper network configuration and monitoring.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/llmnr-nbt-ns-poisoning-windows.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -1804,26 +1692,6 @@ Get-DomainPolicy
 
 *Understanding the password policy is fundamental to safe and effective credential attacks in Active Directory environments.*
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-policy-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Password Spraying - Target User Lists
@@ -2320,26 +2188,6 @@ Get-DomainUser | Select samaccountname
 ***
 
 *Accurate user enumeration is the foundation of successful password spraying - take time to build comprehensive, clean lists while respecting account lockout policies.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-spraying-user-list.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -2909,26 +2757,6 @@ grep "Authority Name" rpc_output.txt | awk '{print $3}' | cut -d',' -f1
 ***
 
 *Password spraying success requires patience, methodology, and respect for account lockout policies - one successful credential can open the entire domain.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-spraying-linux.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -3500,26 +3328,6 @@ Test-WSMan -ComputerName TARGET -Credential $cred
 ***
 
 *Windows-based password spraying combines the power of domain integration with intelligent automation - making it one of the most effective credential discovery methods in Active Directory environments.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/password-spraying-windows.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -4213,26 +4021,6 @@ try { [System.IO.File]::ReadAllText("C:\Windows\System32\drivers\etc\hosts") } c
 
 *Understanding security controls is essential for effective Active Directory enumeration - know your restrictions before you engage, and always have a plan B when controls block your primary approach.*
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/security-controls-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Credentialed Enumeration from Linux
@@ -4639,26 +4427,6 @@ python3 -c "print(hex(1170))"  # Converts decimal to hex for rpcclient
 ***
 
 *Credentialed enumeration from Linux provides powerful capabilities for AD assessment - with valid credentials, even low-privilege accounts can reveal extensive domain intelligence for strategic attack planning.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/credentialed-enumeration-linux.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -5410,26 +5178,6 @@ $admins | ForEach-Object {
 ***
 
 *Windows-based credentialed enumeration provides the deepest insight into Active Directory environments - leveraging native tools and comprehensive frameworks to map the entire domain landscape and identify critical attack paths.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/credentialed-enumeration-windows.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -6300,26 +6048,6 @@ After native enumeration, typical next steps include:
 
 *Living off the land demonstrates that comprehensive Active Directory enumeration is possible using only native Windows tools - proving that security through obscurity is insufficient and that proper access controls and monitoring are essential for domain protection.*
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/living-off-the-land.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Kerberoasting from Linux
@@ -6914,26 +6642,6 @@ crackmapexec smb [DC_IP] -u [CRACKED_USER] -p '[CRACKED_PASS]'
 ***
 
 *Kerberoasting remains one of the most effective Active Directory attack techniques - by targeting the intersection of service requirements and administrative convenience, it often provides a direct path to high-privilege access in enterprise environments.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/kerberoasting-linux.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -7669,26 +7377,6 @@ Get-DomainUser * -spn | select samaccountname,serviceprincipalname
 ***
 
 *Windows-based Kerberoasting provides the most comprehensive and feature-rich approach to this attack, offering everything from stealthy manual techniques to powerful automated frameworks that can extract and process tickets at scale.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/kerberoasting-windows.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -8469,26 +8157,6 @@ Get-DomainGroup -Identity [GROUP_NAME] | select memberof
 ***
 
 *ACL enumeration transforms scattered AD permissions into clear attack paths, revealing how seemingly innocuous user rights can escalate to complete domain compromise through systematic privilege chaining.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/acl-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -9281,26 +8949,6 @@ $krb5tgs$23$*adunn$INLANEFREIGHT.LOCAL$notahacker/LEGIT@INLANEFREIGHT.LOCAL*$d4c
 
 ***
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/acl-abuse-tactics.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## DCSync Attack
@@ -10082,26 +9730,6 @@ Initial Access → ACL Enumeration → ACL Abuse → DCSync → Domain Admin
 **🔑 Complete adversarial simulation mastery achieved - from initial enumeration through ACL abuse to ultimate domain compromise via DCSync - representing the pinnacle of Active Directory penetration testing capabilities!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/dcsync-attack.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -10923,26 +10551,6 @@ Credential Extraction → Privilege Mapping → Lateral Movement → Data Exfilt
 
 ***
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/privileged-access.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Kerberos "Double Hop" Problem
@@ -11659,26 +11267,6 @@ execute
 **🔑 Complete mastery of Kerberos "Double Hop" Problem - from technical understanding through practical workarounds to advanced attack chains - representing essential Active Directory lateral movement expertise for enterprise penetration testing!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/kerberos-double-hop-problem.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -12442,26 +12030,6 @@ Vulnerability Research → Tool Setup → Target Assessment → Exploitation →
 **🔑 Complete mastery of bleeding edge Active Directory vulnerabilities - from theoretical understanding through practical exploitation to defensive implementation - representing cutting-edge enterprise penetration testing capabilities for the most current threat landscape!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/bleeding-edge-vulnerabilities.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -13535,26 +13103,6 @@ Standard Enumeration → Miscellaneous Discovery → Exploitation → Comprehens
 
 ***
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/miscellaneous-misconfigurations.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Domain Trusts Primer
@@ -13754,26 +13302,6 @@ PowerView Trust Mapping → Trust Type Analysis → Cross-Domain Enumeration →
 **🔗 Domain trust enumeration provides critical infrastructure mapping for advanced Active Directory attacks - essential foundation for trust-based privilege escalation and cross-domain exploitation!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/domain-trusts-primer.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -14008,26 +13536,6 @@ Child Domain Compromise → KRBTGT Hash + SIDs → Golden Ticket Creation → Pa
 **⬆️ Child → Parent trust attacks represent one of the most powerful AD privilege escalation techniques - transforming limited child domain access into complete forest control through SID History exploitation!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/child-parent-trust-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -14288,26 +13796,6 @@ Windows Mimikatz/Rubeus ↔ Linux Impacket Toolkit
 
 ***
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/child-parent-trust-attacks-linux.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Cross-Forest Trust Abuse - from Windows
@@ -14563,26 +14051,6 @@ Trust Discovery → Cross-Forest Enumeration → Attack Execution → Forest Com
 
 ***
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/cross-forest-trust-abuse-windows.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Cross-Forest Trust Abuse - from Linux
@@ -14823,26 +14291,6 @@ Linux Impacket Tools → Cross-Forest Enumeration → Multi-Domain Compromise �
 **🐧 Linux-based Cross-Forest Trust Abuse provides comprehensive multi-domain attack capability - demonstrating that sophisticated forest boundary exploitation can be executed effectively from any platform using powerful Python-based tools!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/cross-forest-trust-abuse-linux.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -15266,26 +14714,6 @@ Credential Dumping → Cleartext Discovery → Privilege Analysis → Domain Tak
 **🎯 This Skills Assessment demonstrates the complete AD attack methodology - from initial foothold to full domain compromise using practical techniques that work reliably in real-world scenarios!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/skills-assessment-part-1.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -15880,23 +15308,3 @@ ssh -D 9050 → proxychains → ALL TOOLS WORK
 **🏆 This Skills Assessment demonstrates the evolution from complex exploitation frameworks to streamlined professional methodology - SSH dynamic port forwarding + proxychains + native AD tools = the ultimate pentesting approach!**
 
 ***
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/active-directory-enumeration-and-attacks/skills-assessment-part-2.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

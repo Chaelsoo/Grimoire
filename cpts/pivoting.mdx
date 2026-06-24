@@ -2,46 +2,6 @@
 title: "Pivoting, Tunneling & Port Forwarding"
 ---
 
-- [Module Overview](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/pivoting-overview.md)
-- [SSH Tunneling Complete Guide](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/ssh-tunneling.md)
-- [Dynamic Port Forwarding](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/dynamic-port-forwarding.md)
-- [Remote Port Forwarding](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/remote-port-forwarding.md)
-- [Chisel SOCKS5 Tunneling](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/chisel-socks5-tunneling.md)
-- [SSHuttle Pivoting](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/sshuttle-pivoting.md)
-- [Meterpreter Tunneling](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/meterpreter-tunneling.md)
-- [Socat Redirection](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/socat-redirection.md)
-- [Plink Windows Pivoting](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/plink-windows-pivoting.md)
-- [Netsh Port Forwarding](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/netsh-windows-portforward.md)
-- [SocksOverRDP](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/socksoverrdp-windows-pivoting.md)
-- [Rpivot Web Pivoting](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/rpivot-web-pivoting.md)
-- [DNS Tunneling with dnscat2](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/dnscat2-dns-tunneling.md)
-- [ICMP Tunneling with ptunnel-ng](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/ptunnel-ng-icmp-tunneling.md)
-- [Complete Skills Assessment](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/skills-assessment-complete-walkthrough.md)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
----
-
-## Module Overview
-
 ## **Module Introduction**
 
 This module covers pivoting, tunneling, and port forwarding techniques essential for CPTS certification. Based on HTB Academy's comprehensive course, these techniques allow penetration testers to:
@@ -411,26 +371,6 @@ Attack Host → Ubuntu Server (10.129.202.64) → Windows DC (172.16.5.19)
 * **Proxychains**: `/etc/proxychains.conf` configuration
 * **SOCKS Protocol**: RFC 1928 (SOCKS5), RFC 1929 (Authentication)
 * **Network Fundamentals**: RFC 1918 (Private Address Space)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/pivoting-overview.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -820,26 +760,6 @@ ssh -p 2222 user@pivot.com
 * SSH Config: `man ssh_config`
 * OpenSSH Cookbook: <https://en.wikibooks.org/wiki/OpenSSH>
 * HTB Academy: Pivoting, Tunneling & Port Forwarding
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/ssh-tunneling.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -1344,26 +1264,6 @@ nmap/tools                     localhost:9050       SSH:22     172.16.5.0/24
 * SSH Manual: `man ssh`
 * Proxychains: `/etc/proxychains.conf`
 * SOCKS Protocol: RFC 1928 (SOCKS5)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/dynamic-port-forwarding.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -2257,26 +2157,6 @@ telnet 172.16.5.19 3389
 * **SSH Manual**: `man ssh` (Remote port forwarding)
 * **Metasploit**: `use exploit/multi/handler`
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/remote-port-forwarding.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Chisel SOCKS5 Tunneling
@@ -2977,26 +2857,6 @@ proxychains firefox http://172.16.5.19/webapp
 * **Oxdf Blog**: [Tunneling with Chisel and SSF](https://0xdf.gitlab.io/2020/08/10/tunneling-with-chisel-and-ssf-update.html)
 * **IppSec Video**: [Reddish Box Walkthrough](https://www.youtube.com/watch?v=Yp4oxoQIBAM\&t=1469s)
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/chisel-socks5-tunneling.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## SSHuttle Pivoting
@@ -3666,26 +3526,6 @@ python3 -c "import socket; s=socket.socket(); s.connect(('172.16.5.19', 80))"
 * **sshuttle Documentation**: [ReadTheDocs](https://sshuttle.readthedocs.io/)
 * **Man Page**: `man sshuttle`
 * **Python SSH Tunneling**: [SSH Tunnel Techniques](https://www.pythonsecrets.com/ssh-tunneling/)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/sshuttle-pivoting.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -4382,26 +4222,6 @@ run
 * **Metasploit Documentation**: [Meterpreter Portfwd](https://docs.metasploit.com/)
 * **SANS**: [Metasploit Pivoting Techniques](https://www.sans.org)
 * **Rapid7**: [AutoRoute Module Documentation](https://rapid7.github.io/metasploit-framework/api/)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/meterpreter-tunneling.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -5175,26 +4995,6 @@ netsh advfirewall show allprofiles
 * **Penetration Testing**: [Socat Cheat Sheet](https://highon.coffee/blog/socat-cheat-sheet/)
 * **Red Team Notes**: [Socat Pivoting Techniques](https://ired.team/offensive-security/lateral-movement/socat-redirection)
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/socat-redirection.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Plink Windows Pivoting
@@ -5779,26 +5579,6 @@ nmap --proxy socks4://127.0.0.1:9050 172.16.5.19
 * **SANS**: [SSH Tunneling with Windows](https://www.sans.org/blog/ssh-tunneling-with-windows/)
 * **Microsoft**: [Windows SSH Client](https://docs.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse)
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/plink-windows-pivoting.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Netsh Port Forwarding
@@ -6350,26 +6130,6 @@ netsh.exe interface portproxy add v4tov4 listenport=8083 listenaddress=0.0.0.0 c
 * **Netsh Portproxy**: [Port Proxy Commands](https://docs.microsoft.com/en-us/windows-server/networking/technologies/netsh/netsh-interface-portproxy)
 * **Windows Network Security**: [Security Considerations](https://docs.microsoft.com/en-us/windows/security/threat-protection/)
 * **SANS Windows Pivoting**: [Windows Lateral Movement Techniques](https://www.sans.org/blog/windows-lateral-movement/)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/netsh-windows-portforward.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -7099,26 +6859,6 @@ Test-NetConnection 172.16.6.0/24 -Port 80,443,3389
 * **RDP DVC Documentation**: [Microsoft Dynamic Virtual Channels](https://docs.microsoft.com/en-us/windows/win32/termserv/terminal-services-virtual-channels)
 * **Windows RDP Security**: [RDP Security Best Practices](https://docs.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/remote-desktop-allow-access)
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/socksoverrdp-windows-pivoting.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Rpivot Web Pivoting
@@ -7755,26 +7495,6 @@ wireshark -f "port 9050"
 * **Python 2.7 Documentation**: [Legacy Python Docs](https://docs.python.org/2.7/)
 * **SOCKS Protocol**: [RFC 1928 - SOCKS Version 5](https://tools.ietf.org/html/rfc1928)
 * **NTLM Authentication**: [Microsoft NTLM Documentation](https://docs.microsoft.com/en-us/windows/security/)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/rpivot-web-pivoting.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -8477,26 +8197,6 @@ Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "WindowsUpdat
 * **Dnscat2-PowerShell**: [PowerShell Client](https://github.com/lukebaggett/dnscat2-powershell)
 * **DNS Protocol**: [RFC 1035 - Domain Names](https://tools.ietf.org/html/rfc1035)
 * **DNS Security**: [SANS DNS Security](https://www.sans.org/blog/dns-security-threats/)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/dnscat2-dns-tunneling.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -9295,26 +8995,6 @@ exploit
 * **Network Tunneling**: [SANS Tunneling Guide](https://www.sans.org/reading-room/whitepapers/protocols/tunneling-protocols-security-issues-1674)
 * **Covert Channels**: [ICMP Covert Channel Analysis](https://www.symantec.com/connect/articles/icmp-covert-channel-analysis)
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/ptunnel-ng-icmp-tunneling.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## Complete Skills Assessment
@@ -10007,23 +9687,3 @@ proxychains xfreerdp /v:172.16.5.35 /u:mlefay /p:'Plain Human work!'
 # Via Port Forward
 xfreerdp /v:127.0.0.1:13389 /u:mlefay /p:'Plain Human work!'
 ```
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/pivoting-tunneling-and-port-forwarding/skills-assessment-complete-walkthrough.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

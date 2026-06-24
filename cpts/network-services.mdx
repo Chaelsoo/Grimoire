@@ -2,38 +2,6 @@
 title: "Network Services"
 ---
 
-- [FTP Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ftp-enumeration.md)
-- [SMB Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smb-enumeration.md)
-- [NFS Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/nfs-enumeration.md)
-- [SMTP Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smtp-enumeration.md)
-- [Email Services (IMAP/POP3)](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/email-enumeration.md)
-- [SNMP Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/snmp-enumeration.md)
-- [IPMI Enumeration](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ipmi-enumeration.md)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
----
-
-## FTP Enumeration
-
 ## **Protocol Overview**
 
 **FTP Characteristics:**
@@ -481,26 +449,6 @@ ftpmap -s target_ip
 * vsftpd Documentation: <https://security.appspot.com/vsftpd.html>
 * RFC 959: File Transfer Protocol (FTP)
 * OWASP Testing Guide: Testing for FTP
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ftp-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -1106,26 +1054,6 @@ nmap -p445 --script smb-enum-*,smb-vuln-*,smb-os-discovery target_ip
 * **Monitor SMB traffic** - Detect anomalies
 * **Implement SMB over VPN** - Secure remote access
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smb-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## NFS Enumeration
@@ -1400,26 +1328,6 @@ umount /mnt/nfs-share
 # Remove mount point
 rmdir /mnt/nfs-share
 ```
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/nfs-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -1885,26 +1793,6 @@ grep "User unknown" /var/log/maillog
 2. **Minimal configuration**: Disable unnecessary features
 3. **Access controls**: Restrict SMTP access
 4. **Encryption**: Use TLS for mail transmission
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/smtp-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -2445,26 +2333,6 @@ done
 * Intercept plaintext connections
 * Certificate validation bypass
 * Credential harvesting
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/email-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -3119,26 +2987,6 @@ grep "snmp" /var/log/syslog
 * Interface configuration review
 * Network device identification
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/snmp-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## IPMI Enumeration
@@ -3731,23 +3579,3 @@ ipmitool -I lanplus -H target -U admin -P pass user enable 3
 3. **Vulnerability scanning**
 4. **Access control reviews**
 5. **Incident response procedures**
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/network-services/ipmi-enumeration.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

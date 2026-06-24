@@ -2,38 +2,6 @@
 title: "Attacking Common Services"
 ---
 
-- [FTP Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/ftp-attacks.md)
-- [SMB Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/smb-attacks.md)
-- [SQL Database Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/sql-attacks.md)
-- [DNS Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/dns-attacks.md)
-- [RDP Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/rdp-attacks.md)
-- [Email Services Attacks](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/smtp-attacks.md)
-- [Skills Assessment Scenarios](https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/skills-assessment.md)
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
----
-
-## FTP Attacks
-
 ## 🎯 Overview
 
 This document covers **exploitation techniques** against FTP services, focusing on practical attack methodologies from HTB Academy's "Attacking Common Services" module. Unlike enumeration, these techniques aim to **gain unauthorized access, escalate privileges, or exploit misconfigurations**.
@@ -294,26 +262,6 @@ nmap -Pn -v -n -p80 -b anonymous:password@ftp_server internal_target
 ***
 
 *This document provides comprehensive FTP attack methodologies based on HTB Academy's "Attacking Common Services" module, focusing on practical exploitation techniques for penetration testing and security assessment.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/ftp-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -749,26 +697,6 @@ cat flag.txt
 * **CrackMapExec Wiki** - Advanced SMB testing
 * **Responder Documentation** - LLMNR/NBT-NS poisoning
 * **Microsoft SMB Protocol** - Official specifications
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/smb-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -1503,26 +1431,6 @@ HTB{...}
 
 *This document provides comprehensive SQL database attack methodologies based on HTB Academy's "Attacking Common Services" module, focusing on practical exploitation techniques for penetration testing and security assessment.*
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/sql-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## DNS Attacks
@@ -2017,26 +1925,6 @@ done
 
 *This document provides comprehensive DNS attack methodologies based on HTB Academy's "Attacking Common Services" module, focusing on practical exploitation techniques for penetration testing and security assessment.*
 
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/dns-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
-
 ---
 
 ## RDP Attacks
@@ -2472,26 +2360,6 @@ xfreerdp /v:10.129.203.13 /u:administrator /pth:HASH_VALUE
 ***
 
 *This document provides comprehensive RDP attack methodologies based on HTB Academy's "Attacking Common Services" module, focusing on practical exploitation techniques for penetration testing and security assessment.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/rdp-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -3307,26 +3175,6 @@ smtp-vuln-cve2011-1764  # Exim vulnerability
 ***
 
 *This document provides comprehensive SMTP attack methodologies based on HTB Academy's "Attacking Common Services" module, focusing on practical exploitation techniques for penetration testing and security assessment.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/smtp-attacks.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
 
 ---
 
@@ -4702,23 +4550,3 @@ Advanced Level (Hard):
 ***
 
 *This complete Skills Assessment trilogy provides comprehensive practical scenarios spanning beginner to expert levels, demonstrating the full spectrum of attack techniques covered in the "Attacking Common Services" module for thorough CPTS exam preparation.*
-
-
----
-
-# Agent Instructions
-This documentation is published with GitBook. GitBook is the documentation platform designed so that both humans and AI agents can read, navigate, and reason over technical content effectively. Learn more at gitbook.com.
-
-## Querying This Documentation
-If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
-
-Perform an HTTP GET request on the current page URL with the `ask` query parameter:
-
-```
-GET https://kabaneridev.gitbook.io/pentesting-notes/certification-preparation/cpts-prep/attacking-common-services/skills-assessment.md?ask=<question>
-```
-
-The question should be specific, self-contained, and written in natural language.
-The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
-
-Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.
