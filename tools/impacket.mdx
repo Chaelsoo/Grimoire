@@ -43,6 +43,58 @@ Every impacket tool accepts credentials in the same three forms. Set up once, re
 Always use the DC/target **hostname** with `-k`, never the IP. If DNS doesn't resolve, add the host to `/etc/hosts` and point to `$DC_IP`.
 </Info>
 
+### krb5.conf Template
+
+Linux Kerberos tools read `/etc/krb5.conf` to know which KDC to contact and how to map realms to domains. Without it, most tools either fail or fall back to DNS discovery (which may not work inside a lab).
+
+```ini wrap
+[libdefaults]
+    default_realm = DOMAIN.LOCAL
+    dns_lookup_realm = false
+    dns_lookup_kdc = false
+    ticket_lifetime = 24h
+    renew_lifetime = 7d
+    forwardable = true
+    rdns = false
+    noaddresses = true
+
+[realms]
+    DOMAIN.LOCAL = {
+        kdc = dc01.domain.local
+        admin_server = dc01.domain.local
+    }
+
+[domain_realm]
+    .domain.local = DOMAIN.LOCAL
+    domain.local = DOMAIN.LOCAL
+```
+
+Replace `DOMAIN.LOCAL` with your domain in uppercase, `domain.local` with the lowercase FQDN, and `dc01.domain.local` with the DC hostname. Add `/etc/hosts` entries if DNS does not resolve the DC hostname:
+
+```bash wrap
+echo "$DC_IP  dc01.domain.local dc01" | sudo tee -a /etc/hosts
+```
+
+For multiple domains or child domains, add a block per realm:
+
+```ini wrap
+[realms]
+    DOMAIN.LOCAL = {
+        kdc = dc01.domain.local
+        admin_server = dc01.domain.local
+    }
+    CHILD.DOMAIN.LOCAL = {
+        kdc = child-dc.child.domain.local
+        admin_server = child-dc.child.domain.local
+    }
+
+[domain_realm]
+    .domain.local = DOMAIN.LOCAL
+    domain.local = DOMAIN.LOCAL
+    .child.domain.local = CHILD.DOMAIN.LOCAL
+    child.domain.local = CHILD.DOMAIN.LOCAL
+```
+
 ## Remote Execution
 
 Pick based on noise level: psexec creates a service (very loud), wmiexec runs in WMI (quieter), atexec uses the task scheduler (least trace).
