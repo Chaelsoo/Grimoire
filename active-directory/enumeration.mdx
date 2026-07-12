@@ -36,10 +36,29 @@ enum4linux-ng -A $IP
 
 Once you have creds, enumerate everything before touching exploits.
 
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    bloodhound-python -u $USER -p $PASSWORD -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --bloodhound -c all
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    bloodhound-python -u $USER --hashes :$NTHASH -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --bloodhound -c all
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    bloodhound-python -u $USER -k -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
+    nxc ldap $DC_IP -u $USER --use-kcache -d $DOMAIN --dns-server $DC_IP --bloodhound -c all
+    ```
+  </Tab>
+</Tabs>
+
 ```bash wrap
-# BloodHound collection (most important)
-bloodhound-python -u $USER -p $PASSWORD -d $DOMAIN -dc $DC_HOST -c all -ns $DC_IP
-nxc ldap $IP -u $USER -p $PASSWORD --bloodhound -c all
 
 # Dump all AD objects to HTML
 ldapdomaindump -u '$DOMAIN\\$USER' -p $PASSWORD $DC_IP
@@ -59,22 +78,35 @@ nxc smb $IP -u $USER -p $PASSWORD -M spider_plus
 
 Use smbclient to interactively browse shares and transfer files. More flexible than nxc for actually reading and downloading content.
 
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    smbclient -L //$IP -U $DOMAIN/$USER%$PASSWORD
+    smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    smbclient -L //$IP -U $DOMAIN/$USER%$NTHASH --pw-nt-hash
+    smbclient //$IP/$SHARE -U $DOMAIN/$USER%$NTHASH --pw-nt-hash
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    smbclient -L //$HOSTNAME -k
+    smbclient //$HOSTNAME/$SHARE -k
+    ```
+  </Tab>
+</Tabs>
+
 ```bash wrap
-# List shares
-smbclient -L //$IP -U $USER%$PASSWORD
-
-# Connect to a share
-smbclient //$IP/share -U $USER%$PASSWORD
-
-# Pass the hash
-smbclient //$IP/share -U $USER%$HASH --pw-nt-hash
-
 # Non-interactive: run a single command and exit
-smbclient //$IP/share -U $USER%$PASSWORD -c 'ls'
-smbclient //$IP/share -U $USER%$PASSWORD -c 'get file.txt'
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD -c 'ls'
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD -c 'get file.txt'
 
 # Recursive download of entire share
-smbclient //$IP/share -U $USER%$PASSWORD -c 'recurse; prompt; mget *'
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD -c 'recurse; prompt off; mget *'
 ```
 
 Inside an smbclient session:

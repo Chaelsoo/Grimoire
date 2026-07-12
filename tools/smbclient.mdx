@@ -1,0 +1,160 @@
+---
+title: "SMB Clients"
+---
+
+Two tools for browsing SMB shares interactively from Linux: the native Samba `smbclient` and the impacket `smbclient.py`. Both support password, NT hash, and Kerberos auth but with different syntax.
+
+---
+
+## smbclient (native Samba)
+
+The standard Samba tool. Available on every Kali/Parrot install. Use for quick share browsing, file transfer, and pass-the-hash.
+
+### Listing Shares
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    smbclient -L //$IP -U $DOMAIN/$USER%$PASSWORD
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    smbclient -L //$IP -U $DOMAIN/$USER%$NTHASH --pw-nt-hash
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Requires KRB5CCNAME set and hostname (not IP)
+    export KRB5CCNAME=/tmp/ticket.ccache
+    smbclient -L //$HOSTNAME -k
+    ```
+  </Tab>
+  <Tab title="Null Session">
+    ```bash wrap
+    smbclient -L //$IP -N
+    smbclient -L //$IP -U ''%''
+    ```
+  </Tab>
+</Tabs>
+
+### Connecting to a Share
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    smbclient //$IP/$SHARE -U $DOMAIN/$USER%$NTHASH --pw-nt-hash
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    smbclient //$HOSTNAME/$SHARE -k
+    smbclient //$HOSTNAME/$SHARE -k -U $USER
+    ```
+  </Tab>
+</Tabs>
+
+### Non-Interactive (Single Commands)
+
+```bash wrap
+# Run a single command and exit (-c flag)
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD -c 'ls'
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD -c 'get secrets.txt'
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD -c 'put payload.exe'
+
+# Recursive download of entire share
+smbclient //$IP/$SHARE -U $DOMAIN/$USER%$PASSWORD \
+  -c 'recurse; prompt off; mget *'
+```
+
+### Interactive Session Commands
+
+```text wrap
+ls                        # list current directory
+cd path                   # change directory
+get file.txt              # download file
+put local.txt             # upload file
+recurse on                # enable recursive listing
+prompt off                # disable confirmation prompts for mget/mput
+mget *                    # download everything (run recurse + prompt first)
+mput *                    # upload everything
+del file.txt              # delete remote file
+mkdir newdir              # create remote directory
+exit                      # quit
+```
+
+### Useful Flags
+
+```bash wrap
+-N                        # no password (null/anonymous session)
+-p PORT                   # custom port (default 445)
+--signing=off             # disable SMB signing requirement
+--max-protocol SMB2       # force SMB2
+--option='client min protocol=NT1'  # force SMBv1 (legacy targets)
+```
+
+---
+
+## smbclient.py (impacket)
+
+The impacket equivalent. Useful when native smbclient isn't available or when you need impacket's Kerberos handling. Shares the same auth flags as the rest of impacket.
+
+### Connecting
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Opens interactive shell listing shares
+    smbclient.py $DOMAIN/$USER:$PASSWORD@$IP
+
+    # Connect directly to a specific share
+    smbclient.py $DOMAIN/$USER:$PASSWORD@$IP -share $SHARE
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    smbclient.py -hashes :$NTHASH $DOMAIN/$USER@$IP
+    smbclient.py -hashes :$NTHASH $DOMAIN/$USER@$IP -share $SHARE
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    # Hostname required — not IP
+    export KRB5CCNAME=/tmp/ticket.ccache
+    smbclient.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    smbclient.py -k -no-pass $DOMAIN/$USER@$HOSTNAME -share $SHARE
+    ```
+  </Tab>
+</Tabs>
+
+### Interactive Session Commands
+
+```text wrap
+shares                    # list available shares
+use ShareName             # switch to a share
+ls                        # list files in current directory
+cd path                   # change directory
+get file.txt              # download file
+put local.txt             # upload file
+cat file.txt              # print file contents
+mkdir newdir              # create directory
+rm file.txt               # delete file
+info                      # show server info
+exit                      # quit
+```
+
+### Key Differences vs Native smbclient
+
+| Feature | smbclient | smbclient.py |
+|---------|-----------|-------------|
+| NT Hash PTH | `--pw-nt-hash` flag | `-hashes :NT` |
+| Kerberos | `-k` (system ccache) | `-k -no-pass` + `KRB5CCNAME` |
+| Share selection | Path in URL (`//ip/share`) | `use ShareName` command or `-share` flag |
+| Recursive download | `recurse on; mget *` | manual `get` per file |
+| Availability | Installed by default | Requires impacket |

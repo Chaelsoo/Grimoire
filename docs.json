@@ -115,6 +115,41 @@
         ]
       },
       {
+        "tab": "C2 & Frameworks",
+        "icon": "terminal",
+        "groups": [
+          {
+            "group": "C2",
+            "pages": [
+              "tools/sliver"
+            ],
+            "icon": "dragon"
+          },
+          {
+            "group": "Impacket Suite",
+            "pages": [
+              "tools/impacket",
+              "tools/smbclient"
+            ],
+            "icon": "toolbox"
+          },
+          {
+            "group": "NetExec",
+            "pages": [
+              "tools/nxc"
+            ],
+            "icon": "wifi"
+          },
+          {
+            "group": "bloodyAD",
+            "pages": [
+              "tools/bloodyad"
+            ],
+            "icon": "droplet"
+          }
+        ]
+      },
+      {
         "tab": "Recon & Tools",
         "icon": "stool",
         "groups": [
@@ -130,27 +165,10 @@
             "icon": "camera-cctv"
           },
           {
-            "group": "Tools",
-            "pages": [
-              "tools/index"
-            ],
-            "icon": "toolbox"
-          },
-          {
-            "group": "C2 & Frameworks",
-            "pages": [
-              "tools/sliver",
-              "tools/impacket",
-              "tools/nxc"
-            ],
-            "icon": "phoenix-framework"
-          },
-          {
             "group": "Enumeration",
             "pages": [
               "tools/nmap",
-              "tools/bloodhound",
-              "tools/bloodyad"
+              "tools/bloodhound"
             ],
             "icon": "user-viewfinder"
           },

