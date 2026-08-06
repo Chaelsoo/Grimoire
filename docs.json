@@ -74,7 +74,10 @@
               "web/lfi-rfi",
               "web/cmdi",
               "web/file-upload",
-              "web/auth-bypass"
+              "web/auth-bypass",
+              "web/ssti",
+              "web/ssi",
+              "web/xslt"
             ],
             "icon": "bugs"
           },

