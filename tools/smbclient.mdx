@@ -158,3 +158,129 @@ exit                      # quit
 | Share selection | Path in URL (`//ip/share`) | `use ShareName` command or `-share` flag |
 | Recursive download | `recurse on; mget *` | manual `get` per file |
 | Availability | Installed by default | Requires impacket |
+
+---
+
+## smbcacls
+
+Read and modify Windows DACLs on SMB shares from Linux. Useful for confirming write permissions before attempting ACL abuse or privilege escalation through share ACEs.
+
+### Syntax
+
+```
+smbcacls //$TARGET/$SHARE "path\to\object" [options] -U $DOMAIN/$USER%$PASSWORD
+```
+
+The path is relative to the share root using backslashes. Use an empty string `""` for the share root itself.
+
+### Flags
+
+<AccordionGroup>
+  <Accordion title="Authentication">
+    | Flag | Description |
+    |------|-------------|
+    | `-U $DOMAIN/$USER%$PASSWORD` | Password authentication |
+    | `-N` | Null/anonymous session |
+    | `--no-pass` | Same as `-N` |
+    | `-k` | Kerberos auth from ccache |
+  </Accordion>
+  <Accordion title="ACL Modification">
+    | Flag | Description |
+    |------|-------------|
+    | `-A acl` | Add an ACE to the DACL |
+    | `-M acl` | Modify an existing ACE |
+    | `-D acl` | Delete an ACE |
+    | `-S acl` | Replace the entire DACL |
+    | `-C owner` | Change owner |
+    | `-G group` | Change group |
+    | `--propagate-inheritance` | Cascade ACE changes to children |
+    | `-R` | Recurse into subdirectories |
+  </Accordion>
+</AccordionGroup>
+
+### Reading ACLs
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Folder
+    smbcacls //$TARGET/$SHARE "$DOMAIN\scripts" -U $DOMAIN/$USER%$PASSWORD
+
+    # Specific file
+    smbcacls //$TARGET/$SHARE "$DOMAIN\scripts\login.vbs" -U $DOMAIN/$USER%$PASSWORD
+
+    # Share root
+    smbcacls //$TARGET/$SHARE "" -U $DOMAIN/$USER%$PASSWORD
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    KRB5CCNAME=$USER.ccache smbcacls //$TARGET/$SHARE "$DOMAIN\scripts" -k
+    ```
+  </Tab>
+  <Tab title="Null Session">
+    ```bash wrap
+    smbcacls //$TARGET/$SHARE "$DOMAIN\scripts" -N
+    ```
+  </Tab>
+</Tabs>
+
+### Reading the Output
+
+```
+REVISION:1
+CONTROL:SR|PD|DI|DP
+OWNER:BUILTIN\Administrators
+GROUP:NT AUTHORITY\SYSTEM
+ACL:Everyone:ALLOWED/OI|CI/FULL
+```
+
+ACE format: `PRINCIPAL:TYPE/INHERITANCE_FLAGS/RIGHTS`
+
+<AccordionGroup>
+  <Accordion title="CONTROL Flags">
+    | Flag | Meaning |
+    |------|---------|
+    | `SR` | Self-relative descriptor |
+    | `PD` | DACL protected (no inheritance from parent) |
+    | `DI` | DACL inherited |
+    | `DP` | DACL present |
+  </Accordion>
+  <Accordion title="ACE Type">
+    | Value | Meaning |
+    |-------|---------|
+    | `ALLOWED` | Access allowed ACE |
+    | `DENIED` | Access denied ACE |
+    | `AUDIT` | Audit ACE |
+  </Accordion>
+  <Accordion title="Inheritance Flags">
+    | Flag | Meaning |
+    |------|---------|
+    | `OI` | Object Inherit: ACE propagates to child files |
+    | `CI` | Container Inherit: ACE propagates to child folders |
+    | `IO` | Inherit Only: applies to children, not the object itself |
+    | `NP` | No Propagate: do not inherit further down |
+    | `I` | ACE was inherited from parent |
+  </Accordion>
+  <Accordion title="Rights">
+    | Value | Meaning |
+    |-------|---------|
+    | `FULL` | Full Control |
+    | `READ` | Read only |
+    | `CHANGE` | Read, Write, Execute (no ACL change) |
+    | `0x001F01FF` | Full control (raw bitmask) |
+  </Accordion>
+</AccordionGroup>
+
+### What to Look for in Recon
+
+```
+ACL:Everyone:ALLOWED/OI|CI/FULL
+ACL:NT AUTHORITY\Authenticated Users:ALLOWED/OI|CI/FULL
+ACL:BUILTIN\Server Operators:ALLOWED/OI|CI/READ
+ACL:CREATOR OWNER:ALLOWED/OI|CI|IO/FULL
+```
+
+<Info>
+`IO` on `CREATOR OWNER` is normal. It means the creator-owner ACE applies only to children they create, not the folder itself. Writing a file there does not grant you rights on the folder.
+</Info>
