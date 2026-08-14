@@ -216,6 +216,7 @@
               "active-directory/asrep-roasting",
               "active-directory/pass-attacks",
               "active-directory/acl-abuse",
+              "active-directory/gpo-abuse",
               "active-directory/relay",
               "active-directory/delegation",
               "active-directory/service-accounts",
