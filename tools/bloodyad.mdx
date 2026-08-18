@@ -52,6 +52,8 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype GROUP
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype OU
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype DOMAIN
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype GPO
 
     # Filter by right type
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
@@ -60,8 +62,11 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
     # Show attribute-level detail: which specific attributes are writable per object
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
 
-    # Include deleted/tombstoned objects in the writable results
-    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --include-del
+    # Export writable objects as a BloodHound-compatible zip
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --bh
+
+    # Exclude deleted/tombstoned objects from results (included by default)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get writable --exclude-del
     ```
   </Tab>
   <Tab title="NT Hash">
@@ -74,6 +79,8 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype GROUP
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype OU
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype DOMAIN
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype GPO
 
     # Filter by right type
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
@@ -82,8 +89,11 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
     # Show attribute-level detail: which specific attributes are writable per object
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
 
-    # Include deleted/tombstoned objects in the writable results
-    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --include-del
+    # Export writable objects as a BloodHound-compatible zip
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --bh
+
+    # Exclude deleted/tombstoned objects from results (included by default)
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get writable --exclude-del
     ```
   </Tab>
   <Tab title="Kerberos">
@@ -96,6 +106,8 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype COMPUTER
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype GROUP
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype OU
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype DOMAIN
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype GPO
 
     # Filter by right type
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --right WRITE   # write access
@@ -104,8 +116,11 @@ The `get` and `msldap` subcommands cover the most useful recon paths. Start with
     # Show attribute-level detail: which specific attributes are writable per object
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --otype USER --detail
 
-    # Include deleted/tombstoned objects in the writable results
-    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --include-del
+    # Export writable objects as a BloodHound-compatible zip
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --bh
+
+    # Exclude deleted/tombstoned objects from results (included by default)
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get writable --exclude-del
     ```
   </Tab>
 </Tabs>
@@ -358,6 +373,43 @@ These commands help map group relationships and OU structure without needing Blo
     ```bash wrap
     # Display domain trust tree
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get trusts
+    ```
+  </Tab>
+</Tabs>
+
+### BloodHound Collection
+
+`get bloodhound` runs the built-in BloodHound CE collector and writes a zip file for ingestion. Faster than running SharpHound from a Windows host when you already have LDAP creds.
+
+<Info>
+Still in development. Covers core enumeration but not ADCS ESC paths or complex nodes. Supplement with SharpHound for full coverage.
+</Info>
+
+<Tabs>
+  <Tab title="Password">
+    ```bash wrap
+    # Collect and write a BloodHound-compatible zip to the current directory
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get bloodhound
+
+    # Include transitive trust data (start from a DC in your own domain for best results)
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get bloodhound --transitive
+
+    # Write to a specific output path
+    bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST get bloodhound --path /tmp/bh.zip
+    ```
+  </Tab>
+  <Tab title="NT Hash">
+    ```bash wrap
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get bloodhound
+
+    bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST get bloodhound --transitive
+    ```
+  </Tab>
+  <Tab title="Kerberos">
+    ```bash wrap
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get bloodhound
+
+    bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST get bloodhound --transitive
     ```
   </Tab>
 </Tabs>
@@ -851,7 +903,7 @@ Shadow Credentials abuse the `msDS-KeyCredentialLink` attribute. Adding a Key Cr
 
     # Remove a specific key credential by its DeviceID (shown in add output)
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-      remove shadowCredentials $TARGET --key <DeviceID>
+      remove shadowCredentials $TARGET --key $DEVICE_ID
     ```
   </Tab>
   <Tab title="NT Hash">
@@ -867,7 +919,7 @@ Shadow Credentials abuse the `msDS-KeyCredentialLink` attribute. Adding a Key Cr
 
     # Remove a specific key credential by its DeviceID (shown in add output)
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
-      remove shadowCredentials $TARGET --key <DeviceID>
+      remove shadowCredentials $TARGET --key $DEVICE_ID
     ```
   </Tab>
   <Tab title="Kerberos">
@@ -883,7 +935,7 @@ Shadow Credentials abuse the `msDS-KeyCredentialLink` attribute. Adding a Key Cr
 
     # Remove a specific key credential by its DeviceID (shown in add output)
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
-      remove shadowCredentials $TARGET --key <DeviceID>
+      remove shadowCredentials $TARGET --key $DEVICE_ID
     ```
   </Tab>
 </Tabs>
@@ -1248,9 +1300,9 @@ The LDAP control OID `1.2.840.113556.1.4.2064` unlocks visibility of deleted, to
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
       get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
 
-    # Check which deleted objects your user can write (requires --include-del)
+    # Check which deleted objects your user can write (deleted objects included by default)
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-      get writable --include-del
+      get writable
     ```
   </Tab>
   <Tab title="NT Hash">
@@ -1264,9 +1316,9 @@ The LDAP control OID `1.2.840.113556.1.4.2064` unlocks visibility of deleted, to
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
       get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
 
-    # Check which deleted objects your user can write (requires --include-del)
+    # Check which deleted objects your user can write (deleted objects included by default)
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
-      get writable --include-del
+      get writable
     ```
   </Tab>
   <Tab title="Kerberos">
@@ -1280,9 +1332,9 @@ The LDAP control OID `1.2.840.113556.1.4.2064` unlocks visibility of deleted, to
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
       get object 'DC=$DOMAIN,DC=local' --attr ntsecuritydescriptor --resolve-sd
 
-    # Check which deleted objects your user can write (requires --include-del)
+    # Check which deleted objects your user can write (deleted objects included by default)
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
-      get writable --include-del
+      get writable
     ```
   </Tab>
 </Tabs>
@@ -1296,21 +1348,21 @@ Reanimation requires the `Reanimate Tombstones` extended right on the domain nam
     ```bash wrap
     # Restore a tombstoned object by its SID
     bloodyAD -u $USER -p $PASSWORD -d $DOMAIN --host $DC_HOST \
-      set restore 'S-1-5-21-...-<RID>'
+      set restore $OBJECT_SID
     ```
   </Tab>
   <Tab title="NT Hash">
     ```bash wrap
     # Restore a tombstoned object by its SID
     bloodyAD -u $USER -p "00000000000000000000000000000000:$NTHASH" -d $DOMAIN --host $DC_HOST \
-      set restore 'S-1-5-21-...-<RID>'
+      set restore $OBJECT_SID
     ```
   </Tab>
   <Tab title="Kerberos">
     ```bash wrap
     # Restore a tombstoned object by its SID
     bloodyAD -k ccache=/tmp/ticket.ccache -d $DOMAIN --host $DC_HOST \
-      set restore 'S-1-5-21-...-<RID>'
+      set restore $OBJECT_SID
     ```
   </Tab>
 </Tabs>
@@ -1384,11 +1436,14 @@ These attributes control how long objects remain accessible after deletion.
 |------|---------|
 | `-H` / `--host` | DC hostname or IP |
 | `-i` / `--dc-ip` | DC IP when hostname cannot resolve |
-| `-d` | Domain (e.g., `domain.local`) |
+| `-d` | Domain (e.g., `domain.local`) — use FQDN to avoid `CONSTRAINT_ATT_TYPE` errors when creating computers |
 | `-u` / `-p` | Username and password or `LMHASH:NTHASH` |
 | `-k` | Kerberos auth: `ccache=/path/to/file.ccache`, `kirbi=file.kirbi`, or `keytab=file.keytab` |
-| `-c` | Certificate auth: `/path/to/key:/path/to/cert` |
-| `-s` | Use LDAPS (port 636) |
+| `-f {b64,hex,aes,rc4,default}` | Format for `--password` or `-k <keyfile>` value |
+| `-c` | Certificate auth: `/path/to/key:/path/to/cert`. Leave empty with `-k` to use Windows Certstore for PKINIT |
+| `-s` | Use LDAPS (port 636). Use `-ss` to strip all encryption/signing (debug only) |
+| `--dns` | IP of a DNS server for resolving AD names in inter-domain operations |
 | `--gc` | Connect to Global Catalog (port 3268) for forest-wide queries |
+| `-t` | Connection timeout in seconds |
 | `--json` | Output results as JSON |
-| `-v DEBUG` | Verbose output for troubleshooting LDAP errors |
+| `-v {QUIET,INFO,DEBUG,TRACE}` | Verbosity level |
