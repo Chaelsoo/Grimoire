@@ -85,7 +85,8 @@
             "group": "Web Tools",
             "pages": [
               "web/ffuf",
-              "web/sqlmap"
+              "web/sqlmap",
+              "web/databases"
             ],
             "icon": "screwdriver-wrench"
           }

