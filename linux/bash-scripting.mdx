@@ -1,0 +1,415 @@
+---
+title: "Bash Scripting"
+---
+
+Quick syntax reference for writing enumeration and exploitation scripts during OSCP exams and CTFs.
+
+## Variables and Arithmetic
+
+```bash wrap
+# Assignment (no spaces around =)
+NAME="value"
+NUM=42
+
+# Arithmetic
+COUNT=$((NUM + 1))
+let "COUNT += 1"
+echo $((2 ** 8))    # 256
+
+# Command substitution
+IP=$(hostname -I | awk '{print $1}')
+FILES=$(find / -perm -4000 2>/dev/null | wc -l)
+```
+
+## Conditionals
+
+```bash wrap
+if [ "$USER" == "root" ]; then
+    echo "root"
+elif [ -f /etc/shadow ]; then
+    echo "shadow readable"
+else
+    echo "nothing"
+fi
+```
+
+<AccordionGroup>
+  <Accordion title="File Test Operators">
+    ```bash wrap
+    [ -f file ]    # exists and is a regular file
+    [ -d dir ]     # exists and is a directory
+    [ -r file ]    # readable
+    [ -w file ]    # writable
+    [ -x file ]    # executable
+    [ -s file ]    # non-empty
+    [ -L file ]    # is a symlink
+    [ -e file ]    # exists (any type)
+    ```
+  </Accordion>
+  <Accordion title="String and Numeric Tests">
+    ```bash wrap
+    # Strings
+    [ -z "$var" ]        # empty string
+    [ -n "$var" ]        # non-empty string
+    [ "$a" == "$b" ]
+    [ "$a" != "$b" ]
+
+    # Numbers
+    [ $a -eq $b ]        # equal
+    [ $a -ne $b ]        # not equal
+    [ $a -gt $b ]        # greater than
+    [ $a -lt $b ]        # less than
+    [ $a -ge $b ]        # greater or equal
+    [ $a -le $b ]        # less or equal
+
+    # Combined
+    [ -f file ] && [ -r file ]
+    [[ -f file && -r file ]]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Loops
+
+```bash wrap
+# Range
+for i in {1..254}; do
+    echo $i
+done
+
+# List
+for host in host1 host2 host3; do
+    ping -c 1 -W 1 $host &>/dev/null && echo "$host UP"
+done
+
+# C-style
+for ((i=0; i<10; i++)); do
+    echo $i
+done
+
+# While
+COUNT=5
+while [ $COUNT -gt 0 ]; do
+    echo $COUNT
+    COUNT=$((COUNT - 1))
+done
+
+# Read file line by line
+while IFS= read -r line; do
+    echo "$line"
+done < /etc/passwd
+
+# Until (loop until true)
+until nc -z $TARGET 4444 2>/dev/null; do
+    sleep 1
+done
+echo "[+] shell received"
+```
+
+## Functions
+
+```bash wrap
+# Definition
+check_port() {
+    local host=$1
+    local port=$2
+    nc -z -w 1 $host $port 2>/dev/null && echo "$host:$port OPEN"
+}
+
+# Call
+check_port 10.10.10.1 22
+
+# Return exit code (0=success, non-zero=failure)
+is_root() {
+    [ "$EUID" -eq 0 ]
+}
+
+is_root && echo "root" || echo "not root"
+
+# Return a value via echo
+get_ip() {
+    ip a show tun0 | grep -oP '(?<=inet )\d+\.\d+\.\d+\.\d+'
+}
+LHOST=$(get_ip)
+```
+
+## Arguments and Input
+
+```bash wrap
+# Positional parameters
+$0       # script name
+$1 $2    # first and second argument
+$@       # all arguments (as array)
+$#       # count of arguments
+$?       # exit code of last command
+$$       # current PID
+
+# Validate argument count
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <host> <port>"
+    exit 1
+fi
+
+HOST=$1
+PORT=$2
+
+# Read input
+read -p "Enter target: " TARGET
+read -p "Password: " -s PASS; echo
+```
+
+## String Manipulation
+
+```bash wrap
+STR="Hello World"
+
+# Length
+echo ${#STR}              # 11
+
+# Substring
+echo ${STR:0:5}           # Hello
+echo ${STR:6}             # World
+
+# Replace (first occurrence)
+echo ${STR/World/Bash}
+
+# Replace all
+echo ${STR//l/L}
+
+# Strip prefix
+URL="http://example.com/path"
+echo ${URL#http://}       # example.com/path
+
+# Strip suffix
+FILE="notes.txt"
+echo ${FILE%.txt}         # notes
+
+# Uppercase / lowercase
+echo ${STR^^}             # HELLO WORLD
+echo ${STR,,}             # hello world
+
+# Split on delimiter
+IFS=":" read -ra PARTS <<< "user:pass:host"
+echo ${PARTS[0]}          # user
+echo ${PARTS[1]}          # pass
+```
+
+## Arrays
+
+```bash wrap
+# Declare
+HOSTS=("10.10.10.1" "10.10.10.2" "10.10.10.3")
+
+# Access
+echo ${HOSTS[0]}
+echo ${HOSTS[@]}          # all elements
+echo ${#HOSTS[@]}         # count
+
+# Append
+HOSTS+=("10.10.10.4")
+
+# Iterate
+for h in "${HOSTS[@]}"; do
+    echo $h
+done
+
+# Associative array (bash 4+)
+declare -A PORTS
+PORTS[ssh]=22
+PORTS[http]=80
+echo ${PORTS[ssh]}
+```
+
+## Output and Redirection
+
+```bash wrap
+# Suppress stderr
+command 2>/dev/null
+
+# Redirect stderr to stdout
+command 2>&1
+
+# Capture stderr into variable
+ERR=$(command 2>&1 >/dev/null)
+
+# Tee to file and stdout
+./linpeas.sh | tee output.txt
+
+# Here-string
+grep "root" <<< "$(cat /etc/passwd)"
+
+# Here-doc
+cat << 'EOF'
+line one
+line two
+EOF
+
+# Print to stderr
+echo "error" >&2
+```
+
+## OSCP Scripts
+
+<AccordionGroup>
+  <Accordion title="Ping Sweep">
+    ```bash wrap
+    #!/bin/bash
+    # Usage: ./ping-sweep.sh 10.10.10
+    SUBNET=$1
+    for i in {1..254}; do
+        ping -c 1 -W 1 $SUBNET.$i &>/dev/null && echo "$SUBNET.$i UP" &
+    done
+    wait
+    ```
+  </Accordion>
+  <Accordion title="TCP Port Scanner">
+    ```bash wrap
+    #!/bin/bash
+    # Usage: ./portscan.sh 10.10.10.1 [start_port] [end_port]
+    HOST=$1
+    START=${2:-1}
+    END=${3:-1000}
+    for PORT in $(seq $START $END); do
+        (echo >/dev/tcp/$HOST/$PORT) &>/dev/null && echo "$PORT OPEN" &
+    done
+    wait
+    ```
+
+    Common ports only (faster):
+
+    ```bash wrap
+    PORTS=(21 22 23 25 53 80 110 111 135 139 143 443 445 993 995 1433 1723 3306 3389 5900 8080 8443)
+    for PORT in "${PORTS[@]}"; do
+        nc -z -w 1 $HOST $PORT 2>/dev/null && echo "$PORT OPEN"
+    done
+    ```
+  </Accordion>
+  <Accordion title="HTTP Wordlist Brute Force">
+    ```bash wrap
+    #!/bin/bash
+    # Usage: ./brute.sh http://target/FUZZ /path/to/wordlist.txt
+    URL=$1
+    WORDLIST=$2
+
+    while IFS= read -r word; do
+        TARGET="${URL/FUZZ/$word}"
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET")
+        [ "$STATUS" != "404" ] && echo "$STATUS $TARGET"
+    done < "$WORDLIST"
+    ```
+  </Accordion>
+  <Accordion title="Password Spray">
+    ```bash wrap
+    #!/bin/bash
+    # Usage: ./spray.sh users.txt 'Password123!'
+    USERLIST=$1
+    PASSWORD=$2
+    HOST=$3
+
+    while IFS= read -r user; do
+        RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://$HOST/login \
+            -d "username=$user&password=$PASSWORD")
+        [ "$RESULT" != "401" ] && echo "[+] HIT: $user : $PASSWORD (HTTP $RESULT)"
+    done < "$USERLIST"
+    ```
+  </Accordion>
+  <Accordion title="Wait for Reverse Shell">
+    ```bash wrap
+    #!/bin/bash
+    HOST=${1:-0.0.0.0}
+    PORT=${2:-4444}
+    echo "[*] Waiting for connection on $HOST:$PORT"
+    until nc -z $HOST $PORT 2>/dev/null; do
+        sleep 1
+    done
+    echo "[+] Port $PORT is open"
+    ```
+  </Accordion>
+  <Accordion title="File Change Watcher">
+    ```bash wrap
+    #!/bin/bash
+    # Useful for watching cron job targets
+    FILE=$1
+    PREV=$(md5sum $FILE 2>/dev/null)
+    echo "[*] Watching $FILE"
+    while true; do
+        CUR=$(md5sum $FILE 2>/dev/null)
+        if [ "$PREV" != "$CUR" ]; then
+            echo "[+] $FILE changed at $(date)"
+            PREV=$CUR
+        fi
+        sleep 1
+    done
+    ```
+  </Accordion>
+  <Accordion title="Retry Loop (Race Conditions)">
+    ```bash wrap
+    #!/bin/bash
+    # Run exploit in a tight loop for TOCTOU races
+    while true; do
+        /usr/local/bin/vulnerable-suid 2>/dev/null
+        [ -f /tmp/bash ] && break
+    done
+    echo "[+] done"
+    /tmp/bash -p
+    ```
+
+    Symlink race companion:
+
+    ```bash wrap
+    while true; do
+        ln -sf /tmp/legit /tmp/target 2>/dev/null
+        ln -sf /etc/shadow /tmp/target 2>/dev/null
+    done
+    ```
+  </Accordion>
+  <Accordion title="Parallel Nmap Sweep">
+    ```bash wrap
+    #!/bin/bash
+    SUBNET=$1    # e.g. 10.10.10
+    mkdir -p nmap-results
+    for i in {1..254}; do
+        HOST="$SUBNET.$i"
+        ping -c 1 -W 1 $HOST &>/dev/null && \
+            nmap -sV -T4 $HOST -oN nmap-results/$HOST.txt & 
+    done
+    wait
+    echo "[+] All scans complete"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Useful One-Liners
+
+```bash wrap
+# Check if running as root
+[ "$EUID" -eq 0 ] && echo "root" || echo "not root"
+
+# Get VPN/tun0 IP
+ip a show tun0 | grep -oP '(?<=inet )\d+\.\d+\.\d+\.\d+'
+
+# URL encode a string
+python3 -c "import urllib.parse; print(urllib.parse.quote('$STRING'))"
+
+# Base64 encode / decode
+echo -n "string" | base64
+echo "c3RyaW5n" | base64 -d
+
+# Extract IPs from text
+grep -oP '\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}' file.txt
+
+# Extract URLs from a page
+curl -s http://$TARGET | grep -oP 'https?://[^\s"]+' | sort -u
+
+# Serve current directory over HTTP
+python3 -m http.server 80
+
+# Quick reverse shell listener
+nc -lvnp 4444
+
+# Watch a file grow in real time
+tail -f /var/log/syslog
+
+# Timestamp every line of output
+./script.sh | while IFS= read -r line; do echo "$(date +%H:%M:%S) $line"; done
+```
