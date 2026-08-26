@@ -6,19 +6,19 @@ Fast web fuzzer: use `-fs` or `-fw` to filter noise, `-mc` to whitelist status c
 
 ```bash wrap
 # Directory
-ffuf -u http://$IP/FUZZ -w ~/tools/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt
+ffuf -u http://$IP/FUZZ -w ~/tools/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,301,302,403 -t 50
 
 # Files with extensions
-ffuf -u http://$IP/FUZZ -w wordlist.txt -e .php,.txt,.html,.bak
+ffuf -u http://$IP/FUZZ -w ~/tools/wordlists/seclists/Discovery/Web-Content/raft-medium-files.txt -e .php,.txt,.html,.bak
 
 # vHost
-ffuf -u http://$IP/ -H "Host: FUZZ.$DOMAIN" -w subs.txt -mc 200 -fs <size>
+ffuf -u http://$IP/ -H "Host: FUZZ.$DOMAIN" -w subs.txt -mc 200 -fs $SIZE
 
 # POST
 ffuf -u http://$IP/login -X POST -d "user=FUZZ&pass=test" -w users.txt -mc 200
 
 # Params
-ffuf -u http://$IP/page?FUZZ=test -w params.txt -mc 200 -fs <size>
+ffuf -u http://$IP/page?FUZZ=test -w ~/tools/wordlists/seclists/Discovery/Web-Content/burp-parameter-names.txt -mc 200 -fs $SIZE
 ```
 
 ## Key Flags

