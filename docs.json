@@ -99,7 +99,7 @@
           {
             "group": "Linux",
             "icon": "linux",
-            "pages": ["linux/index", "linux/privesc", "linux/postex", "linux/awk", "linux/bash-scripting"]
+            "pages": ["linux/index", "linux/privesc", "linux/postex", "linux/docker", "linux/awk", "linux/bash-scripting"]
           },
           {
             "group": "Windows",

