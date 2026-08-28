@@ -12,7 +12,7 @@ ffuf -u http://$IP/FUZZ -w ~/tools/wordlists/seclists/Discovery/Web-Content/raft
 ffuf -u http://$IP/FUZZ -w ~/tools/wordlists/seclists/Discovery/Web-Content/raft-medium-files.txt -e .php,.txt,.html,.bak
 
 # vHost
-ffuf -u http://$IP/ -H "Host: FUZZ.$DOMAIN" -w subs.txt -mc 200 -fs $SIZE
+ffuf -u http://$IP/ -H "Host: FUZZ.$DOMAIN" -w ~/tools/wordlists/seclists/Discovery/DNS/subdomains-top1million-5000.txt -mc 200 -fs $SIZE
 
 # POST
 ffuf -u http://$IP/login -X POST -d "user=FUZZ&pass=test" -w users.txt -mc 200
