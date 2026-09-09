@@ -22,12 +22,20 @@ Run these immediately on landing to understand your position before escalating:
 whoami /all                          :: current user, groups, and privileges
 hostname                             :: machine name
 systeminfo                           :: OS version, patch level, architecture
+set                                  :: environment variables (check PATH for writable dirs)
 net user                             :: local accounts
 net localgroup administrators        :: who is local admin
 ipconfig /all                        :: interfaces and DNS (tells you if domain-joined)
 netstat -ano                         :: active connections and listening ports
+netstat -ano | findstr LISTENING     :: just the listening ports (+ owning PID)
 tasklist /svc                        :: running processes with service names
+qwinsta                              :: RDP/console sessions and who is logged on
+query user                           :: logged-on users with session IDs and idle time
 ```
+
+<Tip>
+`qwinsta` (aka `query session`) shows other active sessions. A second `Active` or `Disc` session for a privileged user is a hijack opportunity: `tscon <ID> /dest:<your-session>` from a SYSTEM context steals it without a password.
+</Tip>
 
 ```powershell wrap
 # Check if domain-joined
@@ -36,3 +44,9 @@ tasklist /svc                        :: running processes with service names
 # List all local users and their enabled status
 Get-LocalUser | Select-Object Name, Enabled, LastLogon
 ```
+
+Check `netstat -ano` for services bound to `127.0.0.1` — internal-only listeners are common privesc and pivot targets. See [Listening Services and Ports](/windows/privesc/privesc#listening-services-and-ports).
+
+<Card title="Windows commands" icon="book" href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/windows-commands">
+  Microsoft's full reference for every built-in command: syntax, flags, and examples.
+</Card>

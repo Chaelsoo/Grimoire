@@ -45,3 +45,18 @@ TUN-based tunneling tool: routes traffic through a compromised host at the kerne
     ```
   </Step>
 </Steps>
+
+## Reaching the Agent's Localhost
+
+`240.0.0.1` is the ligolo-ng magic IP: traffic to it is routed to `127.0.0.1` **on the agent host**. Use it to hit services bound only to loopback on the compromised machine (local admin panels, databases, unauthenticated internal APIs).
+
+```bash wrap
+# Route the magic IP through the tunnel (once)
+sudo ip route add 240.0.0.1/32 dev ligolo
+
+# Now target the agent's own localhost
+curl http://240.0.0.1:8000
+nxc mssql 240.0.0.1 -u sa -p $PASSWORD
+```
+
+It sits in the reserved `240.0.0.0/4` (Class E) block, so it never clashes with a real internal subnet. Requires the tunnel to be started (`start`); very old ligolo-ng builds don't support it.
