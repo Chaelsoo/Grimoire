@@ -211,6 +211,7 @@
             "pages": [
               "active-directory/enumeration",
               "active-directory/powerview",
+              "active-directory/ad-module",
               "active-directory/groups"
             ],
             "icon": "user-viewfinder"
@@ -234,7 +235,8 @@
           {
             "group": "ADCS",
             "pages": [
-              "active-directory/adcs"
+              "active-directory/adcs",
+              "tools/certipy"
             ],
             "icon": "envelope-certificate"
           },

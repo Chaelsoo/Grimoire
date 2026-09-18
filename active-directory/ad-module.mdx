@@ -1,0 +1,166 @@
+---
+title: "AD PowerShell Module"
+---
+
+The Active Directory module (`ActiveDirectory`) ships with RSAT and is present by default on domain controllers. It provides `Get-AD*` and `Set-AD*` cmdlets that talk directly to LDAP — no external tool needed on a domain-joined Windows box. Unlike PowerView, these are Microsoft-signed, so they won't trip script-block logging as suspicious.
+
+```powershell wrap
+# Check if the module is available
+Get-Module -ListAvailable ActiveDirectory
+
+# Import (usually auto-imported on DCs; manual elsewhere)
+Import-Module ActiveDirectory
+
+# Install on a non-DC (requires RSAT; needs admin)
+Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+```
+
+## Users
+
+```powershell wrap
+# All users
+Get-ADUser -Filter *
+
+# Search by name
+Get-ADUser -Filter { Name -like "*john*" }
+
+# Full properties — password last set, last logon, UAC flags
+Get-ADUser -Identity $USER -Properties *
+
+# Accounts with pre-auth disabled (AS-REP Roastable)
+Get-ADUser -Filter * -Properties UserAccountControl |
+  Where-Object { $_.UserAccountControl -band 4194304 }
+
+# Accounts with no password expiry
+Get-ADUser -Filter * -Properties PasswordNeverExpires |
+  Where-Object { $_.PasswordNeverExpires }
+
+# Locked-out accounts
+Search-ADAccount -LockedOut | Select-Object Name, SamAccountName, LockedOut, LastLogonDate
+```
+
+## Groups
+
+```powershell wrap
+# All domain groups
+Get-ADGroup -Filter *
+
+# Full group details
+Get-ADGroup -Identity "Domain Admins" -Properties *
+
+# Members of a group (recursive for nested memberships)
+Get-ADGroupMember -Identity "Domain Admins" -Recursive
+
+# Groups a user belongs to
+Get-ADUser -Identity $USER -Properties MemberOf | Select-Object -ExpandProperty MemberOf
+
+# Add a user to a group
+Add-ADGroupMember -Identity "Domain Admins" -Members $USER
+
+# Remove a user from a group
+Remove-ADGroupMember -Identity "Domain Admins" -Members $USER -Confirm:$false
+```
+
+## Computers
+
+```powershell wrap
+# All domain computers
+Get-ADComputer -Filter *
+
+# Computers with OS info
+Get-ADComputer -Filter * -Properties OperatingSystem, OperatingSystemVersion, LastLogonDate |
+  Select-Object Name, OperatingSystem, LastLogonDate
+
+# Computers with unconstrained delegation
+Get-ADComputer -Filter { TrustedForDelegation -eq $true } -Properties TrustedForDelegation
+
+# Computers where a specific user can log on (from Allowed To Act list)
+Get-ADComputer -Identity $HOST -Properties msDS-AllowedToActOnBehalfOfOtherIdentity
+```
+
+## Service Accounts (MSA / gMSA)
+
+```powershell wrap
+# List all managed service accounts
+Get-ADServiceAccount -Filter *
+
+# Full properties — who can retrieve the password
+Get-ADServiceAccount -Identity '$GMSA_NAME$' -Properties *
+
+# Filter to gMSAs only
+Get-ADServiceAccount -Filter { ObjectClass -eq 'msDS-GroupManagedServiceAccount' } -Properties PrincipalsAllowedToRetrieveManagedPassword
+
+# Set who can retrieve a gMSA's managed password
+Set-ADServiceAccount -Identity '$GMSA_NAME$' -PrincipalsAllowedToRetrieveManagedPassword $USER
+
+# Append to the existing list without overwriting it
+$acl = (Get-ADServiceAccount '$GMSA_NAME$' -Properties PrincipalsAllowedToRetrieveManagedPassword).PrincipalsAllowedToRetrieveManagedPassword
+$acl += Get-ADUser $USER
+Set-ADServiceAccount -Identity '$GMSA_NAME$' -PrincipalsAllowedToRetrieveManagedPassword $acl
+```
+
+<Tip>
+`Set-ADServiceAccount -PrincipalsAllowedToRetrieveManagedPassword` **replaces** the entire list. Pass a single username and you wipe everyone else. Read the current value first and append to it as shown above if you need to preserve existing principals.
+</Tip>
+
+## Objects and Attributes
+
+```powershell wrap
+# Generic AD object lookup (users, computers, groups, OUs, anything)
+Get-ADObject -Filter { Name -eq "$TARGET" } -Properties *
+
+# Search the entire directory with a custom LDAP filter
+Get-ADObject -LDAPFilter "(servicePrincipalName=*)"
+Get-ADObject -LDAPFilter "(&(objectClass=user)(msDS-KeyCredentialLink=*))"
+
+# Read a specific attribute
+Get-ADUser -Identity $USER -Properties msDS-KeyCredentialLink |
+  Select-Object msDS-KeyCredentialLink
+
+# Write a generic attribute (GenericWrite required)
+Set-ADObject -Identity $TARGET -Replace @{ servicePrincipalName = "fake/spn.domain.local" }
+
+# Clear an attribute
+Set-ADObject -Identity $TARGET -Clear servicePrincipalName
+```
+
+## Domain and Forest
+
+```powershell wrap
+# Current domain info
+Get-ADDomain
+
+# Forest info (trusts, schema master, etc.)
+Get-ADForest
+
+# Domain controllers
+Get-ADDomainController -Filter *
+
+# Domain trusts
+Get-ADTrust -Filter *
+
+# Password policy
+Get-ADDefaultDomainPasswordPolicy
+
+# Fine-grained password policies
+Get-ADFineGrainedPasswordPolicy -Filter *
+Get-ADFineGrainedPasswordPolicySubject -Identity $POLICY_NAME
+```
+
+## Useful Filters
+
+```powershell wrap
+# Users who have not logged in for 90 days
+$cutoff = (Get-Date).AddDays(-90)
+Get-ADUser -Filter { LastLogonDate -lt $cutoff } -Properties LastLogonDate
+
+# Disabled accounts
+Get-ADUser -Filter { Enabled -eq $false }
+
+# Accounts expiring in the next 30 days
+$soon = (Get-Date).AddDays(30)
+Search-ADAccount -AccountExpiring -DateTime $soon
+
+# Objects in a specific OU
+Get-ADUser -Filter * -SearchBase "OU=Service Accounts,DC=domain,DC=local"
+```
