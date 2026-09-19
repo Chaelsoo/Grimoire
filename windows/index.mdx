@@ -28,6 +28,7 @@ net localgroup administrators        :: who is local admin
 ipconfig /all                        :: interfaces and DNS (tells you if domain-joined)
 netstat -ano                         :: active connections and listening ports
 netstat -ano | findstr LISTENING     :: just the listening ports (+ owning PID)
+netsh advfirewall show allprofiles   :: firewall state per profile (Domain/Private/Public)
 tasklist /svc                        :: running processes with service names
 qwinsta                              :: RDP/console sessions and who is logged on
 query user                           :: logged-on users with session IDs and idle time

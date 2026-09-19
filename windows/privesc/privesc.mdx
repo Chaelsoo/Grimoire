@@ -85,6 +85,44 @@ Forward the loopback service to your attacker box:
 - **SSH** — `ssh -L 9090:127.0.0.1:9090 user@target`
 - **netsh** (admin only) — `netsh interface portproxy add v4tov4 listenport=9090 connectaddress=127.0.0.1 connectport=9090`
 
+## Firewall Enumeration
+
+Firewall rules tell you what outbound ports are allowed (for callbacks and tunnels) and what inbound connections are blocked (for pivoting). All of these work as a low-privilege user.
+
+```powershell wrap
+# Check if Windows Firewall is enabled per profile (Domain / Private / Public)
+Get-NetFirewallProfile | Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction
+
+# All active outbound block rules — tells you which ports your callbacks can't use
+Get-NetFirewallRule -Direction Outbound -Enabled True -Action Block |
+  Select-Object DisplayName, Direction, Action, Profile
+
+# All active inbound rules
+Get-NetFirewallRule -Direction Inbound -Enabled True |
+  Select-Object DisplayName, Direction, Action, Profile
+
+# Outbound allow rules — confirms which ports/protocols the machine can reach out on
+Get-NetFirewallRule -Direction Outbound -Enabled True -Action Allow |
+  Select-Object DisplayName, Profile
+
+# Show port and address details for a rule
+Get-NetFirewallRule -DisplayName "Block Outbound 4444" |
+  Get-NetFirewallPortFilter | Select-Object Protocol, LocalPort, RemotePort
+Get-NetFirewallRule -DisplayName "Block Outbound 4444" |
+  Get-NetFirewallAddressFilter | Select-Object LocalAddress, RemoteAddress
+```
+
+```cmd wrap
+:: netsh equivalent — works on older systems and from cmd.exe
+netsh advfirewall show allprofiles
+netsh advfirewall firewall show rule name=all dir=out action=block
+netsh advfirewall firewall show rule name=all dir=in
+```
+
+<Tip>
+Blocked outbound ports mean your reverse shell won't reach home on those ports. Check for allows on 443, 80, 8443, 53 — pick a callback port that passes. If **all outbound is blocked by default**, look for DCOM/WMI or SMB-based C2 alternatives.
+</Tip>
+
 ## AlwaysInstallElevated
 
 If both registry keys are set to 1, any user can install MSI packages as SYSTEM: generate a malicious installer and run it quietly.
